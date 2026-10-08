@@ -1,0 +1,155 @@
+# RZ/V2L SMARC EVK device map (M0)
+
+**Date:** 2026-10-08. **Status:** M0 deliverable (spec §17, §20). Derived from the reviewed research notes; no new research.
+
+**Guests:** G0 = linux `v6.12.59` (`d5dc97879`); G1 = rz_linux-cip branch `rz-6.12-cip14` @ `212f6e88b7` (`docs/sources.md`). **DTB-U** = upstream `r9a07g054l2-smarc.dtb` built from G0 (`arch/arm64/boot/dts/renesas/r9a07g054l2-smarc.dts`). G1's DT differs only in the QSPI partition table (`research/cpu-gic.md` header), so every row holds for DTB-V too. Firmware pins: TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b` (`research/boot-chain-firmware.md`).
+
+**How to read the tables**
+- Addresses are physical (A55 view). Size is the window to map. IRQs are given as DT `GIC_SPI n` (GIC INTID = n + 32) or PPI (INTID = PPI + 16). Triggers come from DTB-U.
+- Clock / reset: `CLK_ON off bN` / `RST off bN` are CPG offsets from `0x11010000`. CLK_MON = CLK_ON + 0x180 (same polarity); RSTMON = RST + 0x180 (**inverted**; `research/cpg-reset.md` §2.2-2.3). Reset values are HW manual Rev 1.50 Table 7.5, p.246-250.
+- **Milestone** is the first milestone (spec §17) that needs the block at the stated depth. "map" means a mapped window is enough because a stray access would otherwise abort a built-in probe (`research/boot-dependency-graph.md` §4).
+- **Model plan:** REUSE = an existing QEMU model; NEW = a new device model; UNIMP = `create_unimplemented_device` (RAZ/WI, logged under `-d unimp`, listed STUB); RAM = memory region; UNMAPPED = no region (abort). UNIMP is allowed only where a read of 0 is honest (spec §7).
+- **Fidelity** = depth / honesty target (spec §7). Labels in cells: (F) fact, (I) code-derived inference, (O) EVK observation, (A) assumption.
+- **Evidence:** a note name means `docs/research/<name>`. "Manual" = HW manual Rev 1.50 (`r01uh0936ej0150`), printed page numbers. Table 5.1 (detailed address space) is on p.143 (1/3), p.144 (2/3) and p.145 (3/3). `dtsi:N` = linux v6.12.59 `arch/arm64/boot/dts/renesas/r9a07g054.dtsi:N`.
+
+## 1. Memory and device map
+
+### 1.1 Core, memory and the M1-M3b path
+
+| Block | Base | Size | IRQs | Clock / reset | Guest consumers (G0; firmware) | Milestone | Model plan | Fidelity | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| DDR | `0x40000000` | 2 GiB (EVK); manual window 4 GiB | — | — | Linux `/memory` `0x48000000`+`0x78000000`; BL31 `0x44000000`, OP-TEE `0x44100000-0x47DFFFFF`, SHM `0x47E00000` (1 MiB); U-Boot `0x50000000` | M1 | RAM (2 GiB at `0x40000000`) | FULL / faithful. `0x40000000-0x4000003F` is "prohibited" (DDR training, Table 5.1 note 2) and not enforced | cpu-gic §5.1; boot-chain-firmware §1; Manual Table 5.1 (1/3) p.143, note 2 p.145 |
+| CPU cluster (sysregs) | — | — | PMU PPI 7 (INTID 23) level-low | `CLK_I` = PLL1/DIVPL1 (1200 MHz at reset); Stage B: `RST_CA55`, `COREn_PCHCTL/PCHMON` | Linux SMP, cpufreq-dt (`CLK_I` 150-1200 MHz); TF-A A55 `cpu_ops` | M1 | REUSE `cortex-a55` ×2 + board-local IMPDEF `CPUPWRCTLR_EL1` (req.), `CLUSTERIDR/CFR_EL1` (precaution) | FUNCTIONAL / faithful except §4 gaps | cpu-gic §1, §5, §7; EXP-001; boot-chain-firmware §2 C1-C5; Manual §2.1 Table 2.1 p.83 |
+| Generic timer | — (CP15) | — | sec-phys PPI 13 (29), phys PPI 14 (30), virt PPI 11 (27), hyp-phys PPI 10 (26), hyp-virt PPI 12 (28); all level-low | counter from SYC (24 MHz) | Linux arch timer (virt, INTID 27), `sched_clock` until OSTM takes over | M1 | REUSE CPU generic timer, `cntfrq=24000000`; BSA wiring as `fsl-imx8mp.c` | FULL / faithful | cpu-gic §3, §6 D4; dtsi:1344-1353; Manual §8.2 Table 8.2 p.534 |
+| GIC-600 distributor | `0x11900000` | `0x20000` (QEMU backs `0x10000`; cover the upper 64 KiB with UNIMP) | maintenance PPI 9 (INTID 25) level-low | `CLK_ON 0x514 b0` (critical, reset on); `RST 0x814 b0-1` defined, no `resets` in DT | Linux `irq-gic-v3`; TF-A GIC-600 driver (Stage B) | M1 | REUSE `arm_gicv3` rev 3, `num-irq=512` (480 SPIs), `has-security-extensions=true`, `has-lpi=false`, realized after CPUs | FUNCTIONAL / faithful; IIDR/PIDR differ (gap) | cpu-gic §2, §2.1, §6 D1-D3; Manual §8.1 p.530, Table 5.1 (1/3) p.143 |
+| GIC-600 redistributors | `0x11940000` | `0x40000` (frames `0x11940000` CPU0, `0x11960000` CPU1, stride `0x20000`) | — | as above | Linux redistributor walk (GICR_TYPER aff = MPIDR), WAKER | M1 | REUSE (`redist-region-count=[2]`) | FUNCTIONAL / faithful | cpu-gic §2.1 (O: frames, 480 SPIs) |
+| GIC area remainder | `0x11960000+0x20000` to `0x119FFFFF` | rest of 1 MiB | — | — | none known | M1 | UNIMP placeholder (RAZ/WI, logged) | UNSUPPORTED placeholder. Honesty **not established**: logging records accesses but does not make a guest-visible failure honest. No known consumer (cpu-gic §6 D1), so the risk is low; reclassify at the M3b per-window review (REQ-MAP-001) | cpu-gic §6 D1 |
+| SYSC | `0x11020000` | 64 KiB | SPI 42-45 (INTID 74-77) level-high; never requested | none (no CPG gate) | Linux `renesas-soc` reads `0xA04` once at `early_initcall` although the node is disabled; BL2 DEVID check + `LSI_MODE`; BL31 `RVAL1/RVAH1` (CPU_ON), `LP_CTL5` ack (CPU_OFF) | M1 (ID regs); M7 (RVAL, LP_CTL5) | **M1:** three read-only registers only: `LSI_MODE` (board property), `DEVID` `0x18447447`, `PRR` `0x0`; writes ignored. Every other offset UNSUPPORTED in M1 (`LOG_UNIMP`, read-as-zero) as a labelled experiment (M0-report §M1). **Staged for M7 (Stage B):** the Table 6.1 register file incl. `RVAL1/RVAH1` and the `LP_CTL5` ack (sysc §7, staged proposal) | M1: FULL / faithful for the three ID registers; the rest UNSUPPORTED (experiment, no M1 consumer). M7: FUNCTIONAL for the Stage B registers, side effects as listed in sysc §7 | sysc §1-§7; Manual §6.2 Table 6.1 p.167-168, §6.3.43 p.208 |
+| SYC (system counter) | `0x11000000` | 64 KiB (Table 5.1; §15.2 uses 8 KiB) | — | `CLK_ON 0x528 b0`, `RST 0x828 b0` (both 0 at reset) | Linux: none. BL31 copies `CNTFID0` (inferred `+0x020`) into `CNTFRQ_EL0` | M7 | NEW small device: CNTCR, CNTFID0=24000000, CNTCV from virtual clock, read frame at `+0x1000` | STUB → FUNCTIONAL at Stage B / faithful | sysc §5, §7; Manual §15.2 Table 15.1 p.727; Table 5.1 (2/3) p.144 |
+| CPG | `0x11010000` | 64 KiB | none | self | Linux `rzg2l-cpg` (one-shot `platform_driver_probe`, `subsys_initcall`): PLL/divider reads, CLK_ON+CLK_MON 10 µs poll, RST+RSTMON 200 µs poll, always-on genpd, no MSTOP writes; U-Boot SDHI probe (CLK_MON); BL31 CPU_ON (`RST_CA55`, PCH handshake) | M3b (M7 for PCH) | NEW register file with per-register WEN masks, computed mirrors, PLL readback, MSTOP storage-only | FUNCTIONAL / faithful (no gating effects; gap) | cpg-reset §1-§7; boot-dependency-graph §3.2, §6; Manual §7.2.3 Table 7.5 p.246-250 |
+| PFC / GPIO | `0x11030000` | 64 KiB | none of its own; GPIO IRQs via IRQC TINT | `CLK_ON 0x598 b0` (GPIO_HCLK); `RST 0x898 b0-2` (Linux never deasserts) | Linux `pinctrl-rzg2l` (needs IRQC domain; SCIF0 defers forever without it), P38 mux, GPIO hogs, IEN04 hog; TF-A `pfc_setup` (P38, P47, P19, QSPI/SD) | M3b | NEW `TYPE_RZG2L_PFC` byte register file, PWPR gate on PFC, 32-bit PWPR and 64-bit IOLH/SR/PUPD/IEN stores | FUNCTIONAL / faithful for config; pin I/O STUB (PIN default 0, A) | pinctrl §1-§8; Manual §41.2 p.3368-3385 |
+| IRQC (IA55) | `0x110A0000` | 64 KiB | SPI 0 NMI, 1-8 IRQ0-7, 444-475 TINT0-31 (level-high), SPI 25 and 34-39 (edge) | `CLK_ON 0x518 b0-1` (reset 0x3); `RST 0x818 b0` (reset 0x1) | Linux `irq-renesas-rzg2l` (no MMIO at probe; IITSR/TSSR RMW at IRQ allocation) | M3b | NEW: register file with manual reset values; routing later | STUB / honest at M3b (no IRQ0-7/TINT delivery, listed); FUNCTIONAL when a guest needs external/GPIO IRQs (Ethernet PHY IRQs, M6) | pinctrl §6; boot-dependency-graph §4, §6; dtsi:915-988; Table 5.1 (2/3) p.144 |
+| SCIF0 | `0x1004B800` | `0x400` (regs `0x00-0x17`) | SPI 380 ERI, 381 BRI, 382 RXI, 383 TXI, 384 TEI/DRI; level-high | `CLK_ON 0x584 b0`; `RST 0x884 b0`; P0 = 100 MHz | Linux earlycon (bare `earlycon` via `stdout-path`) and `sh-sci` (`PORT_SCIF`, RZ_SCIFA map); BL2, BL31, OP-TEE, U-Boot console | M2 (M3a earlycon, M3b driver, M3 IRQs) | NEW `TYPE_RENESAS_RZ_SCIFA` (do not extend `sh_serial.c`) | FUNCTIONAL / faithful (async mode); deferred TEND, read-armed flag clears, BRR/MDDR banking | scif §1-§10; Manual §22.2 Table 22.3-22.4 p.1271, Table 8.2 (11/13) p.544 |
+| SCIF2 | `0x1004C000` | `0x400` | SPI 390-394, same pattern | `CLK_ON 0x584 b2`; `RST 0x884 b2` | DTB-U enables it (alias serial1, `uart-has-rtscts`, P48 pins) | M3b | NEW (same model) | FUNCTIONAL / faithful; modem lines stored only | scif §1, §9; pinctrl §4 |
+| SCIF1, SCIF3, SCIF4 | `0x1004BC00`, `0x1004C400`, `0x1004C800` | `0x400` each | SPI 385-389, 395-399, 400-404 | `CLK_ON 0x584 b1/b3/b4`; `RST 0x884 b1/b3/b4` | disabled in DTB-U | M3b (cheap) | NEW (same model) | FUNCTIONAL / faithful | scif §1, §9 |
+| OSTM0-2 (GTM) | `0x12801000`, `0x12801400`, `0x12801800` | `0x400` each | SPI 46, 47, 48 edge-rising | `CLK_ON 0x534 b0-2` (reset 0x1); `RST 0x834 b0-2` (reset 0x1) | Linux `renesas-ostm` (ostm1/2 enabled; one-shot probe; first one becomes `sched_clock` at 100 MHz, O) | M3b | NEW: counter at P0, TE/TS/TT (TE clears on TT) | FUNCTIONAL / faithful (RAZ would be silent-wrong) | cpu-gic §3; boot-dependency-graph §4; Manual §20.1.1 Table 20.2 p.1224, §20.2.2.3-5 p.1229-1230 |
+| WDT0 (CA55 core0) | `0x12800800` | `0x400` | SPI 49 wdt, 50 perrout; level-high | `CLK_ON 0x548 b0-1` (reset 0xC3: on); `RST 0x848 b0` (reset 0x9: released) | Linux `rzg2l_wdt` (no register read at probe); U-Boot autostart (60 s); BL31 `SYSTEM_RESET` writes `PEEN_0` @ `0x12800814` | M3b map; M4 FUNCTIONAL | UNIMP at M3b (listed); NEW at M4 | STUB at M3b: never started in G0 direct mode. M4: FUNCTIONAL (overflow, parity-force reset) | boot-chain-firmware §2; boot-dependency-graph §4; Manual §21.2 Table 21.3 p.1245, Table 21.4 p.1246 |
+| WDT1 (CA55 core1) | `0x12800C00` | `0x400` | SPI 51 wdt, 52 perrout | `CLK_ON 0x548 b2-3`; `RST 0x848 b1` | Linux `rzg2l_wdt` (enabled) | M3b map; M4 | as WDT0 | as WDT0 | as WDT0; dtsi:1264-1277 |
+| WDT2 (CM33) | `0x12800400` | `0x400` | not in DTB-U | `CLK_ON 0x548` (Manual §7.2.4.44 p.308); no Linux clock | none (M33 side) | later | UNIMP | STUB / honest | Manual Table 21.3 p.1245 |
+
+### 1.2 Other windows enabled in DTB-U (must be mapped by M3b)
+
+| Block | Base | Size | IRQs | Clock / reset | Guest consumers (G0; firmware) | Milestone | Model plan | Fidelity | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| DMAC (non-secure) | `0x11820000` (AXI) + `0x11830000` (APB) | 64 KiB + 64 KiB | SPI 141 error, 125-140 ch0-15; edge-rising | `CLK_ON 0x52C b0-1` (aclk critical); `RST 0x82C b0-1` | Linux `rz-dmac` (built in; reset deassert + register writes at probe); SCIF/SDHI DT nodes have no `dmas` | M3b map | UNIMP-like write-retaining STUB (I), NEW later | STUB / honest (no transfers; no client uses it) | boot-dependency-graph §4; scif §8; dtsi:990-1026 |
+| RIIC0, RIIC1, RIIC3 (RIIC2 disabled) | `0x10058000` + n×`0x400` | `0x400` each | 8 per channel: ch0 SPI 348-355, ch1 356-363, ch3 372-379 | `CLK_ON 0x580 bN`; `RST 0x880 bN` | Linux `i2c-riic` (built in); clients PMIC `raa215300`, versa3, codec on i2c3/i2c1; no U-Boot driver | M3b map; later | UNIMP | STUB / honest-fault (probe or transfer fails, about 1 s per client, I) | boot-dependency-graph §4; spec §11; dtsi:539-626 |
+| TSU | `0x10059400` | `0x400` | none | `CLK_ON 0x5AC b0`; `RST 0x8AC b0` | Linux `rzg2l_thermal` (bounded TSU_SS poll) | M3b map | UNIMP | STUB / honest-fault (`Failed to start TSU`, no zone; never return garbage, 125 °C trip) | boot-dependency-graph §4; dtsi:669-678 |
+| SDHI0, SDHI1 | `0x11C00000`, `0x11C10000` | 64 KiB each | SPI 104-105, 106-107; level-high | `CLK_ON 0x554 b0-3 / b4-7`; `RST 0x854 b0 / b1`; SD0/SD1 mux `0x218` | Linux `renesas_sdhi` (built in, deferred via pinctrl); U-Boot mmc0 PIO (doubled offsets, 64-bit data port `0xC0`) | M3b map; M5 | UNIMP at M3b; NEW at M5 (reuse `hw/sd` card/eMMC) | M3b STUB / honest-fault (−110); M5 FUNCTIONAL | boot-chain-firmware §2; boot-dependency-graph §4; spec §11; dtsi:1059-1090 |
+| ravb ETH0, ETH1 | `0x11C20000`, `0x11C30000` | 64 KiB each | SPI 84-86, 87-89 (mux, fil, arp_ns); level-high | `CLK_ON 0x57C b0 / b1` (coupled axi+chi); `RST 0x87C b0 / b1` | Linux `ravb` (built in; `ravb_wait` bounded); `ip=on` waits up to 12 s after (b); PFC `0x3018` OEN on TXC | M3b map; M6 | UNIMP at M3b; NEW + MDIO/PHY at M6 | M3b STUB / honest-fault (probe fails); M6 FUNCTIONAL | boot-dependency-graph §4, §5; pinctrl §2; dtsi:1091-1130 |
+| USB: PHY ctrl, USB0 host (OHCI `+0`, EHCI `+0x100`, PHY `+0x200`), USB0 func (HS), USB1 host | `0x11C40000`, `0x11C50000`, `0x11C60000`, `0x11C70000` | 64 KiB each | OHCI0 91, EHCI0 92, PHY0 94, HS 100-103, OHCI1 96, EHCI1 97, PHY1 99 | `CLK_ON 0x578 b0-3`; `RST 0x878 b0-3` | Linux usbphy-ctrl, EHCI/OHCI (bounded handshakes), USBHS (`=m` in G0, built in G1) | M3b map | UNIMP | UNSUPPORTED / honest-fault (spec §18) | boot-dependency-graph §4; dtsi:1131-1248; Table 5.1 (1/3) p.143 |
+| RPC / SPIBSC (`sbc`) | `0x10060000` regs, `0x10070000` write buffer, `0x20000000` flash window | 64 KiB, 64 KiB, 256 MiB | SPI 41 level-high | `CLK_ON 0x550 b0-1`; `RST 0x850 b0` | Linux `rpc-if` (`=m` G0, built in G1); U-Boot `board_init` rewrites SPI-NOR NVCR every boot (polls TEND, 1 s timeout); BL2 SPI boot, FIP at `0x20020000` | M4 map; M7 (U-Boot); M8 (BL2) | UNIMP until M7; NEW at M7 | M7 FUNCTIONAL / faithful (TEND, read window) | boot-chain-firmware §1-§3; spec §11; dtsi:679-695; Table 5.1 (1/3) p.143, (2/3) p.144 |
+| G0 `=m` blocks enabled in DTB-U: SSI0/1, RSPI1, CAN-FD, ADC | `0x10049C00`/`0x1004A000`, `0x1004B000`, `0x10050000`, `0x10059000` | `0x400` each; CAN-FD 32 KiB | SSI 326+/330+, RSPI1 418+, CAN-FD 426+, ADC 347 | `CLK_ON 0x570`, `0x590`, `0x594`, `0x5A8` | never load in G0 (no modules in initramfs); built in under G1 | M4 map | UNIMP | UNSUPPORTED / honest-fault (G1 probe failures listed) | boot-dependency-graph §4 (G1 delta); spec §18; Table 5.1 (2/3)-(3/3) p.144-145 |
+| Display: DSI, VSPD, FCPVD, DU | `0x10850000` (PHY+ctrl, `0x20000`), `0x10870000`, `0x10880000`, `0x10890000` | 64 KiB each | DSI 142+, VSPD 149, DU 152 | `CLK_ON 0x568`, `0x56C` | `=m` in G0; built in under G1 | M4 map | UNIMP | UNSUPPORTED / honest-fault | as above; dtsi:775-875 |
+| GPU Mali-G31 | `0x11840000` | 64 KiB | SPI 153-156 (gpu, job, mmu, event) | `CLK_ON 0x558 b0-2`; `RST 0x858 b0-2` | `panfrost` `=m` in G0; no G1 driver | M4 map | UNIMP | UNSUPPORTED / honest | spec §18; dtsi:1028-1048; Table 5.1 (1/3) p.143 |
+
+### 1.3 Firmware-only and later blocks (not in DTB-U)
+
+| Block | Base | Size | IRQs | Clock / reset | Guest consumers (G0; firmware) | Milestone | Model plan | Fidelity | Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| OTP | `0x11860000` (chip ID @ `0x11861140`) | 64 KiB | — | — | OP-TEE HUK derivation; BL31 SiP chip ID (secure callers only) | M7 | NEW STUB with a documented chip-ID value | STUB / honest (value documented, not silicon) | boot-chain-firmware §1-§3; spec §11; Table 5.1 (1/3) p.143 |
+| TSIP | `0x11850000` ("Reserved" in Table 5.1) | 64 KiB | unknown | unknown | production OP-TEE (`CFG_RZ_SCE=y`) only; acceptance OP-TEE built `CFG_RZ_SCE=n` never touches it | Stage N regression | UNIMP (read-as-zero) | UNSUPPORTED / honest-fault: production OP-TEE prints `Failed to initialize SCE (0x00010002)` and panics | boot-chain-firmware §3; spec §12; Table 5.1 (1/3) p.143 |
+| DDR controller + PHY | `0x11410000` ctrl, `0x11400000` PHY | 64 KiB each | — | — | BL2 DDR init (507 params, 5 training passes, about 11 polls) | M8 | NEW register-file stub (about `0x800` + `0x300` bytes, about 10 forced status reads) | STUB / honest (training not modelled; listed) | boot-chain-firmware §1, §3; spec §11; Table 5.1 (2/3) p.144 |
+| TZC-400 ×4 (SRAM ACPU, SRAM MCPU, SPI, DDR) | `0x11040000`, `0x11050000`, `0x11060000`, `0x11070000` | 64 KiB each | — | — | BL2 programs region 0 only (`TRUSTED_BOARD_BOOT=0`) | M8 | NEW register file, no enforcement | STUB / honest (not enforced; board leaves DDR open) | boot-chain-firmware §1, §3; spec §12; Table 5.1 (2/3) p.144 |
+| SRAM MCPU / ACPU (memory) | `0x00010000` / `0x00020000` | 64 KiB each | — | — | BL2 at `0x00012000` (EL3); BL2→BL31 params at `0x0002F000` | M7 (params) / M8 | RAM | FULL / faithful | boot-chain-firmware §1; Table 5.1 (3/3) p.145 |
+| DMAC secure, SRAM regs, IM33, MHU, CST | `0x11800000`/`0x11810000`, `0x11080000`/`0x11090000`, `0x110B0000`, `0x10400000`, `0x10C00000` | 64 KiB … 4 MiB | — | — | none on the studied paths | later | UNIMP | UNSUPPORTED / honest | spec §18; Table 5.1 (2/3) p.144 |
+| DRP-AI (DRP, AI-MAC), CRU/CSI-2/ISU, GPT/POEG/MTU3a, SCI0/1, IrDA, RSPI0/2, SSI2/3 | `0x13000000` (16 MiB), `0x12C00000` (4 MiB), `0x10830000-0x1084FFFF`, `0x10000000-0x100497FF`, `0x1004CC00-0x1004D7FF`, … | per Table 5.1 | per Table 8.2 | G1 only: DRP `CLK_ON 0x5E8 b0-4`, `RST 0x8E8`; PL3C_SDIV `0x214` (reset `0x401`) | disabled in DTB-U; G1 registers `stpai_*` clocks but no node uses them | later | UNIMP | UNSUPPORTED / honest | cpg-reset §2.6, §3; spec §18; Table 5.1 p.143-145 |
+| Reserved holes | per Table 5.1 | — | — | — | none | — | UNMAPPED (abort) pending the oracle answer on silicon behaviour (spec §7, §14) | UNSUPPORTED / honest | Table 5.1 notes p.145 |
+
+## 2. CPU and board properties
+
+| Property | Value | Stage / note | Evidence |
+|---|---|---|---|
+| CPUs | 2 × `cortex-a55` r2p0, one cluster, cpu1 `start-powered-off` | all | cpu-gic §1, §5; Manual §2.1 p.83 |
+| MPIDR (`mp-affinity`) | `0x0`, `0x100` (set before GIC realize) | all | cpu-gic §1 (O: CPU1 `0x100`) |
+| MIDR | `0x412FD050` (QEMU default matches) | all | cpu-gic §1 (O, both CPUs) |
+| `cntfrq` / CNTFRQ_EL0 | 24 000 000 Hz (QEMU default 62.5 MHz is silent-wrong) | all; Stage B also needs SYC `CNTFID0` = 24 MHz | cpu-gic §3, §5 (O: `24.00MHz (virt)`); boot-chain-firmware C2 |
+| `has_el3` / `has_el2` | Stage A (direct, M1-M6): `true` / `false` (D2). Stage B/C: `true` / to decide in M7 (BL31 drops BL33 to NS-EL1 either way) | per stage | cpu-gic §6 D2; boot-chain-firmware §2 C3 |
+| Kernel entry | NS-EL1 (O: `CPU: All CPU(s) started at EL1`) | direct mode | boot-chain-firmware §1; cpu-gic §5 |
+| PSCI | conduit SMC; QEMU built-in v1.1 (Stage A), real BL31 v1.1 (Stage B); unknown SMCs → `NOT_SUPPORTED` | A / B | cpu-gic §4; EXP-001; spec §12 |
+| GIC | `arm_gicv3` rev 3, `num-cpu=2`, `num-irq=512`, security extensions on (DS=0, O), no LPI/ITS | all | cpu-gic §2, §6 |
+| SYSC `SYS_LSI_DEVID` @ `0x11020A04` | `0x18447447` (rev 1; `[27:0]` = `0x8447447`; Table 6.1's `x841_C447` is the G2L value) | both start states (latched) | EVK boot log (O, ~150 boots); sysc §4 |
+| SYSC `SYS_LSI_PRR` @ `0x11020A08` | `0x00000000` (dual core) | latched | EVK boot log (O) |
+| SYSC `SYS_LSI_MODE` @ `0x11020A00` | machine property: b16 `STAT_SEC_EN`=1, b9 `DEBUGEN`, b2:0 `MD_BOOT` (0 eSD, 1 eMMC 1.8 V, 3 QSPI 1.8 V); observed `0x10000/0x10001/0x10200/0x10201/0x10203` | latched | EVK boot log (O); sysc §3; Manual §6.3.42 p.207 |
+| RAM layout (direct mode) | 2 GiB RAM at `0x40000000`; `loader_start=0x48000000`, `ram_size=0x78000000`; stub at `0x48000000`; Image at `0x48200000`; initrd at `0x50000000`; DTB after initrd (2 MiB aligned); nothing in `0x40000000-0x47FFFFFF` | Stage A | cpu-gic §5.1 |
+| `/chosen` | DTB `bootargs` kept unless `-append`; `stdout-path = "serial0:115200n8"` | Stage A | boot-dependency-graph §5 |
+| Clock rates Linux must compute | I 1200 MHz, P0 100 MHz (O via OSTM), P1 200 MHz, P2 100 MHz, OSC 24 MHz, SD0 533.33 MHz | all | cpg-reset §3 |
+
+## 3. Direct-mode start state (post-firmware overlay)
+
+Values Linux or the console path can observe. "Code" = derived from the pinned firmware source; nothing in this table is measured yet except where marked (O). EVK request IDs are in `evidence/requests.md`.
+
+| Register | Reset (manual) | Post-firmware | Source | Needs EVK? |
+|---|---|---|---|---|
+| SCIF0 SMR `+0x00` | `0x0000` | `0x0000` | code: TF-A `scifa.S`, U-Boot `serial_sh.c` (scif §6.2) | Y (EVK-R20) |
+| SCIF0 BRR `+0x02` (SEMR.MDDRS=0) | `0xFF` | `0x1A` | code: TF-A; U-Boot's `0x35` lands on MDDR and is ignored (TE=RE=1) | Y, indirect only: hidden behind MDDR while MDDRS=1 |
+| SCIF0 MDDR `+0x02` (SEMR.MDDRS=1) | `0xFF` | `0xFE` | code: TF-A `scifa.S:155-156` | Y (EVK-R21) |
+| SCIF0 SCR `+0x04` | `0x0000` | `0x0030` (TE\|RE) | code: TF-A, U-Boot, OP-TEE | Y (EVK-R22) |
+| SCIF0 FSR `+0x08` | `0x0020` | `0x0060` (TDFE\|TEND, line idle) | code | Y (EVK-R23) |
+| SCIF0 FCR / FDR / SPTR / LSR | `0` / `0` / `0x00xx` / `0` | `0` / `0` / untouched / `0` | code | Y (EVK-R24) |
+| SCIF0 SEMR `+0x14` | `0x00` | `0x30` (MDDRS\|BRME) | code: TF-A | Y (EVK-R25) |
+| SCIF0 FTCR `+0x16` | `0x1F1F` | `0x1F1F` | code: TF-A RMW clears nothing set | Y (EVK-R26) |
+| PFC PMC36 `+0x236` / PFC36 `+0x4D8` (P38, SCIF0) | `0x00` / `0x00000000` | `0x03` / `0x00000011` | code: TF-A `pfc.c:44-95` | Y (EVK-R30) |
+| PFC PM36 `+0x16C` | `0x0000` | `0x0000` (not written) | code | Y (EVK-R30) |
+| PFC PWPR `+0x3014` | `0x80` | `0x80` (relocked) | code | Y (EVK-R31) |
+| PFC PMC3F/PFC3F (P47), PMC23/PFC23 (P19) | `0x00` / `0` | `0x03` / `0x11` each | code: TF-A (`RZG2L=1`) | Y (EVK-R32) |
+| PFC SD_ch0 / SD_ch1 `+0x3000/+0x3004` | per §41.2 p.3384 | `1` / `0` | code: TF-A `pfc_sd_setup` | Y (EVK-R33) |
+| PFC QSPI/SD IOLH, PUPD, SR, IEN | per §41.2 | TF-A `pfc.c:99-166` values | code | Y (partly EVK-R33) |
+| PFC ETH MII/RGMII `+0x3018` | `0x03` | `0x03` (untouched, I) | code | Y (EVK-R34) |
+| PFC IEN04 `+0x1820` | `0x00000000` | `0x00000000` (Linux hog sets `0x101` later) | code | Y (EVK-R35) |
+| CPG SCIF `CLK_ON 0x584` / `RST 0x884` / `RSTMON 0xA04` | `0x00` / `0x00` / `0x1F` | b0 on / b0 released / `0x1E` | I: BL2 prints on SCIF0 | Y (EVK-R13) |
+| CPG GPIO `CLK_ON 0x598` / `RST 0x898` / `RSTMON 0xA18` | `0` / `0` / `0x7` | `0x1` / `0x7` / `0` (**required**: Linux never deasserts GPIO resets) | I: TF-A muxes pins | Y (EVK-R14) |
+| CPG IA55 `0x518` / `0x818` | `0x3` / `0x1` | same (I) | manual + I | Y (EVK-R12) |
+| CPG GIC600 `0x514` / `0x814` | `0x1` / `0x3` | same | manual | Y (EVK-R12) |
+| CPG GTM `0x534` / `0x834` | `0x1` / `0x1` | unknown; Linux enables OSTM1/2 itself | — | Y (EVK-R15) |
+| CPG WDT `0x548` / `0x848` | `0xC3` / `0x9` | same; WDT0 counting if U-Boot autostarted it | I | Y (EVK-R16, EVK-R40) |
+| CPG SDHI `0x554` / `0x854` | `0` / `0` | SDHI0 b0-3 on / b0 released (I: U-Boot mmc0) | I | Y (EVK-R17) |
+| CPG SYC `0x528` / `0x828` / `0x9A8` | `0` / `0` / `0x1` | `1` / `1` / `0` (I: counter runs) | I | Y (EVK-R18) |
+| CPG MSTOP `0xB60-0xB88` | all `0` | unknown; stored only, no effect (G0/G1 never write) | — | Y (EVK-R19) |
+| CPG PLL1 `0x004/0x008`, PL1/PL2/PL3A_DDIV, PL2SDHI_DSEL `0x218`, PL3C_SDIV `0x214` | `0x1901`, `0x180601`, `0`, `0`, `0`, `0x11`, `0x401` | unchanged (I; P0 = 100 MHz O) | manual + O | Y (EVK-R10, R11) |
+| SYSC RVAL1/RVAH1 `0x860/0x864` | `0x00020000` / `0` | unchanged before any CPU_ON (I) | — | Y (EVK-R02) |
+| SYSC DEVID / PRR / LSI_MODE | latched | `0x18447447` / `0` / boot switches | O (BL2) | N (re-read in EVK-R01) |
+| SYC CNTCR / CNTFID0 (`+0x020`, I) | TRM | EN=1 / `0x016E3600` | I | Y (EVK-R50) |
+| WDT0 WDTCNT `0x12800800` | `0` | `1` if U-Boot started it; **G0 direct mode default: not running** | boot-chain-firmware §1 vs boot-dependency-graph §4 | Y (EVK-R40) |
+| CNTFRQ_EL0 | — | 24 MHz | O | N |
+| GIC | — | all SPIs Group 1 NS, DS=0 (QEMU `irq_reset_nonsecure`) | O (DS=0) + cpu-gic §6 D2 | Y (EVK-R60…R65) |
+
+## 4. Known fidelity gaps (REQ-GUEST-004 list and model limits)
+
+| # | Gap | Board | QEMU (direct mode) | Class | Evidence |
+|---|---|---|---|---|---|
+| 1 | SMCCC version | v1.4 (O) | v1.0 (no `SMCCC_VERSION` in built-in PSCI); no ARCH_WORKAROUND calls; `vulnerabilities/*` may differ | FIDELITY GAP, guest-visible | cpu-gic §4; boot-dependency-graph §5 #6 |
+| 2 | `SCR_EL3.FIQ` in the GIC banner | `FIQ=1` (O) | `FIQ=0` (`arm_emulate_firmware_reset` does not set it); Stage B with real BL31 should match | FIDELITY GAP, direct mode only | cpu-gic §6 D2 |
+| 3 | GICD/GICR IIDR and PIDR | GIC-600 r1p6 (A: IIDR `0x0201643B`) | fixed `0x43B` (GIC-500-like); boot-harmless; blocks the M1 "GIC ID = EVK" check unless a property is added (D3) | FIDELITY GAP | cpu-gic §2.1, §6 D3 |
+| 4 | Cache topology | L1 32 KiB I/D, no L2, 256 KiB L3 | QEMU CLIDR reports a 512 KiB L2 plus DT L3 in cacheinfo | FIDELITY GAP (sysfs only) | cpu-gic §1 "Cache node" |
+| 5 | MIGRATE_INFO_TYPE | possibly "resident TOS" with opteed (A) | 2 (TOS not present) | open | cpu-gic §4 |
+| 6 | `earlycon` boot argument | added by the board's own boot chain | M3a needs `-append "<stock bootargs> earlycon"` (bare form only) | REQ-GUEST-004 gap (M3a only) | scif §5; boot-dependency-graph §5 #1 |
+| 7 | `/psci` node | as in DTB | replaced by QEMU (adds `arm,psci` + function IDs) | REQ-GUEST-004 gap | cpu-gic §4 |
+| 8 | Loader fixups | U-Boot adds `u-boot,*`, `kaslr-seed` (if OP-TEE RNG), `/firmware/optee` (downstream), `vqmmc-supply` | not replicated; `/memory` rewritten to the same value; `linux,initrd-*` added | REQ-GUEST-004 gaps | boot-chain-firmware §4; boot-dependency-graph §5 |
+| 9 | TZC-400 and SYSC access control (MSTACCCTL/SLVACCCTL) | TZC region 0 only (TBB=0); ACC registers as firmware left them | stored, never enforced | STUB, documented; revisit if a G1 build enables TBB | spec §12; sysc §7 |
+| 10 | TSIP | closed crypto engine | read-as-zero; acceptance OP-TEE built `CFG_RZ_SCE=n` | UNSUPPORTED / honest-fault (build-config exception, REQ-GUEST-003) | boot-chain-firmware §3 |
+| 11 | Clock/reset/MSTOP gating of peripherals | a gated module's behaviour is unknown (hang, zero, abort) | registers modelled, no effect on device models | open oracle question | spec §7, §14; cpg-reset §7 |
+| 12 | Pin mux gating the UART | TX needs P38 in function 1 | SCIF chardev wired regardless of PMC/PFC (A, recorded) | documented decision | pinctrl §8 |
+| 13 | SCIF baud rate | divisor programmed | stored; used for character timing only | documented | scif §10 |
+| 14 | `ID_AA64PFR0_EL1.EL2` | A55 implements EL2 (A) | `has_el2=false` in Stage A reads EL2 = 0 | FIDELITY GAP (A; not yet measured) | cpu-gic §5, §6 D2 |
+| 15 | IRQC external/TINT interrupt delivery | routes IRQ0-7, TINT | STUB at M3b: never asserted | gap until M6 | boot-dependency-graph §4 |
+| 16 | WDT0 in direct mode | running if U-Boot autostarted it | not running unless the U-Boot path is mimicked | documented choice (spec §9) | boot-chain-firmware §1; boot-dependency-graph §4 |
+
+## 5. Note disagreements resolved here
+
+- **RSTMON polarity.** `boot-chain-firmware.md` §2 originally said "mirror"; `cpg-reset.md` §2.3 and the TF-A/Linux poll code show an **inverted** mirror. Inverted is used (and `boot-chain-firmware.md` §2 now says so).
+- **DEVID revision nibble.** `sysc.md` §4 leaves `[31:28]` to be measured; the EVK boot log shows `0x18447447` on every boot. The observed value is used.
+- **CPU divider busy poll.** `cpu-gic.md` §1 says the cpufreq path polls CLKSTATUS; `cpg-reset.md` §2.6 says only the SD mux polls. linux v6.12.59 `drivers/clk/renesas/r9a07g044-cpg.c:167` registers `I` with `DEF_DIV`, a plain `clk_hw_register_divider` (`rzg2l-cpg.c:419-428`) with no poll, so `cpg-reset.md` is right. Either way, CLKSTATUS reading 0 is compatible.
+- **LSI_MODE boot field.** `boot-chain-firmware.md` §2 says bits [3:0]; `sysc.md` §3 and the manual (§6.3.42 p.207) say `MD_BOOT` is bits [2:0] with `DEBUGEN` at bit 9. The manual layout is used.
+- **SCIF0 EVK read command.** `scif.md` Q1 (`md.w 0x1004b800 0xc`) and `boot-dependency-graph.md` Q-B4 (`0xb`) both cover FRDR at `+0x0A`, which pops the RX FIFO. `evidence/requests.md` splits the reads to skip FRDR and FTDR.
+- **WDT0 state in direct mode.** `boot-chain-firmware.md` §1 has U-Boot running WDT0; `boot-dependency-graph.md` §4 says WDT0 is not running in direct mode. Both hold: the direct-mode default does not mimic U-Boot (gap 16).
+- **Addresses** were cross-checked against `r9a07g054.dtsi` and Table 5.1 (p.143-145); no conflicts. The manual names OSTM "GTM ch0-2" and WDT2 "WDT CM33".

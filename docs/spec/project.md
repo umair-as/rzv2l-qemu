@@ -1,6 +1,6 @@
-# qemu-rzv2l — Engineering Specification v0.2
+# qemu-rzv2l — Engineering Specification v0.3
 
-**Status:** Draft for review. Supersedes v0.1; §22 lists the changes.
+**Status:** v0.3, accepted with the M0 exit review (2026-10-08). §22 lists the changes from v0.1 and v0.2.
 **Target:** Renesas RZ/V2L SMARC EVK (SoC R9A07G054L2)
 **Date:** 2026-10-08
 
@@ -12,6 +12,9 @@
 | `../device-map.md` | address/IRQ/clock map (M0 deliverable) |
 | `../research/boot-chain-firmware.md` | firmware study |
 | `../decisions/` | decision records |
+| `traceability.md` | requirement → unit → task → test → evidence |
+| `../units/` | per-milestone work units (spec, design, tasks) |
+| `../learning/` | plain-language companions with PDF spot checks |
 
 ---
 
@@ -171,16 +174,16 @@ Each device model keeps its reset value plus an optional post-firmware overlay t
 
 ## 10. Machine identity and topology
 
-- **REQ-MACH-001.** QEMU exposes `-M rzv2l-smarc`. The final name follows QEMU conventions.
-- **REQ-MACH-002.** Structure: a SoC container `TYPE_R9A07G054` (CPUs, GIC, on-chip devices) plus a board machine (DDR size, SD/eMMC attachment, board devices), following `hw/arm/fsl-imx8mp.c` / `imx8mp-evk.c`. The SoC is written so RZ/G2L (R9A07G044) can be added later; the IP and the Linux drivers are shared.
-- **REQ-MACH-003.** 2× `cortex-a55`:
-  - `mp-affinity` = `0x0`, `0x100` (DT `cpu@0`, `cpu@100`)
-  - `cntfrq` = 24 MHz
-  - the second CPU starts powered off
-  - the MIDR identifies as a Cortex-A55; TF-A panics otherwise.
-- **REQ-MACH-004.** The A55 IMPDEF system registers the real firmware touches are present. Per EXP-001: `CPUPWRCTLR_EL1` is required, and `CLUSTERIDR_EL1`/`CLUSTERCFR_EL1` are precautionary. QEMU 11.1.2's `cortex-a55` defines none of them.
-- **REQ-MACH-005.** DDR appears where software expects it: base `0x40000000`, with the Linux-visible window `0x48000000` + `0x78000000` on the 2 GB EVK.
-- **REQ-MACH-006.** Modelled MMIO devices and interrupts sit at the addresses and SPI numbers of the stock DTB and firmware.
+The canonical statements, evidence and status live in `requirements.md`; this section summarises them by ID.
+
+- **REQ-MACH-001.** QEMU exposes `-M rzv2l-smarc`, built as a SoC container `TYPE_R9A07G054` (CPUs, GIC, on-chip devices) plus a board machine (DDR size, SD/eMMC attachment, board devices), following `hw/arm/fsl-imx8mp.c` / `imx8mp-evk.c`. The SoC is written so RZ/G2L (R9A07G044) can be added later. The final name follows QEMU conventions.
+- **REQ-MACH-002.** 2× `cortex-a55`: `mp-affinity` `0x0`/`0x100` (DT `cpu@0`, `cpu@100`); the second CPU starts powered off; the MIDR identifies as Cortex-A55 r2p0 (TF-A panics otherwise; EVK MIDR `0x412FD050`).
+- **REQ-MACH-003.** `CNTFRQ_EL0` reads 24 MHz (CPU `cntfrq` property). The SYC counter-module register `CNTFID0` is a separate requirement, REQ-SYC-001.
+- **REQ-MACH-004.** Direct mode enters the kernel at NS-EL1 with PSCI over SMC.
+- **REQ-MACH-005.** The A55 IMPDEF system registers the real firmware touches are present. Per EXP-001: `CPUPWRCTLR_EL1` is required; `CLUSTERIDR_EL1`/`CLUSTERCFR_EL1` are precautionary. QEMU 11.1.2's `cortex-a55` defines none of them.
+- **REQ-MACH-006.** DDR appears where software expects it: base `0x40000000`; Linux-visible window `0x48000000` + `0x78000000` on the 2 GB EVK.
+- **REQ-MACH-007.** GIC-600 distributor and redistributors at the stock DTB addresses, with no ITS.
+- **REQ-MACH-008.** Modelled MMIO devices and interrupts sit at the addresses and SPI numbers of the stock DTB and firmware.
 
 ## 11. SoC contract (initial dependency set)
 
@@ -188,10 +191,10 @@ The exact register map and dependencies are not frozen here; they are derived in
 
 | Block | Why it is early | Treatment |
 |---|---|---|
-| Cortex-A55 ×2, GIC-600 (GICv3, no ITS), generic timer | core | existing QEMU models + REQ-MACH-003/004 |
+| Cortex-A55 ×2, GIC-600 (GICv3, no ITS), generic timer | core | existing QEMU models + REQ-MACH-002/003/004/005/007 |
 | PSCI | SMP, reset, power-off | QEMU built-in (Stage A) → real BL31 (Stage B) |
 | **SYSC** @ `0x11020000` | `LSI_DEVID` (BL2 panics unless `0x8447447`), `LSI_MODE` @ `0x11020A00` (boot source), `RVAL/RVAH` (CPU_ON), `LP_CTL5` ack (CPU_OFF), `CNTFID0` (SYC) | functional, early |
-| **CPG** @ `0x11010000` | clock + reset + PM-domain provider. `CLK_MON`/`RSTMON` mirror `CLK_ON`/`RST`. CA55 reset and power handshake (`PCHCTL`/`PCHMON`). CPU OPP dividers | functional, early |
+| **CPG** @ `0x11010000` | clock + reset + PM-domain provider. `CLK_MON` = `CLK_ON` (same polarity); `RSTMON` = `~RST & implemented_mask` (inverted: 1 = in reset); writes honour the `*_WEN` halves. CA55 reset and power handshake (`PCHCTL`/`PCHMON`). CPU OPP divider (no busy poll) | functional, early |
 | **PFC / pinctrl** @ `0x11030000` | SCIF0 has `pinctrl-0`; without pinctrl, `sh-sci` defers forever | functional, early |
 | **SCIF0** @ `0x1004B800` | console. RZ/SCIFA register layout; `FSR.TEND` and FIFO counts; baud divisor not enforced | functional, M2 |
 | **IRQC (IA55)** @ `0x110A0000` | hierarchical IRQ domain for external/GPIO IRQs | investigate in M0 |
@@ -257,6 +260,18 @@ A successful boot is evidence that a software path works. It is **not** evidence
 **Requirement fields:** ID · Statement (SHALL, testable) · Rationale · Evidence · Dependencies · Verification · Milestone · Status. One evidence packet may cover a whole device.
 
 **Decision records** (`../decisions/DR-NNNN-*.md`) are required where reasonable alternatives exist. Fields: Context · Evidence · Alternatives · Decision · Consequences · Unknowns · Revisit condition. An agent may propose a decision; architecturally significant ones need human review.
+
+**Work units** (`../units/<unit>/`, from M1 on). Each milestone slice is a unit with three files, following a spec-driven pattern:
+
+| File | Content |
+|---|---|
+| `spec.md` | the REQ IDs the unit satisfies, with acceptance criteria in EARS form ("WHEN … THEN the machine SHALL …"), scope and non-goals |
+| `design.md` | the model design derived from `../research/`, `../device-map.md` and the decision records; QEMU structure, register behaviour, start states |
+| `tasks.md` | tasks with stable IDs (`<unit>-T01`…), each naming the REQ(s) it serves, the files it touches, and the test that proves it |
+
+A unit starts only after its spec is reviewed by the operator. `traceability.md` links every REQ to its unit, tasks, tests and evidence, and is updated as tasks close. A consistency check (every REQ in a unit spec appears in a task; every task names a test) runs before a unit is marked done.
+
+**Fidelity bugs** use `../units/templates/fidelity-bug.md`: observed behaviour, expected behaviour (with evidence), unchanged behaviour (what must not regress), and the layer verified.
 
 **Actor / validator.** The validator asks what evidence would show the requirement is *not* met. It checks:
 - addresses, IRQs and reset/post-firmware state
@@ -344,7 +359,17 @@ M0 is incomplete until both answers can be defended from evidence.
 
 RZ/V2L, with hardware available, calibrates the method: build the model, measure it against silicon, and refine the evidence, retrieval and validation process. A later SoC without hardware is where the method itself becomes the experiment.
 
-## 22. Changes from v0.1
+## 22. Changes
+
+### v0.2 → v0.3 (2026-10-08)
+
+- Guest kernels pinned: G0 = mainline v6.12.59, G1 = `rz_linux-cip` `rz-6.12-cip14` @ `212f6e88b7` (same mainline base; see `../sources.md`).
+- §15: spec-driven work units (`spec`/`design`/`tasks`, EARS acceptance, task IDs traced to REQs), `traceability.md`, and a fidelity-bug template.
+- DR-0002 accepted; DR-0003 (GIC identity) accepted, option A.
+- M0 deliverables assembled: research notes, device map, EVK evidence and requests, M0 report (`../milestones/M0-report.md`). Operator exit review done 2026-10-08.
+- Requirement IDs in §10 aligned with `requirements.md`; REQ-MACH-008 (MMIO/IRQ placement) and REQ-SYC-001 (CNTFID0, split from REQ-MACH-003) added.
+
+### v0.1 → v0.2
 
 - Added the standalone stance with the G0/G1/G2 tiers (§2). Downstream consumers moved from milestone targets to profiles.
 - The source hierarchy became authority domains plus a conflict rule and the effective-configuration rule (§5).

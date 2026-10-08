@@ -6,7 +6,7 @@ This is the canonical orientation for AI coding agents working in this repo. It 
 
 `qemu-rzv2l` develops a QEMU machine model of the **Renesas RZ/V2L SMARC EVK** (SoC R9A07G054L2: 2× Cortex-A55, GIC-600, 2 GB DDR4). The aim is to run software built for the real board **without modifying that software**.
 
-The specification is `docs/spec/project.md` (v0.2). The requirements are in `docs/spec/requirements.md`, and v0.1 is archived in `docs/spec/archive/`. Read the spec before any hardware-facing work.
+The specification is `docs/spec/project.md` (v0.3). The requirements are in `docs/spec/requirements.md` (the canonical requirement IDs), and traceability is in `docs/spec/traceability.md`. v0.1 is not tracked; spec §22 summarises the changes. Read the spec before any hardware-facing work.
 
 The project is **standalone**. Guest artifacts come in three tiers:
 
@@ -68,13 +68,16 @@ Consequences for this project:
 - PSCI goes over SMC. CPUs are `cpu@0` and `cpu@100`, so set `mp-affinity` = `0x0`, `0x100`.
 - `CNTFRQ` = 24 MHz. TF-A copies it from SYC `CNTFID0`; the DT timer has no `clock-frequency`.
 - BL2 panics unless `SYS_LSI_DEVID[27:0] == 0x8447447`. U-Boot and BL2 read `SYS_LSI_MODE` @ `0x11020A00` for the boot source.
-- Each CPG `CLK_MON`/`RSTMON` register must mirror its `CLK_ON`/`RST` register, or the U-Boot SDHI probe fails.
+- CPG monitors: `CLK_MON` = `CLK_ON` (same polarity); `RSTMON` = `~RST & implemented_mask` (inverted, 1 = in reset). Linux and TF-A poll both; getting either wrong makes drivers time out (U-Boot SDHI, Linux `sh-sci`).
 - The production OP-TEE panics without TSIP, a closed crypto IP. Emulation uses an OP-TEE rebuilt with `CFG_RZ_SCE=n`; TSIP is honest-fault.
 
 ## Repo layout
 
 ```
-docs/spec/          specification v0.2+, requirements, acceptance, traceability
+docs/spec/          specification v0.3, requirements, traceability
+docs/units/         per-milestone work units (spec, design, tasks) + templates
+docs/milestones/    milestone reports (M0-report.md)
+docs/learning/      plain-language companions with PDF spot checks
 docs/device-map.md  MMIO/IRQ/clock/reset map with evidence per row
 docs/sources.md     source register (manuals, pinned guest/firmware sources)
 docs/research/      per-block research (scif, cpg-reset, cpu-gic, boot-dependency-graph, …)

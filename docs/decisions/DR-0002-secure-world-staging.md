@@ -1,6 +1,6 @@
 # DR-0002: Secure-world staging
 
-- **Status:** Proposed; needs operator review. The Stage A technical question was answered by EXP-001 (2026-10-08).
+- **Status:** Accepted (operator, 2026-10-08). The Stage A technical question was answered by EXP-001.
 - **Date:** 2026-10-08
 
 ## Context
@@ -29,7 +29,7 @@ All in `docs/research/boot-chain-firmware.md`:
 3. Real BL31+BL32 from the start.
 4. **Staged:** A (built-in PSCI) → B (real BL31 + rebuilt OP-TEE) → C (real BL2 + DDR stub), plus N (the production OP-TEE as a negative test).
 
-## Decision (proposed)
+## Decision
 
 Option 4.
 
