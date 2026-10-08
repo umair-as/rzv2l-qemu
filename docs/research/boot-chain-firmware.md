@@ -22,7 +22,7 @@ The firmware build configuration was taken from the compile logs. TF-A was built
 ## 1. Chain at a glance
 
 ```
-Mask ROM ──reads SYS_LSI_MODE[3:0]──▶ loads BL2 (512 B boot-param header, 0xAA55 sig, no checksum)
+Mask ROM ──reads MD_BOOT (SYS_LSI_MODE[2:0])──▶ loads BL2 (512 B boot-param header, 0xAA55 sig, no checksum)
    │                                   eSD: byte 0x200 (header ×7, image @0x1000) | eMMC boot0 @0x200 (image @0x400) | QSPI @0x0 (image @0x200)
    ▼
 BL2 @ 0x00012000 (SRAM, EL3)
@@ -67,12 +67,12 @@ Linux @ EL1, memory 0x48000000 + 0x78000000, PSCI via SMC
 | Block | Register | Required behaviour | Consumer |
 |---|---|---|---|
 | SYSC | `SYS_LSI_DEVID` | low 28 bits = `0x8447447` | BL2 (panics otherwise) |
-| SYSC | `SYS_LSI_MODE` @ `0x11020A00` | boot mode (`0x10200` eSD, `0x10201` eMMC); bits [3:0] select the BL2 boot device | BL2, U-Boot |
+| SYSC | `SYS_LSI_MODE` @ `0x11020A00` | boot mode (`0x10200` eSD, `0x10201` eMMC, `0x10203` QSPI); MD_BOOT is bits [2:0] (HW manual §6.3.42 p.207). TF-A masks [3:0] (`plat/renesas/rz/common/drivers/sys.c:21,27`), and bit 3 reads 0 | BL2, U-Boot |
 | SYSC | `RVAL`/`RVAH` | secondary-core reset vector, latched for CPU_ON | BL31 PSCI |
-| SYSC | `SYS_LP_CTL5` acknowledge bit | must read set (normally driven by the M33), otherwise CPU_OFF waits forever | BL31 PSCI |
-| CPG | `CLK_ON_*` (0x500+n) ↔ `CLK_MON_*` (0x680+n) | the monitor register mirrors the enable register | U-Boot (SDHI0 probe: 100 ms timeout → no mmc → no boot), Linux |
-| CPG | `RST_*` ↔ `RSTMON_*` | the monitor register mirrors the reset register | BL31 CPU_ON, Linux |
-| CPG | `RST_CA55`, `CORE1_PCHCTL`/`PCHMON` | power handshake: the PSTATE written to PCHCTL is reflected in PCHMON (0x08 = on) | BL31 CPU_ON |
+| SYSC | `SYS_LP_CTL5` bit (8 + core) | CPU_OFF writes `LP_CTL6`/`LP_CTL1` bit (8 + core), then polls `LP_CTL5` bit (8 + core); normally the M33 side completes it. Must read set, otherwise CPU_OFF waits forever (TF-A `plat/renesas/rz/common/plat_pm.c:92-98`) | BL31 PSCI |
+| CPG | `CLK_ON_*` (0x500+n) ↔ `CLK_MON_*` (0x680+n) | the monitor register mirrors the enable register (same polarity). Linux polls it for only 10 µs with no delay, so the mirror must be computed on read | U-Boot (SDHI0 probe: 100 ms timeout → no mmc → no boot), Linux |
+| CPG | `RST_*` ↔ `RSTMON_*` | **inverted** mirror: an `RST` bit of 1 means released, an `RSTMON` bit of 1 means reset applied, so RSTMON = ~RST over the implemented bits. Both Linux (`drivers/clk/renesas/rzg2l-cpg.c` `__rzg2l_cpg_assert`) and TF-A (`plat_pm.c:56-62`) poll for this; a same-polarity mirror makes every deassert time out | BL31 CPU_ON, Linux |
+| CPG | `RST_CA55`, `COREn_PCHCTL`/`COREn_PCHMON` | CPU_ON: PORESET assert/deassert through `RST_CA55` with `RSTMON_CA55` polls, then a four-phase P-channel handshake. TF-A writes PCHCTL = PSTATE `0x08` (bits [23:16]) + PREQ (bit 0) and waits for PCHMON bit 0 (PACCEPT) = 1, then clears PREQ and waits for PACCEPT = 0. PACCEPT must follow PREQ (`plat_pm.c:30-70`). If `SYS_LP_CTL2` bit 0 is set, the same handshake runs first with PSTATE 0 | BL31 CPU_ON |
 | WDT0 | `0x12800814` (parity-error force) | writing 1 resets the system | BL31 `SYSTEM_RESET` |
 | WDT0 | counter/timeout | started by U-Boot and still running when Linux starts | U-Boot, Linux |
 | SCIF0 | `0x1004B800`, RZ/SCIFA layout | `FSR` (0x08) bit 6 `TEND`, FIFO counts. The baud divisor is not enforced: U-Boot's computed divisor is wrong, yet the console works on silicon. | BL2, BL31, OP-TEE, U-Boot, Linux |
