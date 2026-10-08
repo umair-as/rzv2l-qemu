@@ -1,0 +1,257 @@
+{
+  "collected_on": "2026-10-08",
+  "artifacts": [
+    {
+      "path": "guides/EPBZ-IMB-22-0032-8_RZV2L_Easy_Download_Guide.pdf",
+      "sha256": "38e7b1c21602e78f4991e9a8c06e2ede370c6c4d17901189b2d7a2e676e8c3c2",
+      "bytes": 252499,
+      "text_path": "text/guides/EPBZ-IMB-22-0032-8_RZV2L_Easy_Download_Guide.txt",
+      "pages": 2
+    },
+    {
+      "path": "hardware/r01ds0485ej0110-rzv2l.pdf",
+      "sha256": "24a675a287d56466f99ff00b02f6dd1b5823b164d71b6855b94771a599057b9b",
+      "bytes": 846237,
+      "text_path": "text/hardware/r01ds0485ej0110-rzv2l.txt",
+      "pages": 71
+    },
+    {
+      "path": "hardware/r01uh0936ej0150-rzv2l.pdf",
+      "sha256": "a5daa43d1f163b764a343b7bca1958e36a40befa111c8a8f3f1c7858ec7945e8",
+      "bytes": 24016337,
+      "text_path": "text/hardware/r01uh0936ej0150-rzv2l.txt",
+      "pages": 3559
+    },
+    {
+      "path": "hardware/r01uh0964ej0200-rzg2l-v2l-smarc-module-um.pdf",
+      "sha256": "f8d4193ae928aa3004e7bf9bc0796909f107214dce8c470839da46f189783daa",
+      "bytes": 2309408,
+      "text_path": "text/hardware/r01uh0964ej0200-rzg2l-v2l-smarc-module-um.txt",
+      "pages": 58
+    },
+    {
+      "path": "hardware/r01uh0966ej0200-rz-smarc-carrier-um.pdf",
+      "sha256": "47282532e39cd9e25a264874a0820de325f5991e32568eff15273f56b9f6b537",
+      "bytes": 3683830,
+      "text_path": "text/hardware/r01uh0966ej0200-rz-smarc-carrier-um.txt",
+      "pages": 60
+    },
+    {
+      "path": "guides/r01us0617ej0105-rz-v(Linux+Start-up+Guide+RZV2L).pdf",
+      "sha256": "117e7562ea1d127b182780ccde21664c40e80b9356a71a494c90d9838483c973",
+      "bytes": 2369948,
+      "text_path": "text/guides/r01us0617ej0105-rz-v(Linux+Start-up+Guide+RZV2L).txt",
+      "pages": 56
+    },
+    {
+      "path": "deferred/r01us0619ej0202-rzg2l_rzv2l_GStreamer_UME.pdf",
+      "sha256": "ba7c68a77610a5cee293adbea80d8302400f4f700afd7aa51e8574371b332e9e",
+      "bytes": 2839851,
+      "text_path": "text/deferred/r01us0619ej0202-rzg2l_rzv2l_GStreamer_UME.txt",
+      "pages": 76
+    },
+    {
+      "path": "deferred/r11an0616ej0750-rzv-ai-imp-getstarted.pdf",
+      "sha256": "14af93088c2adea508d30e41beccbbb129ccc2f73078149bb048e395623b573f",
+      "bytes": 1442967,
+      "text_path": "text/deferred/r11an0616ej0750-rzv-ai-imp-getstarted.txt",
+      "pages": 86
+    },
+    {
+      "path": "deferred/r11an0622ej0750-rzv-ai-imp-appendix.pdf",
+      "sha256": "60a04881b4dff20b48ec7f7321b47f5c1bfe95c40e723668564493c38fb0540c",
+      "bytes": 1270076,
+      "text_path": "text/deferred/r11an0622ej0750-rzv-ai-imp-appendix.txt",
+      "pages": 55
+    },
+    {
+      "path": "bsp-drivers/r01us0468ej0107-rz-g_Kernel_Core_UME.pdf",
+      "sha256": "7116d97e9c521b4b65972f60a36171e78823dcf2b32fcdd451871f9551f43728",
+      "bytes": 554936,
+      "text_path": "text/bsp-drivers/r01us0468ej0107-rz-g_Kernel_Core_UME.txt",
+      "pages": 23
+    },
+    {
+      "path": "bsp-drivers/r01us0474ej0107-rz-g_SD_MMC_UME.pdf",
+      "sha256": "6669e9c3a6bde0a9b077c7fd81c76cb3fa92923fe57928bdc254e7ea189ecfd8",
+      "bytes": 534236,
+      "text_path": "text/bsp-drivers/r01us0474ej0107-rz-g_SD_MMC_UME.txt",
+      "pages": 25
+    },
+    {
+      "path": "bsp-drivers/r01us0475ej0107_rz-g_Gigabit_Ethernet_UME.pdf",
+      "sha256": "c3660e0a7df94058568b2fa0a131aa5ab556e15cba1fc4b2f0eebae6c8a00ca9",
+      "bytes": 553462,
+      "text_path": "text/bsp-drivers/r01us0475ej0107_rz-g_Gigabit_Ethernet_UME.txt",
+      "pages": 25
+    },
+    {
+      "path": "bsp-drivers/r01us0476ej0107-rz-g_MTU3a_UME.pdf",
+      "sha256": "6756a0cac775fbc1c5763931a9d374430de43ec3f9fe99e7cbc126fda236d416",
+      "bytes": 578746,
+      "text_path": "text/bsp-drivers/r01us0476ej0107-rz-g_MTU3a_UME.txt",
+      "pages": 32
+    },
+    {
+      "path": "bsp-drivers/r01us0477ej0107-rz-g_I2C_UME.pdf",
+      "sha256": "7d39382584e16255bd34e351e098dbadc7b395dc500722f57079c8c89680cd72",
+      "bytes": 617339,
+      "text_path": "text/bsp-drivers/r01us0477ej0107-rz-g_I2C_UME.txt",
+      "pages": 30
+    },
+    {
+      "path": "bsp-drivers/r01us0478ej0107-rz-g_CANFD_UME.pdf",
+      "sha256": "cab80899556c906bdc6c8971bef9c1f77337434a1e7c51037a4bd0039ea880a0",
+      "bytes": 562989,
+      "text_path": "text/bsp-drivers/r01us0478ej0107-rz-g_CANFD_UME.txt",
+      "pages": 24
+    },
+    {
+      "path": "bsp-drivers/r01us0479ej0107-rz-g_WDT_UME.pdf",
+      "sha256": "8e58a00690230739fe95798fa1d24909276ebe00284aee8afc8fce60593c96fd",
+      "bytes": 567385,
+      "text_path": "text/bsp-drivers/r01us0479ej0107-rz-g_WDT_UME.txt",
+      "pages": 25
+    },
+    {
+      "path": "bsp-drivers/r01us0480ej0107-rz-g_DMAC_UME.pdf",
+      "sha256": "35137b038bb76e449a60228556b195db50afe607121313c58dc3e024d1f7e144",
+      "bytes": 441120,
+      "text_path": "text/bsp-drivers/r01us0480ej0107-rz-g_DMAC_UME.txt",
+      "pages": 19
+    },
+    {
+      "path": "bsp-drivers/r01us0481ej0107-rz-g_SPI_UME.pdf",
+      "sha256": "a167d138cc3c83a2a30f72d89439300a082ea7de07202835d8451aa10acae1c8",
+      "bytes": 624693,
+      "text_path": "text/bsp-drivers/r01us0481ej0107-rz-g_SPI_UME.txt",
+      "pages": 20
+    },
+    {
+      "path": "bsp-drivers/r01us0482ej0107-rz-g_SPI_Multi IO_UME.pdf",
+      "sha256": "0e928e7a5f9dde546b829e61cfcde72bcf532dfe28c1803c961373fcaae89b47",
+      "bytes": 467277,
+      "text_path": "text/bsp-drivers/r01us0482ej0107-rz-g_SPI_Multi IO_UME.txt",
+      "pages": 21
+    },
+    {
+      "path": "bsp-drivers/r01us0483ej0107-rz-g_SCIFA_UME.pdf",
+      "sha256": "7245ca976fa14c66e6bb129f933e371c8235679b7037186ba63c57f632560bde",
+      "bytes": 551343,
+      "text_path": "text/bsp-drivers/r01us0483ej0107-rz-g_SCIFA_UME.txt",
+      "pages": 23
+    },
+    {
+      "path": "bsp-drivers/r01us0484ej0107-rz-g_GPT_UME.pdf",
+      "sha256": "66625177a2ccd413d5663ec2880521c71852d950c6e8c9a3c85a448c9d67a40e",
+      "bytes": 612561,
+      "text_path": "text/bsp-drivers/r01us0484ej0107-rz-g_GPT_UME.txt",
+      "pages": 26
+    },
+    {
+      "path": "bsp-drivers/r01us0485ej0107-rz-g_USB2.0_Host_UME.pdf",
+      "sha256": "184795659c496e19be39517740c54dc3ebd1dc2b63fcea54388bc5ee95b999fa",
+      "bytes": 505583,
+      "text_path": "text/bsp-drivers/r01us0485ej0107-rz-g_USB2.0_Host_UME.txt",
+      "pages": 22
+    },
+    {
+      "path": "bsp-drivers/r01us0486ej0107-rz-g_Thermal_Sensor__UME.pdf",
+      "sha256": "589905bdaaec74c4f8d93a796b9d43240b927018a5d50e750e6ab9448e043e3e",
+      "bytes": 565721,
+      "text_path": "text/bsp-drivers/r01us0486ej0107-rz-g_Thermal_Sensor__UME.txt",
+      "pages": 20
+    },
+    {
+      "path": "bsp-drivers/r01us0487ej0107-rz-g_AD_Converter_UME.pdf",
+      "sha256": "f2cbfc445cc8660450bee62e120fe7c95a15823ad2f963a353c8b11dffb172f6",
+      "bytes": 471596,
+      "text_path": "text/bsp-drivers/r01us0487ej0107-rz-g_AD_Converter_UME.txt",
+      "pages": 22
+    },
+    {
+      "path": "bsp-drivers/r01us0488ej0107-rz-g_GPIO_UME.pdf",
+      "sha256": "44f3578bd514156a7e89ef2ff0cce3b3026f7da1080c762db036728a648f75df",
+      "bytes": 439816,
+      "text_path": "text/bsp-drivers/r01us0488ej0107-rz-g_GPIO_UME.txt",
+      "pages": 24
+    },
+    {
+      "path": "bsp-drivers/r01us0489ej0107-rz-g_LCDC_UME.pdf",
+      "sha256": "eb84f106cee5e6a95f58695b0fbc86e0aa154ad924867e4bb962872e30e9b997",
+      "bytes": 506476,
+      "text_path": "text/bsp-drivers/r01us0489ej0107-rz-g_LCDC_UME.txt",
+      "pages": 28
+    },
+    {
+      "path": "bsp-drivers/r01us0490ej0107-rz-g_SSI_UME.pdf",
+      "sha256": "8a3d365970ca2c6a04293a30a63181895eaffe76b065be52c7f1a5ab0daf8895",
+      "bytes": 619958,
+      "text_path": "text/bsp-drivers/r01us0490ej0107-rz-g_SSI_UME.txt",
+      "pages": 35
+    },
+    {
+      "path": "bsp-drivers/r01us0491ej0107-rz-g_USB2.0_Function_UME.pdf",
+      "sha256": "f736875c7966280378688d9ec72c255ea52c22c64386fd820f5a91c9d9d49c7b",
+      "bytes": 489953,
+      "text_path": "text/bsp-drivers/r01us0491ej0107-rz-g_USB2.0_Function_UME.txt",
+      "pages": 23
+    },
+    {
+      "path": "bsp-drivers/r01us0499ej0107-rz-g_CRU_UME.pdf",
+      "sha256": "eff2cdaa07ecc17e9d54e51c94e5c92ad01aa2f1b38e3528fa0d13b38f1be92b",
+      "bytes": 416808,
+      "text_path": "text/bsp-drivers/r01us0499ej0107-rz-g_CRU_UME.txt",
+      "pages": 23
+    },
+    {
+      "path": "bsp-drivers/r01us0552ej0107-rz-g_POE3_UME.pdf",
+      "sha256": "ba45714df40f08b6c59c02ea96ef2e0c031feca1043b79bdf8c778154db96493",
+      "bytes": 509320,
+      "text_path": "text/bsp-drivers/r01us0552ej0107-rz-g_POE3_UME.txt",
+      "pages": 20
+    },
+    {
+      "path": "bsp-drivers/r01us0605ej0107-rz-g_Power_Management_UME.pdf",
+      "sha256": "ec9db14d0196c9d85da069d83ce545ae56d3a2f58aeee27fc7359a40206a3a70",
+      "bytes": 979330,
+      "text_path": "text/bsp-drivers/r01us0605ej0107-rz-g_Power_Management_UME.txt",
+      "pages": 37
+    },
+    {
+      "path": "security/r11an1001ej0100-rzv2l-security-startup-guide.pdf",
+      "sha256": "e85801cbcb3b8de8f76a8539dfe383a3afef017d0665765adb2e452ce6ffeb3f",
+      "bytes": 971850,
+      "text_path": "text/security/r11an1001ej0100-rzv2l-security-startup-guide.txt",
+      "pages": 40
+    },
+    {
+      "path": "security/r11an1002ej0100-rzg2l-rzv2l-security-users-manual.pdf",
+      "sha256": "1f43b4fba1caeae4e670f0b9605ba0441f2c51fec67a7794d379e2b26e9e6ae2",
+      "bytes": 1377046,
+      "text_path": "text/security/r11an1002ej0100-rzg2l-rzv2l-security-users-manual.txt",
+      "pages": 79
+    },
+    {
+      "path": "security/r11ut0112ej0100-rzv2l-release-note.pdf",
+      "sha256": "fa39245ac23404ae05dc6cb96ce8ad21cb329e181ec2bd526a5edfd695b8ea8b",
+      "bytes": 236887,
+      "text_path": "text/security/r11ut0112ej0100-rzv2l-release-note.txt",
+      "pages": 8
+    },
+    {
+      "path": "security/r11an1043ej0100-sblib.pdf",
+      "sha256": "8e2a958505aded80fb2cd299a2adbe5b9a60e50a065cbd65366b5cd5bf88645e",
+      "bytes": 512576,
+      "text_path": "text/security/r11an1043ej0100-sblib.txt",
+      "pages": 26
+    },
+    {
+      "path": "security/r20ut5349ej0111-security.pdf",
+      "sha256": "a12ea3523e47b857038fb6bff8ae18b5607a77c566158c2a5b7004efed4ccccb",
+      "bytes": 4808632,
+      "text_path": "text/security/r20ut5349ej0111-security.txt",
+      "pages": 211
+    }
+  ]
+}

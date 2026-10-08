@@ -1,0 +1,4 @@
+[submodule "qemu"]
+	path = qemu
+	url = https://github.com/umair-as/qemu.git
+	branch = rzv2l-dev

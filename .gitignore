@@ -1,0 +1,32 @@
+# Renesas documents are copyrighted: track only the index, manifest and checksums.
+artifacts/**/*.pdf
+artifacts/**/*.zip
+artifacts/**/text/
+
+# Local working area (reference clones, studies, experiments).
+scratch/
+
+# Build outputs.
+build/
+out/
+*.o
+*.elf
+*.bin
+!tests/**/*.ld
+
+# Guest artifacts are built or fetched, never committed.
+tests/guests/out/
+tests/guests/dl/
+
+# Editor / OS.
+*.swp
+*~
+.DS_Store
+.vscode/
+.idea/
+
+# Experiment build outputs.
+tests/experiments/**/out/
+
+# Operator-local reference notes copied into the artifacts collection.
+artifacts/**/project-notes/
