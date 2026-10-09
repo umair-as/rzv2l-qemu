@@ -30,7 +30,7 @@
 
 Where two files share a basename (`platform.c`), the directory is written out. G1 citations are `rz_linux-cip 212f6e88b7 <path>:N`; QEMU citations are `qemu v11.1.2 <path>:N`.
 
-Effective configuration facts used throughout (defconfig; the built `.config` of the G0 image is still to be read, per the effective-configuration rule):
+Configuration assumptions used throughout, from the arm64 defconfig **source** (INFERENCE until the built G0 `.config` is read, per the effective-configuration rule; the whole graph is a source-derived hypothesis until a G0 boot confirms it):
 
 | Option | G0 value | G0 line | G1 (rz_linux-cip 212f6e88b7 arch/arm64/configs/defconfig) |
 |---|---|---|---|
@@ -374,7 +374,7 @@ Kept for the later v6.18 LTS regression target (`docs/sources.md`). Citations ar
 All are read-only.
 
 - **Q-B1** (post-Linux, remainder): full `dmesg` with `initcall_debug` *not* set. Record the relative order and timestamps of `rzg2l-cpg`, `rzg2l-irqc`, `pinctrl-rzg2l … support registered`, `bootconsole … disabled`, and the RIIC, ravb and SDHI lines, relative to the known `1004b800.serial: ttySC0` line. Also `cat /sys/kernel/debug/devices_deferred` if debugfs is mounted.
-- **Q-B4** (U-Boot, immediately before `bootm`): `md.w 0x1004b800 0xb` (SCIF0 SCSMR..SEMR). This gives the post-firmware state earlycon inherits. Note: reading FRDR (+0x0A) pops the RX FIFO, so read it last or skip it (shared with `scif.md` Q1).
+- **Q-B4** (U-Boot, immediately before `bootm`): the SCIF0 post-firmware state earlycon inherits. Run EVK-R20–R26 in `../evidence/requests.md` (documented widths; FTDR and FRDR are never read). Superseded: an earlier single `md.w` sweep here crossed FRDR, which pops the RX FIFO.
 - **Q-B5** (U-Boot): CPG `CLK_ON`/`CLK_MON` for SCIF0, GPIO, IA55, OSTM1/2 and WDT0, and `RST`/`RSTMON` for the same modules, plus MSTOP. Shared with `cpg-reset.md` questions 3-5.
 - **Q-B6** (post-Linux, remainder): `cat /proc/cmdline` and `zcat /proc/config.gz | grep -E 'CONFIG_ACPI=|SPCR'` on the EVK image, to record the exact boot arguments and which earlycon path that kernel takes.
 

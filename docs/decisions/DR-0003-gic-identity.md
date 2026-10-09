@@ -28,7 +28,7 @@ The M1 exit gate (spec §17) requires a qtest showing that the GIC and SYSC iden
 ## Consequences
 
 - The §17 gate stays as written: GICD and GICR identity must equal the EVK.
-- **M1 exit needs EVK reads** `EVK-R60`/`R61` (GICD IIDR, PIDR/CIDR) and `EVK-R62`/`R63`/`R65` (GICR IIDR, TYPER, PIDR2) from `docs/evidence/requests.md`.
+- **M1 exit needs EVK reads** `EVK-R60`/`R61` (GICD IIDR, PIDR/CIDR) and `EVK-R62`/`R63`/`R65`/`R66` (GICR IIDR and TYPER for both redistributors; the full PIDR/CIDR block of each) from `docs/evidence/requests.md`.
 - A generic QEMU change, subject to the project's provenance restrictions (spec §16): an agent-written implementation is a prototype, and any upstream submission needs human-authored code.
 
 ## Unknowns

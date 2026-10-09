@@ -86,7 +86,8 @@ U-Boot runs at NS-EL1, so GICD_CTLR shows its non-secure view.
 | EVK-R62 | `md.l 0x11940000 4` | GICR0 CTLR, IIDR, TYPER (lo, hi) | Redistributor 0 identity and affinity | TYPER hi `0x00000000`, Last = 0 | none | cpu-gic.md Q1 | |
 | EVK-R63 | `md.l 0x11960000 4` | GICR1 CTLR, IIDR, TYPER (lo, hi) | Redistributor 1 affinity and Last bit | TYPER hi `0x00000100`, Last (b4) = 1, processor number 1 (I) | none | cpu-gic.md Q1 | |
 | EVK-R64 | `md.l 0x11940014 1; md.l 0x11960014 1` | GICR0/GICR1 WAKER | Redistributor power state with CPU1 still off | CPU0 `0x0` (awake); CPU1 `0x6` (asleep) (I) | none | cpu-gic.md Q1 | |
-| EVK-R65 | `md.l 0x1194ffe8 1` | GICR PIDR2 | ArchRev that Linux checks | ArchRev 3 | none | cpu-gic.md Q1 | |
+| EVK-R65 | `md.l 0x1194ffd0 0xc` | GICR0 PIDR4-7, PIDR0-3, CIDR0-3 (RD_base frame) | Redistributor 0 identity block for DR-0003 option A, incl. the PIDR2 ArchRev Linux checks | PIDR2 bits [7:4] = 3; CIDR `0x0D 0xF0 0x05 0xB1` | none | cpu-gic.md Q1; DR-0003 | |
+| EVK-R66 | `md.l 0x1196ffd0 0xc` | GICR1 PIDR4-7, PIDR0-3, CIDR0-3 (RD_base frame) | Redistributor 1 identity block; asserted separately, not inferred from GICR0 | as EVK-R65 | none | DR-0003 | |
 
 ### 1.7 Last: experimental reads (undefined addresses, register holes, possibly secure-only blocks)
 
@@ -94,9 +95,9 @@ These rows deliberately touch addresses whose read behaviour is **not documented
 
 | ID | Command | Register / meaning | Question it answers | Expected / predicted | Read effect | Source note | Result |
 |---|---|---|---|---|---|---|---|
-| EVK-X01 | `md.l 0x11010500 0x60; md.l 0x11010680 0x60` | all CLK_ON (`0x500-0x67F`) and CLK_MON (`0x680-0x7FF`); includes holes | Is CLK_MON equal to CLK_ON bit for bit for every module, including CLKON_DRP `0x5E8`? | CLK_MON word n == CLK_ON word n | none | **unknown**: the range includes undocumented holes | |
-| EVK-X02 | `md.l 0x11010800 0x60; md.l 0x11010980 0x60` | all RST (`0x800-0x97F`) and RSTMON (`0x980-0xAFF`) | Is RSTMON = ~RST & implemented mask everywhere (SCIF, GPIO, SYC, SDHI, DRP `0x8E8/0xA68`)? | inverted pairs | none | **unknown**: the range includes undocumented holes | |
-| EVK-R50 | `md.l 0x11000000 0x10` | SYC control frame: CNTCR, CNTSR, CNTCV, CNTFID0 (`+0x20`, inferred) | Where CNTFID0 lives and whether the counter is enabled. May abort if SYC is secure-only | CNTCR b0 = 1; `+0x20` = `0x016E3600` (24 MHz) (I) | none (CNTCV counts) | sysc.md Q5, claim 2 | |
+| EVK-X01 | `md.l 0x11010500 0x60; md.l 0x11010680 0x60` | all CLK_ON (`0x500-0x67F`) and CLK_MON (`0x680-0x7FF`); includes holes | Is CLK_MON equal to CLK_ON bit for bit for every module, including CLKON_DRP `0x5E8`? | CLK_MON word n == CLK_ON word n | **unknown** (undocumented holes) | the range includes undocumented holes | |
+| EVK-X02 | `md.l 0x11010800 0x60; md.l 0x11010980 0x60` | all RST (`0x800-0x97F`) and RSTMON (`0x980-0xAFF`) | Is RSTMON = ~RST & implemented mask everywhere (SCIF, GPIO, SYC, SDHI, DRP `0x8E8/0xA68`)? | inverted pairs | **unknown** (undocumented holes) | the range includes undocumented holes | |
+| EVK-R50 | `md.l 0x11000000 0x10` | SYC control frame: CNTCR, CNTSR, CNTCV, CNTFID0 (`+0x20`, inferred) | Where CNTFID0 lives and whether the counter is enabled. May abort if SYC is secure-only | CNTCR b0 = 1; `+0x20` = `0x016E3600` (24 MHz) (I) | **unknown** (block may be secure-only; CNTCV counts) | sysc.md Q5, claim 2 | |
 | EVK-R51 | `md.l 0x11001000 4` | SYC read frame | Does the read-only frame mirror CNTCV? | CNTCV low/high, advancing | **unknown** (block may be secure-only) | sysc.md Q5 | |
 | EVK-R70 | `md.w 0x1004b818 1` | SCIF0 undefined offset | Zero, bus error or alias? Decides the model's undefined-offset behaviour | `0x0000` or abort | unknown | scif.md Q4 | |
 | EVK-R71 | `md.l 0x11033100 1` | PFC undefined offset | Same question for the PFC | `0x00000000` or abort | unknown | pinctrl.md Q4 | |

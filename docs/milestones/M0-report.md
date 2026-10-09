@@ -1,6 +1,6 @@
 # M0 report — research baseline
 
-**Status:** **accepted by the operator, 2026-10-08.** DR-0003 decided: option A. EVK register reads are not needed to *start* M1; the GIC identity reads (EVK-R60–R65) are needed to *pass* its exit gate.
+**Status:** **accepted by the operator, 2026-10-08.** DR-0003 decided: option A. EVK register reads are not needed to *start* M1; the GIC identity reads (EVK-R60–R66) are needed to *pass* its exit gate.
 **Date:** 2026-10-08
 **Spec:** `../spec/project.md` v0.3
 
@@ -20,7 +20,6 @@
 | Area | Documents |
 |---|---|
 | Research (reviewed by the operator against the HW manual) | `../research/{boot-chain-firmware,cpg-reset,sysc,scif,pinctrl,cpu-gic,boot-dependency-graph}.md` |
-| Learning companions | `../learning/` (method guide + three topic explainers with PDF spot checks) |
 | Board evidence | `../evidence/EVK-2026-10-08-boot-log.md` |
 | Decisions | DR-0001 (repo and fork shape), DR-0002 (secure-world staging); both accepted |
 | Process | spec v0.3 work units (`../units/`), `../spec/traceability.md` |
@@ -97,7 +96,7 @@ M1 runs no OS guest; its tests are qtests and a bare-metal test ELF. Any other w
 ### M1 start vs M1 exit
 
 - **Needed to start M1:** nothing further. All M1 inputs are evidenced (EVK boot log, BL2 prints, notes).
-- **Needed to pass the M1 exit gate** (spec §17: "a qtest reads GIC and SYSC ID registers equal to EVK values"): the SYSC part is ready; the GIC part needs EVK-R60–R65 (DR-0003 option A).
+- **Needed to pass the M1 exit gate** (spec §17: "a qtest reads GIC and SYSC ID registers equal to EVK values"): the SYSC part is ready; the GIC part needs EVK-R60–R66 (DR-0003 option A).
 
 ### DR-0003: GIC identity (decided: option A, `../decisions/DR-0003-gic-identity.md`)
 
@@ -112,7 +111,7 @@ M1 runs no OS guest; its tests are qtests and a bare-metal test ELF. Any other w
 ### M1 tests (proposed)
 
 - qtest: SYSC LSI_MODE / DEVID / PRR values vs the EVK, writes ignored, and the unimplemented offsets logged; mutation-checked.
-- qtest: GIC placement (distributor/redistributor bases, `GICD_TYPER` ITLinesNumber for 480 SPIs, `GICR_TYPER` affinity and Last bit per CPU). GIC identity per DR-0003: under option A, GICD_IIDR, GICR_IIDR and both frames' PIDR/CIDR equal the EVK values (EVK-R60–R65).
+- qtest: GIC placement (distributor/redistributor bases, `GICD_TYPER` ITLinesNumber for 480 SPIs, `GICR_TYPER` affinity and Last bit per CPU). GIC identity per DR-0003: under option A, GICD_IIDR, GICR_IIDR and both frames' PIDR/CIDR equal the EVK values (EVK-R60–R66).
 - Test ELF: reads MPIDR on both cores (CPU1 via PSCI CPU_ON), MIDR, CNTFRQ, CurrentEL; results checked through a memory mailbox via qtest/gdbstub, since there is no UART until M2.
 - Script: `info mtree` / `info qtree` diffed against `../device-map.md`.
 
@@ -129,7 +128,7 @@ Reworded: **REQ-CPG-001** now states `CLK_MON` = `CLK_ON` and `RSTMON` = `~RST &
 
 ## Open (carried into M1)
 
-- **EVK register reads** (`../evidence/requests.md`): post-firmware CPG, PFC, SCIF0, PLL and CNTFID0 values, and the GIC distributor and redistributor identity (EVK-R60–R65). Those GIC reads matter for M1's exit gate under option A; the rest are needed before M2/M3b.
+- **EVK register reads** (`../evidence/requests.md`): post-firmware CPG, PFC, SCIF0, PLL and CNTFID0 values, and the GIC distributor and redistributor identity (EVK-R60–R66). Those GIC reads matter for M1's exit gate under option A; the rest are needed before M2/M3b.
 - Cache topology: QEMU's A55 reports an L2 that the silicon lacks (HW manual p.83). Decide in M1 whether to override the cache ID registers or record a gap.
 - **Effective configuration:** the G0 research used the arm64 `defconfig` source. The built G0 kernel's effective `.config` has not been checked. It must be, before M3 acceptance, per AGENTS.md rule 3.
 - `ID_AA64PFR0_EL1.EL2` will read 0 with `has_el2=false`, while the silicon implements EL2 (device-map gap 14, an assumption).

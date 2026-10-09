@@ -248,7 +248,7 @@ G1 (rz-6.12-cip14) delta:
   - (a) add an upstreamable `hw/intc/arm_gicv3` property for IIDR/product ID, or
   - (b) record a fidelity gap and limit the M1 qtest to ArchRev / GICD_TYPER fields QEMU can represent.
 
-  Decide once Q1 is answered.
+  **Decided: (a), as DR-0003 option A** (`../decisions/DR-0003-gic-identity.md`). The options above are kept as the derivation.
 - **D4. Timer wiring.** Wire PHYS→30, VIRT→27, HYP→26, SEC→29, HYPVIRT→28 (BSA constants), the maintenance interrupt → 25 and the PMU → 23, exactly as in fsl-imx8mp.c:351-371 plus `GTIMER_HYPVIRT`.
 
 ---
@@ -260,7 +260,7 @@ The structure follows `fsl-imx8mp.c` / `imx8mp-evk.c` (spec REQ-MACH-001). The c
 1. **CPUs:** 2 × `cortex-a55`.
    - `mp-affinity` 0x0 and 0x100; `cntfrq` 24000000.
    - `has_el2=false`, `has_el3=true` (D2); `start-powered-off` on cpu1.
-   - Board-local A55 reginfo: CPUPWRCTLR_EL1 required; CLUSTERIDR/CLUSTERCFR precautionary (EXP-001).
+   - Not in M1: the board-local A55 IMPDEF reginfo (CPUPWRCTLR_EL1 required; CLUSTERIDR/CLUSTERCFR precautionary, EXP-001) belongs to M7 (REQ-MACH-005), where BL31 first uses it.
    - Later: a CLIDR/CCSIDR override (§1, gap until measured).
 2. **GIC-600:** per D1, D3 and D4, realized after the CPUs; IRQ/FIQ/VIRQ/VFIQ outputs wired to each CPU.
 3. **DDR:** 2 GiB RAM at 0x40000000 (the board; REQ-MACH-006). `arm_boot_info` with `loader_start=0x48000000`, `ram_size=0x78000000`, `psci_conduit=SMC`.
@@ -315,7 +315,7 @@ Kept for the later v6.18 LTS regression target (`docs/sources.md`). Citations ar
 
 All are read-only.
 
-- **Q1** (U-Boot, before `bootm`): `md.l 0x11900000 4` (GICD_CTLR, TYPER, IIDR, TYPER2), `md.l 0x1190ffd0 12` (GICD PIDR4..CIDR3), `md.l 0x11940000 4` and `md.l 0x11960000 4` (GICR_CTLR/IIDR/TYPER for both redistributors), `md.l 0x11940014 1` (GICR_WAKER), `md.l 0x1194ffe8 1` (GICR_PIDR2). These are side-effect-free ID/config registers.
+- **Q1** (U-Boot, before `bootm`): `md.l 0x11900000 4` (GICD_CTLR, TYPER, IIDR, TYPER2), `md.l 0x1190ffd0 12` (GICD PIDR4..CIDR3), `md.l 0x11940000 4` and `md.l 0x11960000 4` (GICR_CTLR/IIDR/TYPER for both redistributors), `md.l 0x11940014 1` (GICR_WAKER), and the full GICR0 and GICR1 ID blocks. These are side-effect-free ID/config registers. The canonical commands are EVK-R60–R66 in `../evidence/requests.md`.
 - **Q2** (post-Linux): `grep . /sys/devices/system/cpu/cpu0/cache/index*/{level,type,size}` and `/proc/cpuinfo` Features. This answers CLIDR encoding with no L2, and whether the crypto extension is present.
 - **Q4** (post-Linux, remainder): `cat /sys/devices/system/clocksource/clocksource0/{current,available}_clocksource` and `grep -E 'arch_timer|ostm' /proc/interrupts`. Expect `arch_sys_counter` current (rating 400 beats OSTM's 300).
 - **Q5** (post-Linux, remainder): `dmesg | grep -iE 'trusted os|migrat'` and `cat /sys/devices/system/cpu/vulnerabilities/*`.

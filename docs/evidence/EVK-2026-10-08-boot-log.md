@@ -5,6 +5,7 @@
 **Kernel:** 6.12.59-cip14, a downstream image built on the G1 base (`rz-6.12-cip14`) with additional downstream patches. SoC- and firmware-level facts transfer to G0 and G1; DT-level facts (which devices are enabled) belong to that image.
 **Boot stage:** U-Boot console output + Linux dmesg (post-Linux).
 **Method:** passive serial capture at 115200 8N1; no register access.
+**Provenance:** the image was not built by this project. The raw captures are kept privately by the operator; their SHA-256 is **not yet recorded** (review finding R4, 2026-10-09). Until it is, the excerpts below are reported observations, not independently checkable ones.
 
 | Observation (verbatim excerpt) | Answers |
 |---|---|

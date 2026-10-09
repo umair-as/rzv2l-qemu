@@ -13,8 +13,9 @@ docs/units/<unit>/
 1. `spec.md` is drafted from `../spec/requirements.md`, `../device-map.md` and the research notes.
 2. The operator reviews the spec. Nothing is implemented before that.
 3. `design.md` and `tasks.md` are written; DRs are opened where alternatives exist.
-4. Tasks are implemented on the QEMU fork's `rzv2l-dev` branch, one task per commit where practical. Commit messages name the task ID.
+4. Tasks are implemented on `unit/<unit>` branches in both repos (`../../AGENTS.md`, "Branches and PRs"), one task per commit where practical. Commit messages name the task ID.
 5. Each task closes only when its test passes; `../spec/traceability.md` is updated.
-6. The unit closes after a consistency check: every REQ appears in a task, every task names a test, and every test result is recorded.
+6. An independent reviewer (a different model) reviews the unit's final revision with `templates/review-prompt.md`. Every finding gets a disposition; BLOCKERs are fixed, never only recorded, and the reviewer rechecks material fixes.
+7. The unit closes when the closure checklist in `tasks.md` is complete.
 
 Templates are in `templates/`.

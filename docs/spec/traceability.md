@@ -15,7 +15,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-MACH-004 | M1 (`has_el2=false`, SMC conduit) | M3 (Linux reports EL1, PSCI works) | M1-machine-skeleton (proposed) | — | — | EXP-001; EVK boot log | P |
 | REQ-MACH-005 | M7 | M7 (BL31 CPU_OFF runs) | — | — | — | EXP-001 | P |
 | REQ-MACH-006 | M1 | M1 (`info mtree`); M3 (`/proc/iomem`) | M1-machine-skeleton (proposed) | — | — | `../research/cpu-gic.md` | P |
-| REQ-MACH-007 | M1 | M1 (placement + GICD/GICR identity == EVK, DR-0003 option A; needs EVK-R60–R65) | M1-machine-skeleton (proposed) | — | — | `../research/cpu-gic.md`; EVK boot log | P |
+| REQ-MACH-007 | M1 | M1 (placement + GICD/GICR identity == EVK, DR-0003 option A; needs EVK-R60–R66) | M1-machine-skeleton (proposed) | — | — | `../research/cpu-gic.md`; EVK boot log | P |
 | REQ-MACH-008 | M1+ (per device) | each device's milestone | — | — | — | `../device-map.md` | P |
 | REQ-SYSC-001 | M1 | M1 | M1-machine-skeleton (proposed) | — | — | `../research/sysc.md`; EVK BL2 print `0x18447447` | P |
 | REQ-SYSC-002 | M1 (board property) | M7 (BL2/U-Boot boot-device selection) | — | — | — | `../research/sysc.md`; EVK BL2 LSI_MODE values | P |

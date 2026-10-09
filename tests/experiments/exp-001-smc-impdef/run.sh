@@ -26,16 +26,35 @@ T[t7-cntfrq-mpaff]="-M virt -cpu cortex-a55,cntfrq=24000000,mp-affinity=0x100 -s
 # t8: control CPU that does define CPUPWRCTLR/CPUACTLR/CPUECTLR (EL3 start)
 T[t8-n1-el3-elf]="-M virt,secure=on,virtualization=on -cpu neoverse-n1 -smp 1 -kernel $ELF"
 
+# A probe prints "=== DONE" and then idles, so `timeout` ending the run
+# (status 124) is expected. A run counts as complete only if DONE was seen.
+# Anything else is reported and makes the script exit non-zero: a launch
+# failure (QEMU exits with another status) or an incomplete probe.
+FAILED=0
 run() {
+    local out rc
     echo "##### $1: qemu-system-aarch64 ${T[$1]}"
+    set +e
     # shellcheck disable=SC2086
-    timeout 10 "$QEMU" -nographic -m 256 -monitor none -serial stdio ${T[$1]} \
-        -d guest_errors 2>&1 | tr -d '\r' || true
+    out=$(timeout 10 "$QEMU" -nographic -m 256 -monitor none -serial stdio ${T[$1]} \
+        -d guest_errors 2>&1)
+    rc=$?
+    set -e
+    printf '%s\n' "$out" | tr -d '\r'
+    if [[ "$out" == *"=== DONE"* ]]; then
+        echo "##### $1: COMPLETE (qemu status $rc)"
+    elif [[ $rc -ne 0 && $rc -ne 124 ]]; then
+        echo "##### $1: LAUNCH FAILURE (qemu status $rc)"; FAILED=1
+    else
+        echo "##### $1: INCOMPLETE (no DONE marker, qemu status $rc)"; FAILED=1
+    fi
 }
 if [[ "${1:-}" == all ]]; then
     for t in $(printf '%s\n' "${!T[@]}" | sort); do run "$t"; done
+    exit $FAILED
 elif [[ -n "${1:-}" && -n "${T[$1]:-}" ]]; then
     run "$1"
+    exit $FAILED
 else
     echo "tests:"; printf '  %s\n' "${!T[@]}" | sort; exit 1
 fi
