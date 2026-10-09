@@ -25,4 +25,4 @@ The rest of this file is Claude-Code-specific.
 
 - Use subagents for broad source reading: TF-A, U-Boot, kernel drivers, the hardware manual text. Have them write findings to a local working file and return a summary.
 - **Verify their surprising claims yourself** against the effective build configuration before relaying or recording them. Subagent reports are leads, not evidence.
-- A Claude subagent reviewing work this session produced is not the independent reviewer of AGENTS.md "How work flows". That review needs a different model (Codex, or another Claude model in a separate session).
+- The independent reviewer of AGENTS.md "How work flows" must be a different model from the implementer, starting from a fresh context with only the filled-in review prompt: Codex, another Claude model in a separate session, or a non-forked subagent with a different `model`. A forked subagent, or one on the implementer's model, does not count.
