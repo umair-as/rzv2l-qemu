@@ -25,6 +25,10 @@ The M1 exit gate (spec §17) requires a qtest showing that the GIC and SYSC iden
 
 **Option A.** M1 adds identity properties to QEMU's `arm_gicv3`, covering IIDR plus the PIDR/CIDR blocks of both frames. The rzv2l machine sets them to the values measured on the EVK. Until a property is set, QEMU's defaults stay unchanged.
 
+## Amendment (2026-10-09)
+
+The Arm GIC-600 r1p6 TRM (100336_0106_00) documents the identity values. Only the IIDR differs from QEMU: `GICD_IIDR` = `GICR_IIDR` = `0x0201743B` (§4.2.3 Table 4-5, §4.4.1 Table 4-22), while the distributor and redistributor PIDR/CIDR blocks equal QEMU's existing table byte for byte (Table 4-2 p.4-108, Table 4-21 p.4-127). Option A therefore reduces to **one** default-off `iidr` property on `arm_gicv3`. The M1 qtest asserts the TRM values; the EVK reads (EVK-R60–R66) confirm them on silicon, and a disagreement is recorded as a conflict and resolved in favour of silicon.
+
 ## Consequences
 
 - The §17 gate stays as written: GICD and GICR identity must equal the EVK.
@@ -33,7 +37,7 @@ The M1 exit gate (spec §17) requires a qtest showing that the GIC and SYSC iden
 
 ## Unknowns
 
-- The silicon IIDR and PIDR/CIDR values (assumed GIC-600 r1p6 per HW manual §8.1, p.530).
+- Whether silicon matches the TRM values (EVK-R60–R66).
 
 ## Revisit condition
 

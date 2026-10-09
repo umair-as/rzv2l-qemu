@@ -21,7 +21,7 @@
 | M1-AC07 | `info mtree` SHALL show 2 GiB of RAM at `0x40000000`, and no QEMU-loaded blob (`info roms`) SHALL overlap `0x40000000`–`0x47FFFFFF`, the firmware-reserved region. | MACH-006 | run script |
 | M1-AC08 | WHEN the stock upstream DTB is passed with `-dtb` THEN the `/memory` node QEMU passes on (monitor command `dumpdtb`, qemu v11.1.2 `hw/arm/boot.c:643-645`) SHALL be `0x48000000` + `0x78000000`, and the only other differences from the stock DTB SHALL be QEMU's known loader fixups, each on the REQ-GUEST-004 gap list: `/psci` replaced (qemu v11.1.2 `hw/arm/boot.c:366-401`; the stock DT has its own, `r9a07g054.dtsi:165-168`) and the `/chosen` initrd properties when an initrd is given (`boot.c:612-627`). | MACH-006, GUEST-004 | run script + DT diff |
 | M1-AC09 | The GIC distributor SHALL be at `0x11900000` and the redistributors at `0x11940000` (CPU0) and `0x11960000` (CPU1), with no ITS; `GICD_TYPER.ITLinesNumber` SHALL be 15 (480 SPIs) with `LPIS` = 0; `GICR_TYPER` SHALL carry each CPU's affinity, with `Last` set only on the second redistributor. | MACH-007, MACH-008 | qtest |
-| M1-AC10 | `GICD_IIDR`, `GICR_IIDR` and the PIDR/CIDR blocks of the distributor and of **both** redistributors' RD_base frames SHALL equal the EVK values from EVK-R60–R66 (DR-0003 option A). | MACH-007 | qtest vs EVK capture |
+| M1-AC10 | `GICD_IIDR` and `GICR_IIDR` (both redistributors) SHALL read `0x0201743B`, and the PIDR/CIDR blocks of the distributor and of both redistributors' RD_base frames SHALL read the GIC-600 r1p6 values (`44 00 00 00 92/93 B4 3B 00 0D F0 05 B1`), per the Arm GIC-600 r1p6 TRM (100336_0106_00) Tables 4-2, 4-5, 4-21, 4-22 (DR-0003, amended). The EVK reads EVK-R60–R66 confirm these on silicon; a disagreement is recorded as a conflict and silicon wins. | MACH-007 | qtest vs TRM values; EVK capture confirms |
 | M1-AC11 | IF the GIC identity properties are not set THEN QEMU's existing GIC identity SHALL be unchanged, so no other machine changes behaviour. | MACH-007 | qtest on an existing machine |
 | M1-AC12 | WHEN `0x11020A04` (`SYS_LSI_DEVID`) is read THEN it SHALL return `0x18447447`; WHEN `0x11020A08` (`SYS_LSI_PRR`) is read THEN it SHALL return `0x00000000`. Both are read-only (R) in Table 6.1 p.167-168; writes SHALL be ignored (inference from R). | SYSC-001 | qtest vs EVK BL2 print, confirmed by EVK-R01 before acceptance |
 | M1-AC12b | WHEN `0x11020A00` (`SYS_LSI_MODE`) is read THEN it SHALL return `STAT_SEC_EN` (bit 16) = 1, `STAT_DEBUGEN` (bit 9) from the board property `debugen` (default 0), `STAT_MD_BOOT` (bits [2:0]) from the board property `boot-mode` (default **0, eSD**), and 0 in every other field (§6.3.42 p.207). `boot-mode` SHALL accept only the modes Table 4.1 p.105 defines (0–5). The register is read-only (R); writes SHALL be ignored (inference from R). | SYSC-002 | qtest vs EVK BL2 prints (`0x10000`, `0x10200`, `0x10001`, `0x10201`, `0x10203`) and EVK-R01 |
@@ -32,7 +32,7 @@
 ## Exit gate
 
 - **Passes when:** AC01–AC15 hold on the final reviewed revision, the closure checklist in `tasks.md` is complete, and `scripts/lint.py` reports 0 errors.
-- **Disqualifies:** any assertion whose expected value comes from the model itself or from an unmeasured prediction (in particular AC10 before EVK-R60–R66 are captured); any placeholder mapped beyond the three M1 windows.
+- **Disqualifies:** any assertion whose expected value comes from the model itself or from an unmeasured prediction (AC10 asserts the TRM's documented values, not a prediction); any placeholder mapped beyond the three M1 windows.
 - **Known blind spot:** M1 runs no OS. Nothing in M1 shows that Linux boots or that interrupts are delivered; those are M2/M3 claims.
 
 ## Scope
@@ -72,3 +72,4 @@
 4. The probe payload's location under `tests/` is decided in `design.md`.
 5. Other SYSC offsets fail with a bus error, not read-as-zero (AC13; review finding R12).
 6. GIC identity (AC10) covers the RD_base frames only, which is what Linux reads (linux v6.12.59 `drivers/irqchip/irq-gic-v3.c:1043`). Whether the GIC-600 repeats ID registers in the SGI_base frame is unverified (external Arm document); not asserted.
+7. GIC identity values come from the Arm GIC-600 r1p6 TRM (100336_0106_00), to which the HW manual defers (§8.4 p.548). Only the IIDR differs from QEMU (`0x0201743B` vs `0x43B`), so DR-0003 option A is one `iidr` property. The EVK reads confirm later instead of gating M1.

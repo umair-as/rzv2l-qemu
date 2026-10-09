@@ -109,7 +109,7 @@ qemu/               submodule: the QEMU fork
 
 ## Sources
 
-- Hardware truth: `artifacts/rzv2l/hardware/r01uh0936ej0150-rzv2l.pdf` (HW manual Rev 1.50). For grep, use the searchable text in `artifacts/rzv2l/text/`. Cite the **PDF** (section/table/page), not the text file.
+- Hardware truth: `artifacts/rzv2l/hardware/r01uh0936ej0150-rzv2l.pdf` (HW manual Rev 1.50). The GIC-600 registers are in the Arm GIC-600 r1p6 TRM (100336_0106_00), to which the manual defers (§8.4 p.548). For grep, use the searchable text in `artifacts/rzv2l/text/`. Cite the **PDF** (section/table/page), not the text file.
 - Board: the SMARC module UM (`r01uh0964ej0200`) and carrier UM (`r01uh0966ej0200`).
 - When sources conflict: the manual is authority for intended layout and reset values, silicon for actual behaviour, and guest code for what is actually required. Record the conflict; never silently pick one.
 - The BSP driver manuals (`bsp-drivers/`) describe software usage only. Treat them as leads.

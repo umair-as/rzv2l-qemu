@@ -252,6 +252,13 @@
       "bytes": 4808632,
       "text_path": "text/security/r20ut5349ej0111-security.txt",
       "pages": 211
+    },
+    {
+      "path": "hardware/arm-100336_0106_00-gic600-r1p6-trm.pdf",
+      "sha256": "500c1d7d733d576ca8de8c3bc4592bfcaf102267a5ddeff01d9e4ef997a7050f",
+      "bytes": 1476350,
+      "text_path": "text/hardware/arm-100336_0106_00-gic600-r1p6-trm.txt",
+      "pages": 216
     }
   ]
 }

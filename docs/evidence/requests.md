@@ -81,12 +81,12 @@ U-Boot runs at NS-EL1, so GICD_CTLR shows its non-secure view.
 
 | ID | Command | Register / meaning | Question it answers | Expected / predicted | Read effect | Source note | Result |
 |---|---|---|---|---|---|---|---|
-| EVK-R60 | `md.l 0x11900000 4` | GICD_CTLR, GICD_TYPER, GICD_IIDR, GICD_TYPER2 | Silicon IIDR (decision D3), TYPER fields QEMU must match | CTLR (NS) `0x00000012` (I); TYPER ITLinesNumber `0xF`, SecurityExtn = 1, LPIS = 0; IIDR `0x0201643B` (A) | none | cpu-gic.md Q1, claims 1-2 | |
-| EVK-R61 | `md.l 0x1190ffd0 0xc` | GICD PIDR4-7, PIDR0-3, CIDR0-3 | GIC-600 product ID and ArchRev | PIDR2 bits [7:4] = 3; CIDR `0x0D 0xF0 0x05 0xB1` | none | cpu-gic.md Q1 | |
-| EVK-R62 | `md.l 0x11940000 4` | GICR0 CTLR, IIDR, TYPER (lo, hi) | Redistributor 0 identity and affinity | TYPER hi `0x00000000`, Last = 0 | none | cpu-gic.md Q1 | |
+| EVK-R60 | `md.l 0x11900000 4` | GICD_CTLR, GICD_TYPER, GICD_IIDR, GICD_TYPER2 | Silicon IIDR (decision D3), TYPER fields QEMU must match | CTLR (NS) `0x00000012` (I); TYPER ITLinesNumber `0xF`, SecurityExtn = 1, LPIS = 0; IIDR `0x0201743B` (TRM Table 4-5) | none | cpu-gic.md Q1, claims 1-2 | |
+| EVK-R61 | `md.l 0x1190ffd0 0xc` | GICD PIDR4-7, PIDR0-3, CIDR0-3 | GIC-600 product ID and ArchRev | `44 00 00 00 92 B4 3B 00 0D F0 05 B1` (TRM Table 4-2 p.4-108) | none | cpu-gic.md Q1 | |
+| EVK-R62 | `md.l 0x11940000 4` | GICR0 CTLR, IIDR, TYPER (lo, hi) | Redistributor 0 identity and affinity | IIDR `0x0201743B` (TRM Table 4-22); TYPER hi `0x00000000`, Last = 0 | none | cpu-gic.md Q1 | |
 | EVK-R63 | `md.l 0x11960000 4` | GICR1 CTLR, IIDR, TYPER (lo, hi) | Redistributor 1 affinity and Last bit | TYPER hi `0x00000100`, Last (b4) = 1, processor number 1 (I) | none | cpu-gic.md Q1 | |
 | EVK-R64 | `md.l 0x11940014 1; md.l 0x11960014 1` | GICR0/GICR1 WAKER | Redistributor power state with CPU1 still off | CPU0 `0x0` (awake); CPU1 `0x6` (asleep) (I) | none | cpu-gic.md Q1 | |
-| EVK-R65 | `md.l 0x1194ffd0 0xc` | GICR0 PIDR4-7, PIDR0-3, CIDR0-3 (RD_base frame) | Redistributor 0 identity block for DR-0003 option A, incl. the PIDR2 ArchRev Linux checks | PIDR2 bits [7:4] = 3; CIDR `0x0D 0xF0 0x05 0xB1` | none | cpu-gic.md Q1; DR-0003 | |
+| EVK-R65 | `md.l 0x1194ffd0 0xc` | GICR0 PIDR4-7, PIDR0-3, CIDR0-3 (RD_base frame) | Redistributor 0 identity block for DR-0003 option A, incl. the PIDR2 ArchRev Linux checks | `44 00 00 00 93 B4 3B 00 0D F0 05 B1` (TRM Table 4-21 p.4-127) | none | cpu-gic.md Q1; DR-0003 | |
 | EVK-R66 | `md.l 0x1196ffd0 0xc` | GICR1 PIDR4-7, PIDR0-3, CIDR0-3 (RD_base frame) | Redistributor 1 identity block; asserted separately, not inferred from GICR0 | as EVK-R65 | none | DR-0003 | |
 
 ### 1.7 Last: experimental reads (undefined addresses, register holes, possibly secure-only blocks)

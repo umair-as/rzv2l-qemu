@@ -129,7 +129,7 @@ Values Linux or the console path can observe. "Code" = derived from the pinned f
 |---|---|---|---|---|---|
 | 1 | SMCCC version | v1.4 (O) | v1.0 (no `SMCCC_VERSION` in built-in PSCI); no ARCH_WORKAROUND calls; `vulnerabilities/*` may differ | FIDELITY GAP, guest-visible | cpu-gic §4; boot-dependency-graph §5 #6 |
 | 2 | `SCR_EL3.FIQ` in the GIC banner | `FIQ=1` (O) | `FIQ=0` (`arm_emulate_firmware_reset` does not set it); Stage B with real BL31 should match | FIDELITY GAP, direct mode only | cpu-gic §6 D2 |
-| 3 | GICD/GICR IIDR and PIDR | GIC-600 r1p6 (A: IIDR `0x0201643B`) | fixed `0x43B` (GIC-500-like); boot-harmless; blocks the M1 "GIC ID = EVK" check unless a property is added (D3) | FIDELITY GAP | cpu-gic §2.1, §6 D3 |
+| 3 | GICD/GICR IIDR | GIC-600 r1p6: `0x0201743B` (Arm GIC-600 r1p6 TRM (100336_0106_00) Tables 4-5, 4-22); the PIDR/CIDR blocks equal QEMU's (Tables 4-2, 4-21) | fixed `0x43B`; closed in M1 by an `iidr` property (DR-0003) | FIDELITY GAP until M1 | cpu-gic §2.1, §6 D3 |
 | 4 | Cache topology | L1 32 KiB I/D, no L2, 256 KiB L3 | QEMU CLIDR reports a 512 KiB L2 plus DT L3 in cacheinfo | FIDELITY GAP (sysfs only) | cpu-gic §1 "Cache node" |
 | 5 | MIGRATE_INFO_TYPE | possibly "resident TOS" with opteed (A) | 2 (TOS not present) | open | cpu-gic §4 |
 | 6 | `earlycon` boot argument | added by the board's own boot chain | M3a needs `-append "<stock bootargs> earlycon"` (bare form only) | REQ-GUEST-004 gap (M3a only) | scif §5; boot-dependency-graph §5 #1 |

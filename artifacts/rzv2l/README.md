@@ -9,6 +9,7 @@ This is the reference collection for the specification (`docs/spec/project.md`),
 | Reference | Use |
 | --- | --- |
 | SoC hardware manual Rev.1.50 (`hardware/r01uh0936ej0150-rzv2l.pdf`) | Primary authority for address map, interrupts, SCIF, CPG/reset, power, storage, Ethernet and firmware-visible registers. |
+| Arm CoreLink GIC-600 r1p6 TRM, 100336_0106_00 (`hardware/arm-100336_0106_00-gic600-r1p6-trm.pdf`) | GIC-600 register values. The SoC manual defers to it (§8.4 p.548). Arm copyright; obtain from developer.arm.com. |
 | Datasheet Rev.1.10 (`hardware/r01ds0485ej0110-rzv2l.pdf`) | Device variants and capabilities. |
 | SMARC module manual Rev.2.00 (`hardware/r01uh0964ej0200-…`) | Module memory, peripherals and wiring. Confirm the physical board revision. |
 | SMARC carrier manual Rev.2.00 (`hardware/r01uh0966ej0200-…`) | Carrier connections, switches and console routing. |
@@ -39,6 +40,7 @@ The following are not part of this collection:
 | File | PDF pages |
 | --- | ---: |
 | `guides/EPBZ-IMB-22-0032-8_RZV2L_Easy_Download_Guide.pdf` | 2 |
+| `hardware/arm-100336_0106_00-gic600-r1p6-trm.pdf` | 216 |
 | `hardware/r01ds0485ej0110-rzv2l.pdf` | 71 |
 | `hardware/r01uh0936ej0150-rzv2l.pdf` | 3559 |
 | `hardware/r01uh0964ej0200-rzg2l-v2l-smarc-module-um.pdf` | 58 |

@@ -292,7 +292,7 @@ Kept for the later v6.18 LTS regression target (`docs/sources.md`). Citations ar
 
 ## Claims to verify
 
-1. The GIC-600 r1p6 GICD_IIDR is 0x0201643B (ProductID 0x02, variant 1, revision 6) and differs from QEMU's 0x43B. Evidence: qemu v11.1.2 hw/intc/gicv3_internal.h:749-758; silicon via Q1.
+1. ~~The GIC-600 r1p6 GICD_IIDR is 0x0201643B~~ **Corrected 2026-10-09:** the Arm GIC-600 r1p6 TRM (100336_0106_00) encodes p6 as Revision `0x7` (Table 4-5, p.4-112), so GICD_IIDR = GICR_IIDR = `0x0201743B`, which differs from QEMU's 0x43B. The PIDR/CIDR blocks equal QEMU's (Tables 4-2, 4-21). Original claim: Evidence: qemu v11.1.2 hw/intc/gicv3_internal.h:749-758; silicon via Q1.
 2. Silicon GICD_TYPER has LPIS = 0 and ESPI = 0, and its IDbits/RSS values are unknown. Evidence: HW manual Rev 1.50 §8.1 p.530 ("LPI: Not supported"); Q1. (ITLinesNumber is consistent with the observed 480 SPIs.)
 3. With `has_el3=true` and GIC security extensions on, a QEMU direct boot gives Linux `GICD_CTRL.DS=0` and `SCR_EL3.FIQ=0` (board: DS=0, FIQ=1). Evidence: qemu v11.1.2 hw/intc/arm_gicv3_common.c:546-551,587-602, target/arm/cpu.c:719-780; irq-gic-v3.c:165-229. To be shown by an M1 run.
 4. The RAZ/WI GICR_PWRR satisfies TF-A's GIC-600 power-on sequence in Stage B. Evidence: qemu v11.1.2 hw/intc/arm_gicv3_redist.c:750-762; the TF-A `drivers/arm/gic/v3/gic600.c` power-on loop (not read here).

@@ -8,7 +8,7 @@ Sources are authoritative by **domain**, not by a single ranking (spec §5):
 
 | Domain | Authority |
 |---|---|
-| Intended register layout, bit meaning, reset values | the HW manual |
+| Intended register layout, bit meaning, reset values | the HW manual; for the GIC-600, the Arm GIC-600 r1p6 TRM (100336_0106_00), to which the HW manual defers (§8.4 p.548) |
 | Board wiring and straps | the SMARC module and carrier manuals |
 | Actual silicon behaviour | measurements on the EVK (`evidence/`), with boot stage and build identity |
 | What guest software requires | the pinned guest and firmware sources, checked against their effective build configuration |
