@@ -142,7 +142,7 @@ Useful QEMU debugging (see `docs/imx95/methodology.md` in qemu-imx95):
 ## Commit style
 
 - **Project repo:** Conventional Commits, `<type>(<scope>): <subject>`, imperative mood, ≤72 chars. Scopes: `spec`, `docs`, `research`, `evidence`, `tests`, `scripts`, `artifacts`, `qemu` (submodule bumps).
-- **QEMU fork (`rzv2l-dev`):** upstream QEMU style, `<subsystem>: <subject>` (e.g. `hw/arm: add RZ/V2L SoC skeleton`), with `Signed-off-by:` from the operator, `scripts/checkpatch.pl` clean, one logical change per commit.
+- **QEMU fork (`rzv2l-dev`):** upstream QEMU style, `<subsystem>: <subject>` (e.g. `hw/arm: add RZ/V2L SoC skeleton`), `scripts/checkpatch.pl --no-signoff` clean, one logical change per commit. No `Signed-off-by:` on agent-written commits: it certifies the DCO, which QEMU holds cannot be given for AI-generated code (`qemu/docs/devel/code-provenance.rst`). The operator signs off only code they wrote, if a submission is ever considered.
 - **Commit body:** say what was verified and how, and what was not verified. A test that has never been seen to fail does not count as verification (rule 7).
 - **AI attribution, both repos:** end every agent-touched commit with `Assisted-by: <tool>:<exact-model-id-you-are-running-as>`. Use one line per model that touched the change, in order. Never copy a model id from a doc or a past commit. **Do not add `Co-Authored-By:` lines for AI tools.**
 - Run `scripts/lint.py` before every commit; it must report 0 errors. Warnings are reviewed, not ignored.

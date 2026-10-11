@@ -13,7 +13,7 @@
 | GIC `iidr` property (DR-0003 A) | fork | `hw/intc/gicv3_internal.h`, `arm_gicv3_common.c`, `arm_gicv3_dist.c`, `arm_gicv3_redist.c`, `include/hw/intc/arm_gicv3_common.h` | one generic, default-off property |
 | Build wiring | fork | `hw/arm/Kconfig`, `hw/arm/meson.build`, `hw/misc/Kconfig`, `hw/misc/meson.build` | `R9A07G054` selects `ARM_GICV3`, `RENESAS_RZG2L_SYSC`; `RZV2L_SMARC` selects `R9A07G054` |
 | Machine doc | fork | `docs/system/arm/rzv2l-smarc.rst` (+ index) | what is modelled, what is not |
-| qtests | fork | `tests/qtest/rzv2l-smarc-test.c` (+ `meson.build`) | AC09–AC12b, AC11 on `virt` |
+| qtests | fork | `tests/qtest/rzv2l-smarc-test.c`, `tests/qtest/arm-gicv3-iidr-test.c` (+ `meson.build`) | AC09–AC12b; AC11 and the `iidr` property on `virt` (own file, so T01 carries its test) |
 | Probe payload | project | `tests/probes/m1-skeleton/` | arm64 `Image`; reports through semihosting (below) |
 | Acceptance run | project | `tests/acceptance/m1/run.sh` + expected files | AC01–AC08, AC13–AC14; drives the probe and the monitor |
 
