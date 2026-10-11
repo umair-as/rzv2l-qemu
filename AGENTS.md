@@ -98,6 +98,7 @@ docs/milestones/    milestone reports
 docs/research/      per-block research notes
 docs/decisions/     decision records
 docs/experiments/   experiment records (EXP-NNN-*.md)
+docs/learning/      how QEMU models a machine, from real monitor output
 docs/evidence/      EVK captures; each records board, image/build ID and boot stage
 docs/device-map.md  MMIO/IRQ/clock/reset map, with evidence per row
 docs/sources.md     source register: manuals, pinned guest and firmware sources
