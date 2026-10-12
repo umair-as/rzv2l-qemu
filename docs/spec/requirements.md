@@ -49,4 +49,4 @@ The format and states are defined in `project.md` §15. Evidence paths are relat
 |---|---|---|---|---|---|
 | REQ-TEST-001 | `tests/hello-rzv2l` (ELF) SHALL print `Hello from RZ/V2L` via SCIF0 in direct mode. | spec §17 | scripted run, exact-match output | M2 | P |
 | REQ-TEST-002 | Every device model SHALL have a kernel-free qtest asserting manual reset and ID values; each test SHALL be mutation-checked. | spec §13 | CI + mutation record | M1+ | P |
-| REQ-TEST-003 | Acceptance runs SHALL use `-d unimp,guest_errors`; every logged access SHALL be modelled or listed. | spec §13 | log review per milestone | M3+ | P |
+| REQ-TEST-003 | Acceptance runs SHALL use `-d unimp,guest_errors,invalid_mem`; every logged access SHALL be modelled or listed. | spec §13 | log review per milestone | M3+ | P |

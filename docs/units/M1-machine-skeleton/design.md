@@ -11,7 +11,7 @@
 | Board `rzv2l-smarc` | fork | `hw/arm/rzv2l-smarc.c` | RAM, SoC instance, boot info, board properties |
 | SYSC | fork | `hw/misc/renesas_rzg2l_sysc.c`, `include/hw/misc/renesas_rzg2l_sysc.h` | named for the RZ/G2L family, whose SYSC layout RZ/V2L shares; IDs are properties |
 | GIC `iidr` property (DR-0003 A) | fork | `hw/intc/gicv3_internal.h`, `arm_gicv3_common.c`, `arm_gicv3_dist.c`, `arm_gicv3_redist.c`, `include/hw/intc/arm_gicv3_common.h` | one generic, default-off property |
-| Build wiring | fork | `hw/arm/Kconfig`, `hw/arm/meson.build`, `hw/misc/Kconfig`, `hw/misc/meson.build` | `R9A07G054` selects `ARM_GICV3`, `RENESAS_RZG2L_SYSC`; `RZV2L_SMARC` selects `R9A07G054` |
+| Build wiring | fork | `hw/arm/Kconfig`, `hw/arm/meson.build`, `hw/misc/Kconfig`, `hw/misc/meson.build` | `R9A07G054` selects `ARM_GIC` (which selects `ARM_GICV3` under TCG; `ARM_GICV3` itself `depends on ARM_GIC`, `hw/intc/Kconfig:24-33`) and `RENESAS_RZG2L_SYSC`; `RZV2L_SMARC` selects `R9A07G054` |
 | Machine doc | fork | `docs/system/arm/rzv2l-smarc.rst` (+ index) | what is modelled, what is not |
 | qtests | fork | `tests/qtest/rzv2l-smarc-test.c`, `tests/qtest/arm-gicv3-iidr-test.c` (+ `meson.build`) | AC09–AC12b; AC11 and the `iidr` property on `virt` (own file, so T01 carries its test) |
 | Probe payload | project | `tests/probes/m1-skeleton/` | arm64 `Image`; reports through semihosting (below) |
@@ -102,7 +102,7 @@ Checks, one line of output each:
 
 ## Acceptance run (`tests/acceptance/m1/run.sh`)
 
-Builds the probe, then runs `qemu-system-aarch64 -M rzv2l-smarc -kernel probe.Image -semihosting-config enable=on -d unimp,guest_errors` and checks:
+Builds the probe, then runs `qemu-system-aarch64 -M rzv2l-smarc -kernel probe.Image -semihosting-config enable=on -d unimp,guest_errors,invalid_mem` and checks:
 - the probe's exit status and its lines (AC03–AC06, AC13, AC14);
 - through the monitor: `info qtree` and `info mtree -f` against hand-written expected files derived from `../../device-map.md` (AC02, AC07), `info roms` for the `0x40000000`–`0x47FFFFFF` rule (AC07);
 - `-M help` (AC01);

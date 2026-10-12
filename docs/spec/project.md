@@ -235,7 +235,7 @@ The exact register map and dependencies are not frozen here; they are derived in
 |---|---|
 | **qtest per device** (kernel-free, CI) | register behaviour against **manual** values: reset values, ID and capability registers, command/status semantics |
 | **Mutation check** of each qtest | the test fails when the model's load-bearing behaviour is broken |
-| **Unimplemented-access gate**: `-d unimp,guest_errors` during acceptance runs | every access is either modelled or listed |
+| **Unimplemented-access gate**: `-d unimp,guest_errors,invalid_mem` during acceptance runs | every access is either modelled or listed |
 | **Oracle diffs**: live DT, `/proc/iomem`, `/proc/interrupts`, boot-log probe order, ID registers | model vs EVK |
 | **Acceptance runs** per milestone (scripted, expected output) | software paths work |
 | ASan/UBSan build of the device models | memory safety |

@@ -129,6 +129,68 @@ Two other reads show the remaining region kinds:
 
 The DTB sits at the start of RAM because `virt` places it there for bare-metal boots (`qemu/docs/system/arm/virt.rst`: "the DTB is at the start of RAM (0x4000_0000)"). The monitor is not a CPU, so at the hole it just reports failure; a guest CPU reading there would take the abort from §2.
 
+### 3.1 Reading a real device: SYSC
+
+The GIC is large. The SYSC model written in M1-T02 is about 160 lines and shows every piece of a QEMU device in one file: `qemu/hw/misc/renesas_rzg2l_sysc.c`. (Line numbers are at fork commit `0e2a93b8e9`.)
+
+**What it models.** Three read-only registers BL2, U-Boot and Linux read to identify the chip and its boot setup (manual §6.3.42–6.3.44 p.207–209):
+
+| Register | Offset | Returns | Comes from |
+|---|---|---|---|
+| `SYS_LSI_MODE` | `0xA00` | bit 16 = 1 (security available), bit 9 = DEBUGEN pin, bits 2:0 = boot-mode switches | properties `debugen`, `boot-mode` |
+| `SYS_LSI_DEVID` | `0xA04` | `0x18447447` on RZ/V2L | property `lsi-devid`, set by the SoC |
+| `SYS_LSI_PRR` | `0xA08` | `0x0` | property `lsi-prr` |
+
+**Naming registers: `REG32` and `FIELD`** (`renesas_rzg2l_sysc.c:27-32`). Macros from `qemu/include/hw/core/registerfields.h` that give names to offsets and bit fields:
+
+```c
+REG32(SYS_LSI_MODE, 0xa00)                      /* A_SYS_LSI_MODE = 0xa00 (byte offset)       */
+    FIELD(SYS_LSI_MODE, STAT_DEBUGEN, 9, 1)     /* bit 9, 1 bit wide                          */
+```
+
+`REG32` defines `A_SYS_LSI_MODE` = `0xa00`, the byte offset used in the `switch`, and `R_SYS_LSI_MODE` = `0x280`, the index in 32-bit words, for devices that keep a register array. `FIELD` defines the shift, length and mask of one field. `FIELD_DP32(value, REG, FIELD, x)` ("deposit") writes `x` into that field (`renesas_rzg2l_sysc.c:41-44`). The bit position therefore appears once, in the `FIELD` line, and comes straight from the manual's bit table. The T04 mutation "`debugen` on bit 8" changes exactly that line.
+
+**One read, end to end.** A guest `ldr w0, [0x11020A04]`:
+
+```mermaid
+sequenceDiagram
+    participant G as Guest (BL2 or Linux)
+    participant M as Memory map
+    participant V as .valid check
+    participant S as rzg2l_sysc_read()
+    G->>M: read 4 bytes at 0x11020A04
+    M->>M: owner = renesas-rzg2l-sysc, offset 0xA04
+    M->>V: size 4 allowed? (min 4, max 4)
+    V-->>M: yes
+    M->>S: offset 0xA04
+    S-->>M: case A_SYS_LSI_DEVID: data = 0x18447447, MEMTX_OK
+    M-->>G: w0 = 0x18447447
+```
+
+**Three ways an access can fail, and why each one fails loudly:**
+
+| Access | Who refuses it | Result for the guest | Logged under |
+|---|---|---|---|
+| 8- or 16-bit read | QEMU's memory core, before our code (`.valid` sizes, `renesas_rzg2l_sysc.c:105-106`; `qemu/system/memory.c:1404`) | synchronous external abort | `-d invalid_mem` |
+| any offset other than the three | our `default:` case returns `MEMTX_DECODE_ERROR` (`renesas_rzg2l_sysc.c:69`, `:95`) | synchronous external abort | `-d unimp` |
+| write to one of the three | our write callback ignores it, returns `MEMTX_OK` (`renesas_rzg2l_sysc.c:84-90`) | nothing; value unchanged | `-d guest_errors` |
+
+Why abort instead of returning 0 for unknown offsets: the real SYSC has dozens of other registers, many with non-zero reset values (manual Table 6.1 p.167-168). A model that answered 0 would be *silent-wrong*: the guest would carry on with a wrong value and fail much later, far from the cause. An abort is *honest-fault*: the guest stops at the exact instruction, and `-d unimp` names the offset. `read_with_attrs` / `write_with_attrs` are used instead of plain `read` / `write` because only they can return a `MemTxResult` (`renesas_rzg2l_sysc.c:99-107`).
+
+**Properties and realize** (`renesas_rzg2l_sysc.c:109-141`). The four settings are declared with `DEFINE_PROP_*`. `realize` refuses what the hardware cannot be:
+- `boot-mode` 6 or 7: reserved in manual Table 4.1, so QEMU stops with "boot-mode 6 is reserved (valid: 0-5)";
+- `lsi-devid` 0: the ID is per SoC and no default is right, so QEMU stops with "lsi-devid property must be set" rather than show a wrong ID.
+
+**No reset, no migration state** (`renesas_rzg2l_sysc.c:146-150`). Nothing the guest does changes the device: every value comes from properties. So there is nothing to restore on reset and nothing to save in a snapshot.
+
+**Build wiring.** Three small edits make QEMU aware of the file:
+
+| File | Line added | Meaning |
+|---|---|---|
+| `qemu/hw/misc/Kconfig` | `config RENESAS_RZG2L_SYSC` | a build switch; the SoC will `select` it (M1-T03) |
+| `qemu/hw/misc/meson.build` | `system_ss.add(when: 'CONFIG_RENESAS_RZG2L_SYSC', …)` | compile the file only when the switch is on |
+| `qemu/hw/misc/trace-events` | `renesas_rzg2l_sysc_read(…)`, `…_write(…)` | trace points, see `building-and-testing.md` §5 |
+
 ## 4. Objects, properties, realize
 
 Every device is an *object* in the QEMU Object Model (QOM):
@@ -209,6 +271,75 @@ flowchart TB
 
 The order is bottom-up: the parts first, then the chip that holds them, then the board that holds the chip.
 
+### 5.1 Reading the SoC: `r9a07g054.c`
+
+The SoC object (`qemu/hw/arm/r9a07g054.c`, M1-T03) adds no register behaviour of its own. It **creates** the parts, **configures** them, **places** them at their addresses and **wires** them together. Its template is QEMU's i.MX 8M Plus SoC (`qemu/hw/arm/fsl-imx8mp.c`). (Line numbers are at fork commit `0e2a93b8e9`.)
+
+**Two stages, as for every device (§4).** `r9a07g054_init` (`:52`) only creates the children: two `cortex-a55` CPUs, the GIC and the SYSC. `r9a07g054_realize` (`:71`) then sets their properties and switches each one on, in a fixed order:
+
+```mermaid
+flowchart LR
+    C["1. CPUs<br/>mp-affinity 0x0 / 0x100<br/>cntfrq 24 MHz, EL3 on, EL2 off<br/>CPU1 powered off"] --> G["2. GIC<br/>512 IRQs, 2 redistributors<br/>security on, iidr GIC-600<br/>mapped 0x11900000 / 0x11940000"]
+    G --> W["3. Wiring<br/>CPU timers → GIC PPIs<br/>GIC IRQ/FIQ → CPUs"]
+    W --> Y["4. SYSC<br/>lsi-devid 0x18447447<br/>mapped 0x11020000"]
+```
+
+The CPUs must come first: the GIC reads each CPU's `mp-affinity` when it is realized and copies it into that CPU's redistributor ID register, `GICR_TYPER` (`qemu/hw/intc/arm_gicv3_common.c:462-469`). Set the affinity after the GIC and Linux would see redistributors whose IDs don't match the CPUs.
+
+**Interrupts are wires between objects.** QEMU models an interrupt line as a *GPIO*: an output end on the device that raises it, an input end on the device that receives it. The SoC connects the ends:
+
+| Call | Connects | Example |
+|---|---|---|
+| `qdev_connect_gpio_out(cpu, j, gic_in)` | CPU output `j` → a GIC input | CPU0's NS-EL1 physical timer → INTID 30 of CPU0 |
+| `qdev_connect_gpio_out_named(cpu, "pmu-interrupt", 0, gic_in)` | a named CPU output → a GIC input | CPU0's PMU → INTID 23 of CPU0 |
+| `sysbus_connect_irq(gic, n, cpu_in)` | GIC output `n` → a CPU input | the GIC's "IRQ for CPU1" → CPU1's IRQ pin |
+
+How the GIC numbers its inputs (`qemu/hw/intc/arm_gicv3_common.c:321-327`): first one input per shared interrupt (SPI), then 32 per CPU for that CPU's private interrupts:
+
+```
+input index:  0 ............ 479 | 480 ........ 511 | 512 ........ 543
+carries:      SPI INTID 32 … 511 | CPU0 INTID 0…31  | CPU1 INTID 0…31
+```
+
+So CPU1's timer at INTID 30 goes to input `480 + 1 × 32 + 30` = 542. That is the `intidbase + timer_irqs[j]` sum in the code (`:124`, `:137`). The other direction is grouped by kind: GIC outputs `0–1` are IRQ for CPU0 and CPU1, `2–3` FIQ, `4–5` VIRQ, `6–7` VFIQ (`:147-154`).
+
+A wrong wire still builds and starts: nothing checks it until a guest waits for an interrupt that never arrives. Linux's timer tick in M3 is the first real test of this wiring.
+
+**Pass-through properties.** On the EVK, the boot mode and DEBUGEN are pins set by DIP switches and the JTAG header. In the model they are SYSC properties, and the SoC re-exports them under its own name with `object_property_add_alias` (`:66-68`). The board in M1-T04 forwards them again, so `-M rzv2l-smarc,boot-mode=3` works like setting the switches to QSPI before power-on.
+
+**What the SoC leaves out on purpose.** imx8mp fills unmodelled address ranges with *unimplemented device* placeholders that read as zero. This SoC maps only SYSC, the GIC and (from the board) RAM; every other address has no owner, so a guest access aborts and `-d invalid_mem` names the address (§2; `qemu/system/memory.c:1410-1416`, "reason: rejected"). That is the honest-fault rule applied to the whole address space.
+
+**Build wiring.** `config R9A07G054` in `qemu/hw/arm/Kconfig` selects `ARM_GIC` (which brings in the GICv3 for TCG) and `RENESAS_RZG2L_SYSC`. Selecting it is what finally pulls the SYSC file into the build; the board (M1-T04) selects `R9A07G054`.
+
+
+### 5.2 Reading the board: `rzv2l-smarc.c`
+
+The board (`qemu/hw/arm/rzv2l-smarc.c`, M1-T04) is the object `-M rzv2l-smarc` selects. It holds what sits around the chip on the SMARC module. (Line numbers are at fork commit `0e2a93b8e9`.)
+
+| Piece | Code | Why |
+|---|---|---|
+| 2 GiB DDR at `0x40000000` | `memory_region_add_subregion(...)` (`:70`); any other `-m` refused (`:50`) | the 2 GB EVK; the Linux memory window below only fits that size |
+| SoC | `object_initialize_child(..., TYPE_R9A07G054)`, then realize | the chip from §5.1 |
+| Board switches | class properties `boot-mode`, `debugen` (`:123-131`), forwarded to the SoC (`:64-67`), which forwards them to SYSC (§5.1) | `-M rzv2l-smarc,boot-mode=3,debugen=on` = DIP switches on QSPI, JTAG DEBUGEN high |
+| Exactly 2 × `cortex-a55` | `mc->min_cpus = max_cpus = 2`, `mc->valid_cpu_types` (`:116-119`) | QEMU's machine core refuses `-smp 1` or `-cpu cortex-a53` with a clear message |
+| Direct kernel boot | `arm_boot_info` (`:56-61`), `arm_load_kernel` (`:74`) | below |
+
+**Direct kernel boot.** On the EVK, TF-A and U-Boot run first and hand Linux the memory `0x48000000` + `0x78000000`; the first 128 MiB of DDR hold BL31 and OP-TEE (`docs/device-map.md`, DDR row). With `-kernel`, QEMU plays the part of that firmware:
+
+```
+0x40000000 ┌──────────────────────────────┐
+           │ firmware-reserved (empty)    │  BL31, OP-TEE on the EVK; QEMU loads nothing here
+0x48000000 ├──────────────────────────────┤  loader_start: QEMU's boot stub, then the Image
+           │ Linux memory (/memory node)  │  0x48000000 + 0x78000000, as on the EVK
+0xC0000000 └──────────────────────────────┘
+```
+
+- `loader_start` = `0x48000000`, `ram_size` = `0x78000000` (`:57-59`): QEMU places its boot stub and the kernel from there and writes that window into the DTB's `/memory` node (`qemu/hw/arm/boot.c:643-645`).
+- `psci_conduit` = SMC (`:60`): QEMU's built-in PSCI answers the `SMC` instructions Linux uses to start CPU1, standing in for BL31.
+- The kernel is entered at non-secure EL1, as on the EVK, because the CPUs have no EL2 (§5.1).
+- In qtest mode nothing is loaded (`:73`), as in imx8mp: tests read registers, they do not run a kernel.
+
+**Machine properties are class properties.** `object_class_property_add` declares a property once for the machine *type*, with a getter and a setter (`:78-104`). The setter only stores the value; the SYSC's `realize` validates it later (§3.1). That is why `boot-mode=6` gets past the command line and is refused at start-up with the SYSC's message.
 ## 6. From manual to model: how one register gets in
 
 Nothing goes into the model because it seems plausible. Every value has to be traced to a source (AGENTS.md rule 1, "evidence before implementation"), and the sources are read in a fixed order of authority:
@@ -270,7 +401,7 @@ flowchart LR
     end
 ```
 
-- **qtest** (M1-T01 to T04) reads registers directly, with no guest code. It is exact and fast, and asserts the values from the **hardware manual**, not values copied from the model's own output (AGENTS.md rule 7).
+- **qtest** (M1-T01 to T04) reads registers directly, with no guest code. It is exact and fast, but blind to bus errors (below), and asserts the values from the **hardware manual**, not values copied from the model's own output (AGENTS.md rule 7).
 - **The guest probe** (M1-T05) is a small program that runs *on* the emulated CPU. It checks what qtest cannot: CPU IDs, the timer frequency, the exception level, PSCI `CPU_ON`, and that unmapped addresses really abort.
 
 **Mutation check.** A test only counts once it has been seen to fail. The model is broken on purpose and the test must turn red:
@@ -281,9 +412,31 @@ flowchart LR
 | default changed `0x43b` → `0x43c` | `not ok …/default`: `(0x0000043c == 0x0000043b)` |
 | GICR ignores the property | `not ok …/property`: `(0x0000043b == 0x0201743b)` |
 
+The machine's own qtest (`qemu/tests/qtest/rzv2l-smarc-test.c`, M1-T04) checks T02–T04 together, against manual and TRM values:
+
+| Test | Checks |
+|---|---|
+| `/rzv2l-smarc/sysc/id` | `DEVID` `0x18447447`, `PRR` `0`, `LSI_MODE` `0x10000`; a write to `DEVID` changes nothing |
+| `/rzv2l-smarc/sysc/boot-pins` | `boot-mode=3` → `0x10003`; `debugen=on` → `0x10200` |
+| `/rzv2l-smarc/sysc/boot-mode-reserved` | `boot-mode=6`: QEMU refuses to start, with "boot-mode 6 is reserved" (run in a child process, GLib `g_test_trap_subprocess`) |
+| `/rzv2l-smarc/gic/layout` | `ITLinesNumber` 15, `LPIS` 0; `GICR_TYPER` affinity `0x0`/`0x100`, `Last` only on the second |
+| `/rzv2l-smarc/gic/identity` | `GICD_IIDR`, both `GICR_IIDR` = `0x0201743B`; the 12 PIDR/CIDR bytes of GICD and both GICRs |
+
+| Mutation (M1-T02 to T04) | Test result |
+|---|---|
+| `DEVID` `0x18447447` → `0x18447448` | `not ok …/sysc/id`: `(0x18447448 == 0x18447447)` |
+| `STAT_DEBUGEN` on bit 8 | `not ok …/sysc/boot-pins`: `(0x00010100 == 0x00010200)` |
+| CPU1 `mp-affinity` `0x100` → `0x1` | `not ok …/gic/layout`: `(0x00000001 == 0x00000100)` |
+| `num-irq` 256, wiring unchanged | red, but QEMU aborts at start-up: the SoC wires a timer to GIC input 510, which no longer exists (`qemu/hw/core/gpio.c:108`). The assertion never ran. |
+| 224 SPIs (`num-irq` 256), wiring consistent | `not ok …/gic/layout`: `(7 == 15)` |
+
+The fourth row is a lesson in itself: a red test is not automatically the *right* red. Only the fifth row shows the `ITLinesNumber` assertion doing its job.
+
+**What qtest cannot see: bus errors.** qtest performs reads through QEMU's memory API and discards the transaction result (`qemu/system/qtest.c:555-569`); a failed read simply returns 0. So a qtest cannot tell "bus error" from "reads as zero", and the M1 qtest does not try. Whether an unmodelled SYSC offset or an unmapped address really aborts (AC13, AC14) is checked by the guest probe (M1-T05), where a real CPU must take the exception.
+
 ## 8. Hands-on recipe
 
-Build once (AGENTS.md "Build and run"), then from `build/qemu`:
+Build once (`building-and-testing.md` §1), then from `build/qemu`:
 
 ```bash
 Q="./qemu-system-aarch64 -M virt,gic-version=3 -cpu cortex-a57 -smp 2 -m 1G \
@@ -299,7 +452,61 @@ printf 'xp /1wx 0x08000008\nquit\n' | $Q -global arm-gicv3.iidr=0x0201743b
 - `xp /1wx` means one (`1`) 32-bit word (`w`) in hex (`x`).
 - `-global <type>.<property>=<value>` sets a property on every device of that type.
 
-Once M1-T04 exists, the same commands with `-M rzv2l-smarc` show this project's own board. That tour will be added here.
+### 8.1 The same tour on `rzv2l-smarc`
+
+```bash
+Q="./qemu-system-aarch64 -M rzv2l-smarc -S -display none -nodefaults -monitor stdio"
+
+printf 'info mtree -f\nquit\n' | $Q          # memory map
+printf 'info qom-tree\nquit\n' | $Q          # composition tree
+printf 'info qtree\nquit\n'    | $Q          # devices and properties
+printf 'xp /3wx 0x11020a00\nquit\n' | ./qemu-system-aarch64 -M rzv2l-smarc,boot-mode=3,debugen=on \
+    -S -display none -nodefaults -monitor stdio   # SYSC with the "switches" set
+```
+
+The memory map holds exactly four windows; everything else is a hole that aborts (§2):
+
+```
+0000000011020000-000000001102ffff (prio 0, i/o): renesas-rzg2l-sysc
+0000000011900000-000000001190ffff (prio 0, i/o): gicv3_dist
+0000000011940000-000000001197ffff (prio 0, i/o): gicv3_redist_region[0]
+0000000040000000-00000000bfffffff (prio 0, ram): rzv2l-smarc.ram
+```
+
+The composition tree is the diagram of §5, as QEMU sees it:
+
+```
+/machine (rzv2l-smarc-machine)
+  /soc (r9a07g054)
+    /cpu0 (cortex-a55-arm-cpu)
+    /cpu1 (cortex-a55-arm-cpu)
+    /gic (arm-gicv3)
+    /sysc (renesas-rzg2l-sysc)
+```
+
+`info qtree` shows the properties the SoC set (excerpt):
+
+```
+dev: renesas-rzg2l-sysc, id ""
+  boot-mode = 0 (0x0)
+  lsi-devid = 407139399 (0x18447447)
+  mmio 0000000011020000/0000000000010000
+dev: arm-gicv3, id ""
+  gpio-in "" 544                 ← 480 SPIs + 2 CPUs × 32 private inputs (§5.1)
+  num-irq = 512 (0x200)
+  iidr = 33649723 (0x201743b)    ← GIC-600 r1p6 (M1-T01)
+  has-security-extensions = true
+```
+
+And the board switches, end to end:
+
+```
+11020a00: 0x00010203 0x18447447 0x00000000
+          └ LSI_MODE  └ DEVID    └ PRR
+            bit 16 security, bit 9 DEBUGEN, bits 2:0 = 3 (QSPI)
+```
+
+`0x00010203` is the value the EVK's BL2 printed most often (`docs/evidence/EVK-2026-10-08-boot-log.md`): QSPI boot with the JTAG DEBUGEN pin high.
 
 ## 9. Glossary
 

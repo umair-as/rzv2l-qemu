@@ -42,6 +42,7 @@ qemu-rzv2l/                 this repo: spec, research, evidence, tests, guest bu
 - The operator sees only what review cannot settle: source conflicts, inferences, assumptions and design choices. Do not ask the operator to proofread citations.
 - The reviewer works from `docs/units/templates/review-prompt.md`. Its findings are leads too: the implementer re-checks each one before acting on it.
 - One review checkpoint at a time. The project has no deadline; review matters more than speed.
+- **Explanations land in the repo.** Whatever the implementer explains to the operator (a QEMU concept, how a device works, a build or test step) goes into `docs/learning/` before the task's commit, written along the way or batched per task. Text about uncommitted code is committed with that code.
 
 **Session state** (the current handoff and task board) is kept outside the tracked tree, in the operator's local working area. At the start of a session, read the handoff the operator points you to; at the end, update it with the current state and the next step. Durable results are promoted into `docs/`; working material stays out of tracked files.
 
@@ -127,8 +128,10 @@ ninja qemu-system-aarch64
 
 Build out-of-tree under `build/` (gitignored). Never build inside `qemu/`.
 
+Rebuilding, qtests, checkpatch, tracing and editor setup: `docs/learning/building-and-testing.md`.
+
 Useful QEMU debugging (see `docs/imx95/methodology.md` in qemu-imx95):
-- `-d unimp,guest_errors`: an acceptance run must have every unimplemented access fixed or listed.
+- `-d unimp,guest_errors,invalid_mem`: an acceptance run must have every unimplemented access fixed or listed. `invalid_mem` is the only mask that logs accesses to unmapped addresses and refused access sizes (`docs/learning/building-and-testing.md` §5).
 - `-d nochain` plus gdb `hbreak` when TCG breakpoints misbehave.
 - `-icount` only to debug races; never in boot tests.
 

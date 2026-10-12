@@ -4,7 +4,7 @@
 **Layer verified:** e.g. "register model", "driver probe", "boot sequence"
 
 ## Observed (current behaviour)
-What the guest sees in QEMU: log excerpt, register trace (`-d unimp,guest_errors`, trace events).
+What the guest sees in QEMU: log excerpt, register trace (`-d unimp,guest_errors,invalid_mem`, trace events).
 
 ## Expected (with evidence)
 What the hardware does: manual section/page, driver file:line, EVK measurement (boot stage).

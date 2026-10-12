@@ -77,8 +77,10 @@ mkdir -p build/qemu && cd build/qemu
 ninja qemu-system-aarch64
 ```
 
+Rebuilding, running the tests, style checks, tracing and editor setup: [Building and testing by hand](docs/learning/building-and-testing.md).
+
 > [!WARNING]
-> The `rzv2l-smarc` machine does not exist yet; it arrives with milestone M1. Until then this builds QEMU from the pinned upstream base.
+> The `rzv2l-smarc` machine is a skeleton (milestone M1): two Cortex-A55 cores, the GIC and the SYSC identification registers. It has no console yet; that arrives with M2.
 
 The QEMU port lives in a fork, included as the `qemu/` submodule. It carries only code in the shape upstream QEMU would accept; the specification, research, evidence and tests live in this repository.
 
@@ -90,6 +92,7 @@ The QEMU port lives in a fork, included as the `qemu/` submodule. It carries onl
 | 📋 | [Requirements](docs/spec/requirements.md) | the requirement catalogue, traced to tests |
 | 🗺️ | [Device map](docs/device-map.md) | every MMIO window, interrupt, clock and reset, with evidence |
 | 🧭 | [Decisions](docs/decisions/) | decision records and their alternatives |
+| 🎓 | [Learning](docs/learning/) | how QEMU models a machine; building and testing by hand |
 
 > [!NOTE]
 > The RZ/V2L hardware manual and board manuals are © Renesas and are not redistributed here. The repository keeps only an index and checksums; obtain the documents from Renesas.
