@@ -402,7 +402,7 @@ flowchart LR
 ```
 
 - **qtest** (M1-T01 to T04) reads registers directly, with no guest code. It is exact and fast, but blind to bus errors (below), and asserts the values from the **hardware manual**, not values copied from the model's own output (AGENTS.md rule 7).
-- **The guest probe** (M1-T05) is a small program that runs *on* the emulated CPU. It checks what qtest cannot: CPU IDs, the timer frequency, the exception level, PSCI `CPU_ON`, and that unmapped addresses really abort.
+- **The guest probe** (M1-T05, §7.1) is a small program that runs *on* the emulated CPU. It checks what qtest cannot: CPU IDs, the timer frequency, the exception level, PSCI `CPU_ON`, and that unmapped addresses really abort.
 
 **Mutation check.** A test only counts once it has been seen to fail. The model is broken on purpose and the test must turn red:
 
@@ -433,6 +433,73 @@ The machine's own qtest (`qemu/tests/qtest/rzv2l-smarc-test.c`, M1-T04) checks T
 The fourth row is a lesson in itself: a red test is not automatically the *right* red. Only the fifth row shows the `ITLinesNumber` assertion doing its job.
 
 **What qtest cannot see: bus errors.** qtest performs reads through QEMU's memory API and discards the transaction result (`qemu/system/qtest.c:555-569`); a failed read simply returns 0. So a qtest cannot tell "bus error" from "reads as zero", and the M1 qtest does not try. Whether an unmodelled SYSC offset or an unmapped address really aborts (AC13, AC14) is checked by the guest probe (M1-T05), where a real CPU must take the exception.
+
+### 7.1 A program inside the machine: the M1 probe
+
+The probe (`tests/probes/m1-skeleton/`, M1-T05) is about 300 lines of C and assembly that run *on* the emulated Cortex-A55s. It checks what qtest cannot see. Run it with `tests/probes/m1-skeleton/run.sh`:
+
+```
+M1 skeleton probe
+PASS Image load address: 0x0000000048200000
+-- CPU0
+PASS MPIDR_EL1 affinity: 0x0000000000000000
+PASS MIDR_EL1: 0x00000000412fd050
+PASS CNTFRQ_EL0: 24000000
+PASS CurrentEL: 1
+-- CPU1 via PSCI CPU_ON(0x100)
+PASS CPU_ON return: 0
+PASS CPU1 reported: 1
+-- CPU1
+PASS MPIDR_EL1 affinity: 0x0000000000000100
+...
+-- aborts
+PASS unmapped 0x10000000 ESR.EC: 0x0000000000000025
+PASS unmapped 0x10000000 DFSC: 0x0000000000000010
+PASS SYSC offset 0x0 ESR.EC: 0x0000000000000025
+PASS SYSC offset 0x0 DFSC: 0x0000000000000010
+RESULT: PASS (0 failures)
+```
+
+**Pretending to be Linux.** The probe starts with the 64-byte arm64 Image header (`start.S:9-18`). QEMU sees it and takes the same path it takes for a kernel: it loads the image at `loader_start` + 2 MiB = `0x48200000` (header `text_offset` 0, `qemu/hw/arm/boot.c:858-870`), enters it at EL1 and answers PSCI over SMC (§5.2). The probe is linked at that address and checks that it really landed there.
+
+**Talking to the host: semihosting.** The machine has no UART yet, so the probe reports through *semihosting*: the instruction `HLT #0xF000` (`start.S:60`) asks QEMU to do something on the guest's behalf, with an operation number in `x0` and a parameter in `x1`. The probe uses two operations:
+
+| Operation | Number | What QEMU does |
+|---|---|---|
+| `SYS_WRITE0` | `0x04` | prints a NUL-terminated string, to QEMU's **stderr** |
+| `SYS_EXIT` | `0x18` | with the A64 parameter block {`0x20026` = application exit, status}, QEMU itself exits with that status (`qemu/semihosting/arm-compat-semi.c:751-772`) |
+
+So `qemu-system-aarch64`'s own exit status is the probe's verdict, and a shell script can check `$?`. Semihosting is off unless `-semihosting-config enable=on` is given: it is a property of the test run, not of the board. Without it `HLT` is an undefined instruction.
+
+**Starting the second CPU.** CPU1 is powered off at start (§5.1). The probe calls PSCI `CPU_ON` the way Linux does: `SMC #0` with `x0` = `0xC4000003` (CPU_ON, 64-bit), `x1` = target affinity `0x100`, `x2` = entry address (`probe.c:239`). QEMU's built-in PSCI powers CPU1 on at `secondary_entry` (`start.S:41`), which reads its own four values into a mailbox in RAM; CPU0 waits for the mailbox with a timeout.
+
+**Catching an abort.** To prove a read aborts, the probe installs its own exception vector table (`start.S:81`), a 2 KiB block of 16 entries the CPU jumps to on an exception. The handler (`probe.c:123`) reads `ESR_EL1`, the *Exception Syndrome Register*, which says what happened:
+
+```
+ESR_EL1 = 0x96000010
+          ││     └┴─ DFSC [5:0] = 0x10: synchronous external abort (the bus said no)
+          └┴──────── EC [31:26] = 0x25: data abort taken without changing EL
+```
+
+(The remaining set bit, 25, is IL: the faulting instruction was 32 bits. QEMU's `-d int` log shows the same value: `Taking exception 4 [Data Abort] … with ESR 0x25/0x96000010`.)
+
+It then adds 4 to `ELR_EL1` (the return address) so `eret` resumes *after* the faulting load (`probe.c:150`), and the probe carries on. If the load completes instead, nothing was caught and the check fails: that is exactly what a zero-reading placeholder would cause.
+
+The same reads appear in QEMU's log with `-d unimp,guest_errors,invalid_mem` (`run.sh` keeps it in `out/qemu.log`):
+
+```
+Invalid read at addr 0x10000000, size 4, region '(null)', reason: rejected   ← invalid_mem: hole
+rzg2l_sysc_read: unimplemented read at offset 0x0                            ← unimp: SYSC default case
+```
+
+| Mutation (M1-T05) | Probe result |
+|---|---|
+| none | `RESULT: PASS (0 failures)`, exit 0 |
+| SoC `cntfrq` 24 MHz → 62.5 MHz | `FAIL CNTFRQ_EL0: 62500000 (expected 24000000)` on both CPUs, exit 1 |
+| zero-reading window at `0x10000000` (`create_unimplemented_device`, as imx8mp does for its holes) | `FAIL unmapped 0x10000000: read completed without an abort`, exit 1 |
+| semihosting off | no output; `run.sh`: "no RESULT line … probe did not finish", exit 2 after its 20 s timeout |
+
+**A lesson from the last row.** The first version of the handler tried to *print* the unexpected exception, which executes `HLT` again, which is undefined again: the exceptions nested until the stack ran down through memory into the GIC's registers, and `-d guest_errors` filled with stray GIC writes. The handler now parks the CPU if it is entered while already handling an exception (`probe.c:128`). A test harness has to fail cleanly too.
 
 ## 8. Hands-on recipe
 

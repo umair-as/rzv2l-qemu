@@ -88,6 +88,16 @@ ok 5 /aarch64/rzv2l-smarc/gic/identity
 
 One test case only: append `-p /aarch64/rzv2l-smarc/gic/layout`.
 
+The guest probe (M1-T05) runs inside the machine instead (`qemu-machine-modelling.md` §7.1). It needs the cross compiler `aarch64-linux-gnu-gcc` (`apt install gcc-aarch64-linux-gnu`):
+
+```bash
+tests/probes/m1-skeleton/run.sh          # builds the probe, runs it, exit 0 = all checks pass
+echo $?
+cat tests/probes/m1-skeleton/out/qemu.log    # the -d unimp,guest_errors,invalid_mem lines
+```
+
+`run.sh` exits 0 when every check passes, 1 when a check fails, 2 when the probe produced no result. Extra arguments go to QEMU, e.g. `run.sh -semihosting-config enable=off` to watch it fail without its output channel.
+
 All Arm qtests (several minutes):
 
 ```bash

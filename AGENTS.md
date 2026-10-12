@@ -104,6 +104,7 @@ docs/evidence/      EVK captures; each records board, image/build ID and boot st
 docs/device-map.md  MMIO/IRQ/clock/reset map, with evidence per row
 docs/sources.md     source register: manuals, pinned guest and firmware sources
 tests/experiments/  sources and run scripts backing docs/experiments/
+tests/probes/       bare-metal guest programs that check a machine from inside
 scripts/            repo tooling (lint, build and run helpers)
 artifacts/rzv2l/    manuals index, manifest and checksums (the manuals are not tracked)
 qemu/               submodule: the QEMU fork
