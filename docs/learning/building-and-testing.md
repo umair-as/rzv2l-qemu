@@ -96,7 +96,14 @@ echo $?
 cat tests/probes/m1-skeleton/out/qemu.log    # the -d unimp,guest_errors,invalid_mem lines
 ```
 
-`run.sh` exits 0 when every check passes, 1 when a check fails, 2 when the probe produced no result. Extra arguments go to QEMU, e.g. `run.sh -semihosting-config enable=off` to watch it fail without its output channel.
+`run.sh` exits 0 when every check passes, 1 when a check fails, 2 when the probe produced no result.
+
+The M1 acceptance run (M1-T06) combines the probe with the monitor checks and the log gate (`qemu-machine-modelling.md` §7.2):
+
+```bash
+tests/acceptance/m1/run.sh       # ends with "M1 ACCEPTANCE: PASS", exit 0
+ls tests/acceptance/m1/out/      # the captured mtree, qtree, roms and probe output
+``` Extra arguments go to QEMU, e.g. `run.sh -semihosting-config enable=off` to watch it fail without its output channel.
 
 All Arm qtests (several minutes):
 

@@ -501,6 +501,48 @@ rzg2l_sysc_read: unimplemented read at offset 0x0                            ←
 
 **A lesson from the last row.** The first version of the handler tried to *print* the unexpected exception, which executes `HLT` again, which is undefined again: the exceptions nested until the stack ran down through memory into the GIC's registers, and `-d guest_errors` filled with stray GIC writes. The handler now parks the CPU if it is entered while already handling an exception (`probe.c:128`). A test harness has to fail cleanly too.
 
+### 7.2 The acceptance run: is M1 done?
+
+`tests/acceptance/m1/run.sh` (M1-T06) answers that with one exit code. It combines the probe (§7.1) with what only the whole running machine shows:
+
+```
+== -M help
+PASS -M help lists rzv2l-smarc
+== info mtree -f
+PASS mtree: 4 windows, nothing else
+== info qtree
+PASS qtree: 3 devices, 14 properties
+== info roms
+PASS roms: 2 blobs, none in 0x40000000-0x47ffffff
+== guest probe
+RESULT: PASS (0 failures)
+PASS probe exited 0
+== log gate
+PASS log: only the 2 allowed line(s)
+
+M1 ACCEPTANCE: PASS
+```
+
+**Expected values come from the documents, not from QEMU.** The files in `tests/acceptance/m1/expected/` are written from `docs/device-map.md`, and each one says which rows it comes from. Copying QEMU's output into them would only prove that the model has not changed since, not that it is right (AGENTS.md rule 7). So the checks are shaped by what the documents actually state:
+
+| Check | Match | Why that shape |
+|---|---|---|
+| `info mtree -f`, the flat view of the "memory" address space | **exact**: these 4 lines, nothing else | the device map gives every window's base and size; an extra window is a failure |
+| `info qtree` | **exact device set**; per device, only the listed lines (base, size, `lsi-devid`, `num-irq`, `iidr` …) | QEMU prints internal properties (`force-8-bit-prio`, `first-cpu-index`) that no project document defines |
+| `info roms` | a **rule**: every blob inside the Linux window `0x48000000`–`0xBFFFFFFF`, none in the firmware-reserved `0x40000000`–`0x47FFFFFF` | AC07; the exact blob list depends on the payload |
+| the probe | exit status 0 | §7.1 |
+| `-d unimp,guest_errors,invalid_mem` log of the probe run | an **allow-list** of exactly the probe's two deliberate abort reads | anything else the guest touches is either modelled or listed (REQ-TEST-003) |
+
+`info roms` lists what QEMU will copy into guest memory at reset. With `-kernel`, those are its 40-byte boot stub at `0x48000000` and the image at `0x48200000`.
+
+| Mutation (M1-T06) | What fails |
+|---|---|
+| SYSC moved to `0x11030000` | mtree (diff printed), qtree (`missing 'mmio 0000000011020000/…'`), log (`Invalid read at addr 0x11020000`) |
+| board `loader_start` → `0x40000000` | roms (boot stub and image overlap reserved DDR), probe (`Image load address: 0x40200000`) |
+| SYSC logs one extra guest-error line | log gate only: `rzg2l_sysc_read: extra` |
+
+**Why the checks belong together.** With SYSC moved, the *probe still passes*: its read of `0x11020000` aborts either way, because the address has become a hole. Only the memory map, the device list and the log gate notice that the abort now comes from the wrong place. Each check is blind somewhere; together they cover each other.
+
 ## 8. Hands-on recipe
 
 Build once (`building-and-testing.md` §1), then from `build/qemu`:

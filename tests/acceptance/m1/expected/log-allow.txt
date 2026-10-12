@@ -1,0 +1,4 @@
+# Lines allowed in the -d unimp,guest_errors,invalid_mem log of the probe run.
+# Exactly the probe's two deliberate abort reads (M1-T05, AC14, AC13).
+Invalid read at addr 0x10000000, size 4, region '(null)', reason: rejected
+rzg2l_sysc_read: unimplemented read at offset 0x0

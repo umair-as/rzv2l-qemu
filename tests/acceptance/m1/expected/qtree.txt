@@ -1,0 +1,22 @@
+# `info qtree` on rzv2l-smarc with default machine options.
+# "dev:" lines: the exact set of devices on the system bus.
+# Indented lines: must appear in that device's block (other QEMU-internal
+# properties are not checked). Values from docs/device-map.md (SYSC, GIC
+# rows and the post-firmware table) and the M1 unit spec (AC09, AC10, AC12).
+dev: renesas-rzg2l-sysc
+  boot-mode = 0 (0x0)
+  debugen = false
+  lsi-devid = 407139399 (0x18447447)
+  lsi-prr = 0 (0x0)
+  mmio 0000000011020000/0000000000010000
+dev: arm-gicv3
+  num-cpu = 2 (0x2)
+  num-irq = 512 (0x200)
+  revision = 3 (0x3)
+  iidr = 33649723 (0x201743b)
+  has-lpi = false
+  has-security-extensions = true
+  redist-region-count = 2 (0x2)
+  mmio 0000000011900000/0000000000010000
+  mmio 0000000011940000/0000000000040000
+dev: r9a07g054

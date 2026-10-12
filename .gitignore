@@ -28,6 +28,7 @@ tests/guests/dl/
 # Experiment build outputs.
 tests/experiments/**/out/
 tests/probes/**/out/
+tests/acceptance/**/out/
 
 # Operator-local reference notes copied into the artifacts collection.
 artifacts/**/project-notes/
