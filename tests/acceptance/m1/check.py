@@ -143,9 +143,12 @@ def dts_nodes(path):
 
 # QEMU's loader fixups on the REQ-GUEST-004 gap list (M1 spec AC08).
 # /memory is rewritten from the board's binfo, /psci replaced outright;
-# the replacement must keep the board's SMC conduit (AGENTS.md board facts).
+# the replacement must keep the board's SMC conduit (AGENTS.md board facts)
+# and the PSCI 1.0 binding Linux matches. QEMU's 0.1 function IDs are QEMU's
+# own values, which Linux ignores; they are not checked.
 DTB_FIXUP_NODES = ("/psci",)
 DTB_PSCI_METHOD = 'method = "smc";'
+DTB_PSCI_COMPAT = "arm,psci-1.0"
 DTB_MEMORY = ("/memory@48000000",
               ['device_type = "memory";',
                "reg = <0x00 0x%x 0x00 0x%x>;"
@@ -163,6 +166,10 @@ def check_dtb(captured, stock):
         rc = fail("dtb: %s is %s, expected %s" % (path, got.get(path), props))
     if DTB_PSCI_METHOD not in got.get("/psci", []):
         rc = fail("dtb: /psci lacks '%s'" % DTB_PSCI_METHOD)
+    compat = [l for l in got.get("/psci", []) if l.startswith("compatible = ")]
+    if not compat or DTB_PSCI_COMPAT not in re.findall(
+            r'([^"\\]+)(?:\\0|")', compat[0].split("=", 1)[1]):
+        rc = fail("dtb: /psci compatible lacks '%s'" % DTB_PSCI_COMPAT)
     fixed = []
     for n in sorted(set(got) & set(want)):
         if got[n] == want[n]:

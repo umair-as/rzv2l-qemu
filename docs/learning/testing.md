@@ -235,6 +235,10 @@ The guest gets the edited copy. The monitor command `dumpdtb <file>` writes out 
 
 One of these flags is `-@`. It adds a `__symbols__` node, because an overlay can go on top of this DTB.
 
+The script also protects the reference:
+- If the source checkout has local changes, the script stops.
+- If the SHA-256 of DTB-U is not the recorded value, the script gives a warning. It is not an error, because a different `dtc` version can give different bytes from the same source.
+
 The acceptance run then does these steps:
 1. It starts the paused machine with `-dtb DTB-U`.
 2. It runs `dumpdtb`.
@@ -257,7 +261,11 @@ The `/psci` of QEMU is different from the stock node:
 +		migrate = <0xc4000005>;
 ```
 
-The extra properties are from the old PSCI 0.1 binding. Linux uses the 1.0 binding and ignores them. Thus the check lets QEMU change `/psci`, but `/psci` must keep `method = "smc"`. With `"hvc"`, Linux would call a hypervisor that this board does not have. The kernel runs at NS-EL1, and there is no EL2.
+The extra properties are from the old PSCI 0.1 binding. Linux uses the 1.0 binding and ignores them. Thus the check lets QEMU change `/psci`, with two conditions:
+- `/psci` must keep `method = "smc"`.
+- The `compatible` list must include `arm,psci-1.0`, the binding that Linux uses.
+
+The check does not compare the 0.1 function IDs. They are values of QEMU itself, and Linux ignores them. With `"hvc"`, Linux would call a hypervisor that this board does not have. The kernel runs at NS-EL1, and there is no EL2.
 
 **Why the check compares `/memory` with a value.** QEMU gives its new node the same name and contents as the stock node. Thus a plain diff shows nothing. A plain diff tells only that the two nodes agree. It does not tell that the value is correct. Thus the check also compares the node with `0x48000000` + `0x78000000` from AC08.
 
@@ -267,6 +275,7 @@ The extra properties are from the old PSCI 0.1 binding. Linux uses the 1.0 bindi
 | (checker test) `/chosen/bootargs` edited | dtb: `/chosen differs` |
 | (checker test) a node removed | dtb: `node /audio1-clk removed` |
 | (checker test) `/psci` method `"hvc"` | dtb: `/psci lacks 'method = "smc";'` |
+| (checker test) `arm,psci-1.0` removed from `compatible` | dtb: `/psci compatible lacks 'arm,psci-1.0'` |
 
 The `ram_size` mutation shows a blind spot again. The memory map, the ROM list and the probe all still pass, because here `ram_size` changes only the DT.
 
