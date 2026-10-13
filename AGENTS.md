@@ -106,6 +106,7 @@ docs/sources.md     source register: manuals, pinned guest and firmware sources
 tests/experiments/  sources and run scripts backing docs/experiments/
 tests/acceptance/   per-milestone acceptance runs and their expected outputs
 tests/probes/       bare-metal guest programs that check a machine from inside
+tests/guests/       scripts that build or fetch guest artifacts (outputs untracked)
 scripts/            repo tooling (lint, build and run helpers)
 artifacts/rzv2l/    manuals index, manifest and checksums (the manuals are not tracked)
 qemu/               submodule: the QEMU fork

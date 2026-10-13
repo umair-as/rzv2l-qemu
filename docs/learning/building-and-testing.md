@@ -102,8 +102,10 @@ The M1 acceptance run (M1-T06) combines the probe with the monitor checks and th
 
 ```bash
 tests/acceptance/m1/run.sh       # ends with "M1 ACCEPTANCE: PASS", exit 0
-ls tests/acceptance/m1/out/      # the captured mtree, qtree, roms and probe output
-``` Extra arguments go to QEMU, e.g. `run.sh -semihosting-config enable=off` to watch it fail without its output channel.
+ls tests/acceptance/m1/out/      # the captured mtree, qtree, roms, DTB and probe output
+```
+
+Since M1-T07 it also needs `dtc` and a host `cc` (`apt install device-tree-compiler gcc`). The first run fetches the pinned kernel's device-tree sources into `tests/guests/dl/` (gitignored; network, about a minute). Extra arguments go to QEMU, e.g. `run.sh -semihosting-config enable=off` to watch it fail without its output channel.
 
 All Arm qtests (several minutes):
 

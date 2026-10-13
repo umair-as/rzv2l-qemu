@@ -543,6 +543,49 @@ M1 ACCEPTANCE: PASS
 
 **Why the checks belong together.** With SYSC moved, the *probe still passes*: its read of `0x11020000` aborts either way, because the address has become a hole. Only the memory map, the device list and the log gate notice that the abort now comes from the wrong place. Each check is blind somewhere; together they cover each other.
 
+### 7.3 What QEMU does to a device tree you give it (M1-T07)
+
+A device tree (DT) describes the board to Linux: which devices exist, at which addresses, with which interrupts. On the real EVK, U-Boot hands it to the kernel. In QEMU's direct-kernel mode, `-dtb file.dtb` does that instead. QEMU does **not** pass the file through untouched. Before the first instruction runs, `arm_load_dtb()` (qemu v11.1.2 `hw/arm/boot.c`) edits it:
+
+| Node | What QEMU does | Where | On our board |
+|---|---|---|---|
+| `/memory*` | blanks every memory node, then writes one from the board's `arm_boot_info` (`loader_start`, `ram_size`) | `boot.c:530-575` | `0x48000000` + `0x78000000`: the same as the stock DT, so the node comes out identical |
+| `/chosen` | adds `bootargs` only with `-append`, `linux,initrd-start/end` only with `-initrd` | `boot.c:604-627` | neither is given in M1, so `/chosen` is untouched (the stock DT carries its own `bootargs`) |
+| `/psci` | deletes the DT's node and writes its own whenever the board enables QEMU's built-in PSCI | `boot.c:366-401` | always: `rzv2l-smarc.c:60` sets the SMC conduit |
+
+The edited copy is what the guest gets, and what the monitor command `dumpdtb <file>` writes out (`boot.c:643-645` stores it as the machine's DT). Each edit is a difference from the real board, so each one is on the REQ-GUEST-004 gap list (`docs/device-map.md` §4, rows 7 and 8).
+
+**The check.** `tests/guests/g0/build-dtb.sh` builds *DTB-U*, the stock `r9a07g054l2-smarc.dtb`, from the pinned G0 kernel (v6.12.59). It fetches only the DT sources and repeats kbuild's two commands: the C preprocessor (for the `#include`s and macros), then `dtc` with kbuild's flags. `-@` is among them: it adds a `__symbols__` node, because an overlay can be applied on top of this DTB. The acceptance run then starts the paused machine with `-dtb DTB-U`, runs `dumpdtb`, decompiles both DTBs with `dtc -I dtb -O dts -s` (`-s` sorts nodes, so the order cannot cause a difference) and compares them node by node:
+
+```
+== dumpdtb with DTB-U
+PASS dtb: 209 nodes; /memory@48000000 as expected; only /psci rewritten
+```
+
+QEMU's `/psci` differs from the stock one like this:
+
+```
+-		compatible = "arm,psci-1.0\0arm,psci-0.2";
++		compatible = "arm,psci-1.0\0arm,psci-0.2\0arm,psci";
++		cpu_off = <0x84000002>;
++		cpu_on = <0xc4000003>;
++		cpu_suspend = <0xc4000001>;
++		migrate = <0xc4000005>;
+```
+
+The extra properties belong to the old PSCI 0.1 binding; Linux uses the 1.0 one and ignores them. The check therefore allows `/psci` to be rewritten, but requires that it keep `method = "smc"`. With `"hvc"`, Linux would call into a hypervisor this board does not have (the kernel runs at NS-EL1 with no EL2).
+
+**Why `/memory` is checked by value.** QEMU's rewrite gives the node the same name and contents as the stock one, so a plain diff shows nothing. That says only that they agree, not that the value is right. The check therefore also compares the node with `0x48000000` + `0x78000000` from AC08.
+
+| Mutation (M1-T07) | What fails |
+|---|---|
+| board `ram_size` 1 MiB smaller (`rzv2l-smarc.c:59`) | dtb only: `reg = <0x00 0x48000000 0x00 0x77f00000>` |
+| (checker test) `/chosen/bootargs` edited | dtb: `/chosen differs` |
+| (checker test) a node removed | dtb: `node /audio1-clk removed` |
+| (checker test) `/psci` method `"hvc"` | dtb: `/psci lacks 'method = "smc";'` |
+
+The `ram_size` mutation shows the blind spot again: the memory map, the ROM list and the probe all still pass, because `ram_size` here only feeds the DT. **Not covered:** the initrd fixup (M1 passes no `-initrd`), and whether Linux actually boots with this DT. That is M3.
+
 ## 8. Hands-on recipe
 
 Build once (`building-and-testing.md` §1), then from `build/qemu`:
