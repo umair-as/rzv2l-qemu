@@ -23,6 +23,13 @@ extern char _head[];
 #define CPU0_AFF            0x0UL           /* DT cpu@0 */
 #define CPU1_AFF            0x100UL         /* DT cpu@100 */
 #define MPIDR_AFF_MASK      0xff00ffffffUL  /* Aff3, Aff2, Aff1, Aff0 */
+/*
+ * ID_AA64PFR0_EL1.EL2, bits [11:8]. The model sets has_el2=false (spec.md
+ * "Instantiation"); the A55 itself has EL2 (device-map.md section 4, gap 14).
+ * This asserts the model's recorded choice, not a manual value.
+ */
+#define PFR0_EL2_SHIFT      8
+#define PFR0_EL2_MASK       0xfUL
 
 #define PSCI_CPU_ON_64      0xc4000003UL
 #define PSCI_SUCCESS        0
@@ -38,7 +45,7 @@ extern char _head[];
 #define ADP_APP_EXIT        0x20026
 
 struct cpu_info {
-    uint64_t mpidr, midr, cntfrq, el;
+    uint64_t mpidr, midr, cntfrq, el, pfr0_el2;
 };
 
 static volatile struct {
@@ -192,6 +199,8 @@ static void read_cpu_info(struct cpu_info *ci)
     ci->midr = READ_SYSREG(midr_el1);
     ci->cntfrq = READ_SYSREG(cntfrq_el0);
     ci->el = read_currentel();
+    ci->pfr0_el2 = (READ_SYSREG(id_aa64pfr0_el1) >> PFR0_EL2_SHIFT) &
+                   PFR0_EL2_MASK;
 }
 
 static void check_cpu(const char *cpu, const struct cpu_info *ci,
@@ -204,6 +213,7 @@ static void check_cpu(const char *cpu, const struct cpu_info *ci,
     check("MIDR_EL1", ci->midr, MIDR_A55_R2P0, 0);
     check("CNTFRQ_EL0", ci->cntfrq, CNTFRQ_HZ, 1);
     check("CurrentEL", ci->el, 1, 1);
+    check("ID_AA64PFR0_EL1.EL2", ci->pfr0_el2, 0, 1);
 }
 
 void secondary_main(void);
@@ -216,6 +226,7 @@ void secondary_main(void)
     mailbox.info.midr = ci.midr;
     mailbox.info.cntfrq = ci.cntfrq;
     mailbox.info.el = ci.el;
+    mailbox.info.pfr0_el2 = ci.pfr0_el2;
     __asm__ volatile("dsb sy" ::: "memory");
     mailbox.done = 1;
     __asm__ volatile("dsb sy; sev" ::: "memory");
@@ -247,6 +258,7 @@ void probe_main(void)
         ci.midr = mailbox.info.midr;
         ci.cntfrq = mailbox.info.cntfrq;
         ci.el = mailbox.info.el;
+        ci.pfr0_el2 = mailbox.info.pfr0_el2;
         check_cpu("CPU1", &ci, CPU1_AFF);
     }
 

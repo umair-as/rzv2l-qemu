@@ -39,7 +39,7 @@ flowchart LR
 - **The guest probe** (M1-T05, [§2](#2-a-program-inside-the-machine-the-m1-probe)) is a small program that runs *on* the emulated CPU. It checks what qtest cannot check:
   - the CPU IDs
   - the timer frequency
-  - the exception level
+  - the exception level, and that the model has no EL2
   - PSCI `CPU_ON`
   - that an access to an unmapped address aborts
 
@@ -91,6 +91,7 @@ PASS MPIDR_EL1 affinity: 0x0000000000000000
 PASS MIDR_EL1: 0x00000000412fd050
 PASS CNTFRQ_EL0: 24000000
 PASS CurrentEL: 1
+PASS ID_AA64PFR0_EL1.EL2: 0
 -- CPU1 via PSCI CPU_ON(0x100)
 PASS CPU_ON return: 0
 PASS CPU1 reported: 1
@@ -139,6 +140,8 @@ ESR_EL1 = 0x96000010
           └┴──────── EC [31:26] = 0x25: data abort taken without changing EL
 ```
 
+Note: the EL2 check asserts a choice of the model, not a value from the manual. The real Cortex-A55 has EL2 (fidelity gap 14 in [`docs/device-map.md` §4](../device-map.md#4-known-fidelity-gaps-req-guest-004-list-and-model-limits)). The check makes sure that the choice stays as recorded.
+
 Note: the other bit that is set, bit 25, is IL. It means that the instruction that caused the fault has 32 bits. The QEMU log `-d int` shows the same value: `Taking exception 4 [Data Abort] … with ESR 0x25/0x96000010`.
 
 The handler then adds 4 to `ELR_EL1` (the return address). Thus `eret` continues *after* the load that caused the fault (`probe.c:150`), and the probe continues. If the load completes, the handler caught nothing and the check fails. A placeholder that reads as zero causes exactly this failure.
@@ -156,6 +159,7 @@ rzg2l_sysc_read: unimplemented read at offset 0x0                            ←
 | SoC `cntfrq` 24 MHz → 62.5 MHz | `FAIL CNTFRQ_EL0: 62500000 (expected 24000000)` on both CPUs, exit 1 |
 | zero-reading window at `0x10000000` (`create_unimplemented_device`, as imx8mp does for its holes) | `FAIL unmapped 0x10000000: read completed without an abort`, exit 1 |
 | semihosting off | no output; `run.sh`: "no RESULT line … probe did not finish", exit 2 after its 20 s timeout |
+| SoC `has_el2` false → true | `FAIL CurrentEL: 2 (expected 1)` and `FAIL ID_AA64PFR0_EL1.EL2: 2 (expected 0)` on both CPUs, then no RESULT line: exit 2 |
 
 **A lesson from the last row.** The first version of the handler tried to *print* the exception that it did not expect. Printing executes `HLT` again, and `HLT` is undefined again. This is what happened:
 1. The exceptions nested.
