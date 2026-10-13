@@ -106,6 +106,8 @@ echo $?
 cat tests/probes/m1-skeleton/out/qemu.log    # the -d unimp,guest_errors,invalid_mem lines
 ```
 
+Extra arguments to the probe's `run.sh` go to QEMU. For example, `run.sh -semihosting-config enable=off` shows the failure when the probe has no output channel.
+
 The exit status of `run.sh`:
 - 0: all checks pass
 - 1: a check fails
@@ -120,7 +122,6 @@ ls tests/acceptance/m1/out/      # the captured mtree, qtree, roms, DTB and prob
 
 - Since M1-T07, the acceptance run also needs `dtc` and a host `cc` (`apt install device-tree-compiler gcc`).
 - The first run gets the device-tree sources of the pinned kernel into `tests/guests/dl/` (gitignored). This needs the network and takes approximately a minute.
-- Extra arguments go to QEMU. For example, `run.sh -semihosting-config enable=off` shows the failure when the probe has no output channel.
 
 All Arm qtests (several minutes):
 

@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 LAYOUT_PARENTS = ("docs", "tests")
 LAYOUT_SKIP_TOP = {"docs", "tests"}  # covered through their children
 
-SCOPES = {"spec", "docs", "research", "evidence", "tests", "scripts", "artifacts", "qemu"}
+SCOPES = {"spec", "docs", "learning", "research", "evidence", "tests", "probe", "acceptance", "scripts", "artifacts", "qemu"}
 TYPES = {"feat", "fix", "docs", "test", "chore", "refactor", "build", "ci", "revert"}
 
 REQ_RE = re.compile(r"\bREQ-[A-Z]+-\d{3}\b")

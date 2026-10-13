@@ -16,7 +16,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-MACH-005 | M7 | M7 (BL31 CPU_OFF runs) | — | — | — | EXP-001 | P |
 | REQ-MACH-006 | M1 | M1 (`info mtree`); M3 (`/proc/iomem`) | M1-machine-skeleton | M1-T04, T06, T07 | acceptance `info mtree -f`, `info roms`, `dumpdtb` vs DTB-U | `../research/cpu-gic.md` | P |
 | REQ-MACH-007 | M1 | M1 (placement + GICD/GICR identity == EVK, DR-0003 option A; TRM values; EVK-R60–R66 confirm on silicon) | M1-machine-skeleton | M1-T01, T03 | qtest `arm-gicv3-iidr-test`; qtest `rzv2l-smarc-test` `/gic/layout`, `/gic/identity` | `../research/cpu-gic.md`; EVK boot log | P |
-| REQ-MACH-008 | M1+ (per device) | each device's milestone | M1-machine-skeleton | M1-T03, T06 | acceptance `info mtree -f`, `info qtree` | `../device-map.md` | P |
+| REQ-MACH-008 | M1+ (per device) | each device's milestone | M1-machine-skeleton | M1-T03, T06 | acceptance `info mtree -f`, `info qtree` (vs `device-map.md`); M1 has no SPI devices, PPI wiring untested until M3 | `../device-map.md` | P |
 | REQ-SYSC-001 | M1 | M1 | M1-machine-skeleton | M1-T02, T05 | qtest `rzv2l-smarc-test` `/sysc/id`; probe (abort on a non-ID offset) | `../research/sysc.md`; EVK BL2 print `0x18447447` | P |
 | REQ-SYSC-002 | M1 (board property) | M7 (BL2/U-Boot boot-device selection) | M1-machine-skeleton | M1-T02 | qtest `rzv2l-smarc-test` `/sysc/boot-pins`, `/sysc/boot-mode-reserved` | `../research/sysc.md`; EVK BL2 LSI_MODE values | P |
 | REQ-SYC-001 | M7 | M7 | — | — | — | `../research/sysc.md` §5 (inference); EVK-R50 pending | P |
@@ -25,7 +25,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-PFC-001 | M3b | M3b | — | — | — | `../research/pinctrl.md` | P |
 | REQ-OSTM-001 | M3b | M3b | — | — | — | `../research/boot-dependency-graph.md`; EVK boot log | P |
 | REQ-IRQC-001 | M3b | M3b | — | — | — | `../research/boot-dependency-graph.md` | P |
-| REQ-MAP-001 | M1 (initial classification) → M3b | M3b | M1-machine-skeleton | M1-T05, T06 | probe (aborts on unmapped and non-ID SYSC offsets); acceptance log gate | `../device-map.md` | P |
+| REQ-MAP-001 | M1 (initial classification) → M3b | M3b | M1-machine-skeleton | M1-T05, T06 | probe (aborts on unmapped and non-ID SYSC offsets); acceptance log gate; classification of every DTB-U window not checked in M1 | `../device-map.md` | P |
 | REQ-WDT-001 | M4 | M4 | — | — | — | `../research/boot-chain-firmware.md` | P |
 | REQ-TSIP-001 | M7 | M7 (Stage N negative test) | — | — | — | `../research/boot-chain-firmware.md` | P |
 | REQ-GUEST-001 | — (process) | M3 | — | — | — | spec §8 | P |
@@ -34,5 +34,5 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-GUEST-004 | — (process) | M3 | M1-machine-skeleton | M1-T07 (M1 fixups) | acceptance `dumpdtb` vs DTB-U | spec §8; `../research/scif.md` (earlycon gap) | P |
 | REQ-GUEST-005 | M4 (loader) | M4 | — | — | — | `../research/boot-chain-firmware.md` §4 | P |
 | REQ-TEST-001 | M2 | M2 | — | — | — | spec §17 | P |
-| REQ-TEST-002 | M1+ | every unit | M1-machine-skeleton | M1-T01–T07 | mutation per task (`../units/M1-machine-skeleton/tasks.md`) | spec §13 | P |
+| REQ-TEST-002 | M1+ | every unit | M1-machine-skeleton | M1-T01–T07 | mutations per task in `../units/M1-machine-skeleton/tasks.md`; T04 has none of its own (covered by T03/T05); `/sysc/boot-mode-reserved`, `/gic/identity` and the PRR/default `LSI_MODE` reads have no recorded mutation | spec §13 | P |
 | REQ-TEST-003 | M3+ | M3+ | M1-machine-skeleton | M1-T06 (M1 log gate) | acceptance log gate (`-d unimp,guest_errors,invalid_mem`) | spec §13 | P |

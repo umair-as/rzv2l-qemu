@@ -265,7 +265,7 @@ The extra properties are from the old PSCI 0.1 binding. Linux uses the 1.0 bindi
 - `/psci` must keep `method = "smc"`.
 - The `compatible` list must include `arm,psci-1.0`, the binding that Linux uses.
 
-The check does not compare the 0.1 function IDs. They are values of QEMU itself, and Linux ignores them. With `"hvc"`, Linux would call a hypervisor that this board does not have. The kernel runs at NS-EL1, and there is no EL2.
+The check does not compare the 0.1 function IDs. They are values of QEMU itself, and Linux ignores them. With `"hvc"`, Linux would call a hypervisor that this board does not have. The kernel runs at NS-EL1, and the model has no EL2 (fidelity gap 14 in [`docs/device-map.md` §4](../device-map.md#4-known-fidelity-gaps-req-guest-004-list-and-model-limits)).
 
 **Why the check compares `/memory` with a value.** QEMU gives its new node the same name and contents as the stock node. Thus a plain diff shows nothing. A plain diff tells only that the two nodes agree. It does not tell that the value is correct. Thus the check also compares the node with `0x48000000` + `0x78000000` from AC08.
 

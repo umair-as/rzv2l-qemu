@@ -137,9 +137,9 @@ The board (`qemu/hw/arm/rzv2l-smarc.c`, M1-T04) is the object that `-M rzv2l-sma
 0xC0000000 └──────────────────────────────┘
 ```
 
-- `loader_start` = `0x48000000`, `ram_size` = `0x78000000` (`:57-59`). QEMU puts its boot stub and the kernel at this address. It writes the same window into the `/memory` node of the DTB (`qemu/hw/arm/boot.c:643-645`).
+- `loader_start` = `0x48000000`, `ram_size` = `0x78000000` (`:57-59`). QEMU puts its boot stub and the kernel at this address. It writes the same window into the `/memory` node of the DTB (`qemu/hw/arm/boot.c:571-572`).
 - `psci_conduit` = SMC (`:60`). Linux uses `SMC` instructions to start CPU1. The built-in PSCI of QEMU answers them, in place of BL31.
-- QEMU enters the kernel at non-secure EL1, as on the EVK. The reason is that the CPUs have no EL2 ([§1.1](#11-reading-the-soc-r9a07g054c)).
+- QEMU enters the kernel at non-secure EL1, as on the EVK. The reason is that the model switches off EL2 in the CPUs ([§1.1](#11-reading-the-soc-r9a07g054c)). The real Cortex-A55 has EL2: this is fidelity gap 14 in [`docs/device-map.md` §4](../device-map.md#4-known-fidelity-gaps-req-guest-004-list-and-model-limits).
 - In qtest mode, QEMU loads nothing (`:73`), as in imx8mp. The tests read registers. They do not run a kernel.
 
 **Machine properties are class properties.** `object_class_property_add` declares a property one time, for the machine *type*. The property has a getter and a setter (`:78-104`). The setter only stores the value. Later, the `realize` of SYSC checks the value ([`qemu-basics.md` §3.1](qemu-basics.md#31-reading-a-real-device-sysc)). For this reason, the command line accepts `boot-mode=6`. QEMU then refuses it at start-up, with the message from SYSC.

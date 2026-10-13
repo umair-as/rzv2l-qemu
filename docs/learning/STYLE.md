@@ -65,7 +65,7 @@ Add a term here before you use it with a new meaning.
 ## 6. Checks
 
 - `scripts/lint.py style` gives a hint for each sentence that is longer than 25 words, and for each word from §1.3 to §1.5. A hint is not an error. Keep the text as it is if it is clearer that way.
-- `scripts/doc-facts.py OLD NEW` compares the facts in two versions of a file. Use it for each rewrite. It lists each code token, number, citation and section reference that is in one version only.
+- `scripts/doc-facts.py OLD NEW` compares the facts in two versions of a file. Use it for each rewrite. It lists each code token, number, ID (`M1-T04`, `EL1`), page, citation and section reference that is in one version only. It compares sets: it does not see a fact that moves to another place, or a lost qualifier such as "only" or "not". Read each changed sentence too.
 
 The style hints are advisory. The facts check is not: a difference in facts must be a mistake to fix or a deliberate change to name. A reviewer reads the text too.
 

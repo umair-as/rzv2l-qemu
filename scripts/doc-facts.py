@@ -5,6 +5,7 @@ A rewrite for style must keep every fact. This script lists what is in one
 version only:
   code    each `code span`
   number  each decimal or hex number outside code (0x11020A04, 24, 6.3.43)
+  id      each word with a digit (M1-T04, AC13, EL1, GIC-600) and page (p.207)
   ref     each section reference (§N) and each link target
   quote   each "quoted text" of four words or more (quotes from sources)
   block   each fenced code block, compared whole
@@ -12,6 +13,9 @@ version only:
 Usage: scripts/doc-facts.py OLD NEW
        scripts/doc-facts.py REV:PATH PATH    (OLD from git, e.g. HEAD:docs/...)
 Exit status is 1 if any fact is in one version only.
+
+Limits: facts are compared as sets, so a fact that moves, repeats or loses a
+qualifier ("only", "not", "never") is not reported. Read each changed sentence.
 """
 
 import re
@@ -30,8 +34,8 @@ def read(arg):
 
 
 def facts(text):
-    found = {"code": set(), "number": set(), "ref": set(), "quote": set(),
-             "block": set()}
+    found = {"code": set(), "number": set(), "id": set(), "ref": set(),
+             "quote": set(), "block": set()}
     blocks = re.findall(r"^[ \t]*```.*?^[ \t]*```", text, flags=re.S | re.M)
     found["block"] = {b.strip() for b in blocks}
     prose = re.sub(r"^[ \t]*```.*?^[ \t]*```", "", text, flags=re.S | re.M)
@@ -42,6 +46,8 @@ def facts(text):
     rest = re.sub(r"\]\([^)\s]+\)", "]", rest)
     found["quote"] = {q for q in re.findall(r'"([^"]+)"', rest)
                       if len(q.split()) >= 4}
+    found["id"] = set(re.findall(
+        r"\bp\.\d+(?:[-–]\d+)?|\b[A-Za-z][\w-]*\d[\w.-]*\w|\b[A-Za-z]+\d\b", rest))
     found["number"] = set(re.findall(
         r"(?<![\w.])(?:0x[0-9A-Fa-f_]+|\d+(?:\.\d+)*)(?![\w])", rest))
     return found
