@@ -7,6 +7,8 @@ Checks:
   reqs     requirements.md and traceability.md list the same REQ IDs,
            and every REQ ID cited in the docs exists
   commits  commit messages follow AGENTS.md "Commit style"
+  style    docs/learning/ prose follows docs/learning/STYLE.md (warnings only;
+           not in the default set until every file is rewritten)
 
 Usage: scripts/lint.py [--commits RANGE] [CHECK ...]
 Exit status is 1 if any check reports an error. Warnings do not fail.
@@ -62,6 +64,61 @@ def repo_files():
 def markdown_files():
     return [p for p in repo_files()
             if p.suffix == ".md" and p.parts[0] not in ("qemu",)]
+
+
+# --- style ------------------------------------------------------------------
+
+STYLE_MAX_WORDS = 25
+# STYLE.md section 1.3-1.5: idioms, complex words, filler
+STYLE_AVOID = ("carry on", "in order to", "utilize", "e.g.", "i.e.",
+               "simply", "just", "basically", "obviously", "really")
+SENT_END_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z`*\[(\"])")
+
+
+def prose_blocks(text):
+    """(line, text) of each paragraph or list item, outside code, tables,
+    headings and quotations."""
+    blocks, cur, start, fence = [], [], 0, False
+    for n, l in enumerate(text.splitlines(), 1):
+        s = l.strip()
+        if s.startswith("```"):
+            fence = not fence
+        new_item = re.match(r"([-*]|\d+\.) ", s)
+        if (fence or not s or s.startswith(("```", "#", "|", '> "', "---"))
+                or new_item):
+            if cur:
+                blocks.append((start, " ".join(cur)))
+            cur = []
+            if fence or not new_item:
+                continue
+        if not cur:
+            start = n
+        cur.append(s.lstrip("> "))
+    if cur:
+        blocks.append((start, " ".join(cur)))
+    return blocks
+
+
+def plain_words(sentence):
+    s = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", sentence)   # link -> text
+    s = re.sub(r"``.*?``|`[^`]*`", "X", s)                  # code = one word
+    s = re.sub(r"\([^()]*\)", "", s)                       # citations
+    return [w for w in re.split(r"\s+", s) if re.search(r"\w", w)]
+
+
+def check_style(rep):
+    for md in sorted((ROOT / "docs/learning").glob("*.md")):
+        rel = md.relative_to(ROOT)
+        for line, block in prose_blocks(md.read_text()):
+            for sent in SENT_END_RE.split(block):
+                n = len(plain_words(sent))
+                if n > STYLE_MAX_WORDS:
+                    rep.warn("style", f"{rel}:{line}: sentence of {n} words: "
+                             f"{sent[:60]}...")
+            low = re.sub(r"`[^`]*`|\"[^\"]*\"", "", block).lower()
+            for w in STYLE_AVOID:
+                if re.search(r"(?<!\w)" + re.escape(w) + r"(?!\w)", low):
+                    rep.warn("style", f"{rel}:{line}: avoid '{w}'")
 
 
 # --- layout -----------------------------------------------------------------
@@ -203,19 +260,22 @@ def check_commits(rep, rng):
 
 # --- main -------------------------------------------------------------------
 
-CHECKS = {"layout": check_layout, "links": check_links, "reqs": check_reqs}
+CHECKS = {"layout": check_layout, "links": check_links, "reqs": check_reqs,
+          "style": check_style}
+DEFAULT = ["layout", "links", "reqs", "commits"]
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("checks", nargs="*", metavar="CHECK",
-                    help="layout, links, reqs, commits (default: all)")
+                    help="layout, links, reqs, commits, style "
+                         "(default: all but style)")
     ap.add_argument("--commits", metavar="RANGE",
                     help="commit range for the commits check "
                          "(default: @{upstream}..HEAD, or HEAD with no upstream)")
     args = ap.parse_args()
-    selected = args.checks or [*CHECKS, "commits"]
+    selected = args.checks or DEFAULT
     unknown = [c for c in selected if c not in (*CHECKS, "commits")]
     if unknown:
         ap.error(f"unknown check(s): {', '.join(unknown)}")
