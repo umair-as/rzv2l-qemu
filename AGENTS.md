@@ -143,7 +143,7 @@ Useful QEMU debugging (see `docs/imx95/methodology.md` in qemu-imx95):
 - Use a project-owned debug image (G1) or U-Boot `md`. Hardened images typically block `/dev/mem`.
 - Record whether a register read has side effects (FIFO pop, write-1-to-clear, read-to-clear).
 - A measurement answers a specific question stated beforehand. Store it under `docs/evidence/`.
-- **Provenance.** Every evidence file names the image or build it came from. When the image was not built by this project, the raw originals are kept privately by the operator and the evidence file records their SHA-256, so an excerpt can always be checked against its source. Over time, prefer re-measuring on G0/G1 images this project builds; such evidence replaces downstream-image evidence.
+- **Provenance.** Every evidence file names the image or build it came from. When the image was not built by this project, the operator keeps the raw originals and their SHA-256 privately, so an excerpt can always be checked against its source. Over time, prefer re-measuring on G0/G1 images this project builds; such evidence replaces downstream-image evidence.
 
 ## Commit style
 

@@ -5,7 +5,7 @@
 **Kernel:** 6.12.59-cip14, a downstream image built on the G1 base (`rz-6.12-cip14`) with additional downstream patches. SoC- and firmware-level facts transfer to G0 and G1; DT-level facts (which devices are enabled) belong to that image.
 **Boot stage:** U-Boot console output + Linux dmesg (post-Linux).
 **Method:** passive serial capture at 115200 8N1; no register access.
-**Provenance:** the image was not built by this project. The raw captures are kept privately by the operator; their SHA-256 is **not yet recorded** (review finding R4, 2026-10-09). Until it is, the excerpts below are reported observations, not independently checkable ones.
+**Provenance:** the image was not built by this project. The raw captures and their SHA-256 are kept privately by the operator; every excerpt below was re-checked verbatim against its capture on 2026-10-13. To be replaced by measurements on a project-built image.
 
 | Observation (verbatim excerpt) | Answers |
 |---|---|
@@ -22,7 +22,7 @@
 | `1004c000.serial: ttySC1 at MMIO 0x1004c000 (irq = 43, base_baud = 0) is a scif` at 2.34 s | A second SCIF (SCIF1) probes in this image; that image's DT is downstream, so this says nothing about which SCIFs DTB-U enables |
 | `clk: Disabling unused clocks` at 3.0 s | The unused-clock sweep runs; clocks not claimed by a driver are gated (cpg-reset.md) |
 
-## SYSC identification registers printed by BL2 (archived boot logs, about 150 boots, June–October 2026)
+## SYSC identification registers printed by BL2 (archived EVK boot logs, 150 BL2 printouts, June–October 2026)
 
 TF-A BL2 prints three SYSC registers on every boot (TF-A `plat/renesas/rz/common/bl2_plat_setup.c:238-240` @ `f59ed5a31`). **Boot stage:** BL2, after DDR init.
 
@@ -30,4 +30,4 @@ TF-A BL2 prints three SYSC registers on every boot (TF-A `plat/renesas/rz/common
 |---|---|---|
 | `SYS_LSI_DEVID` (0x11020A04) | `0x18447447`, on every boot | DEV_ID[31:28] = 1 (revision 1); DEV_ID[27:0] = `0x8447447`. **Resolves the manual conflict:** §6.3.43 p.208 is correct, and Table 6.1 p.168 (`x841_C447`) is a copy of the RZ/G2L value. |
 | `SYS_LSI_PRR` (0x11020A08) | `0x00000000`, on every boot | bit 0 CA55_1CPU = 0 → dual Cortex-A55 (§6.3.44 p.209) |
-| `SYS_LSI_MODE` (0x11020A00) | `0x10203` (90×), `0x10000` (35×), `0x10001` (14×), `0x10200` (9×), `0x10201` (1×) | bit 16 STAT_SEC_EN = 1 on every boot (security function available). Bit 9 = DEBUGEN pin, bits [2:0] = MD_BOOT pins (§6.3.42 p.207). MD_BOOT per Table 4.1 (§4): 0 = eSD, 1 = 1.8 V eMMC, 3 = 1.8 V serial flash (QSPI). The values track the board's boot-mode switches between sessions. |
+| `SYS_LSI_MODE` (0x11020A00) | `0x10203` (90×), `0x10000` (35×), `0x10001` (14×), `0x10200` (10×), `0x10201` (1×) | bit 16 STAT_SEC_EN = 1 on every boot (security function available). Bit 9 = DEBUGEN pin, bits [2:0] = MD_BOOT pins (§6.3.42 p.207). MD_BOOT per Table 4.1 (§4): 0 = eSD, 1 = 1.8 V eMMC, 3 = 1.8 V serial flash (QSPI). The values track the board's boot-mode switches between sessions. |
