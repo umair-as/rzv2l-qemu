@@ -64,6 +64,7 @@ The procedures above are packaged as skills, so every agent runs them the same w
 | Proving a test | `mutation-check` | plausible wrong value, confirmed rebuild, the right red line, restore |
 | Running guests | `guest-bringup` | the rule 5 loop in practice: triage by symptom, hangs, allowed fixes, coverage list |
 | Explanations for the operator | `learning-docs` | writes or rewrites `docs/learning/` per `docs/learning/STYLE.md` |
+| Seeing the model run | `bench-drive` | runs the web bench and drives a session through Playwright MCP or its HTTP API |
 
 Technical skills do one piece of modelling or testing work. Process skills (review, unit onboarding, one task) put them in order and stop at the operator checkpoints; they land as listed in DR-0004. Commits and handoff stay in this file.
 
@@ -134,6 +135,7 @@ tests/acceptance/   per-milestone acceptance runs and their expected outputs
 tests/probes/       bare-metal guest programs that check a machine from inside
 tests/guests/       scripts that build or fetch guest artifacts (outputs untracked)
 scripts/            repo tooling (lint, build and run helpers)
+bench/              web front end for one QEMU session (stock QEMU interfaces only) and its self-test
 artifacts/rzv2l/    manuals index, manifest and checksums (the manuals are not tracked)
 qemu/               submodule: the QEMU fork
 .agents/            skills shared by Claude Code and Codex

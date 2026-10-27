@@ -1,0 +1,10 @@
+# Self-test of the bench itself on stock QEMU (no fork build needed).
+# A bare-metal program on virt's PL011: prints a banner, echoes keys,
+# exits with status 0 through semihosting on 'q'.
+name = "virt · bench self-test (echo)"
+description = "Stock QEMU virt + PL011 echo program. Type to echo; 'q' exits with status 0."
+qemu = "qemu-system-aarch64"
+prepare = ["make", "-s", "-C", "bench/tests/virt-echo"]
+args = ["-M", "virt", "-cpu", "cortex-a55", "-kernel", "bench/tests/virt-echo/out/echo.elf"]
+semihosting = true
+log = "unimp,guest_errors"   # QEMU 8.x has no invalid_mem; holes log under guest_errors there

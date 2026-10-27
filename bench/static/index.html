@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rzv2l bench</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/vendor/xterm.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand">rzv2l <span>bench</span></div>
+  <select id="profile" data-testid="profile-select" aria-label="Profile"></select>
+  <div class="controls">
+    <button id="start" data-testid="btn-start" class="primary">Start</button>
+    <button id="start-paused" data-testid="btn-start-paused">Start paused</button>
+    <button id="pause" data-testid="btn-pause" disabled>Pause</button>
+    <button id="reset" data-testid="btn-reset" disabled>Reset</button>
+    <button id="stop" data-testid="btn-stop" class="danger" disabled>Stop</button>
+  </div>
+  <div class="status">
+    <span id="state" class="pill" data-testid="status" data-state="none" role="status" aria-label="Session status">no session</span>
+    <span id="exit" data-testid="exit-code" role="status" aria-label="Exit status" hidden></span>
+  </div>
+</header>
+<p id="profile-desc" class="desc"></p>
+
+<main>
+  <section class="panel console-panel">
+    <div class="panel-head">
+      <h2>Console</h2>
+      <span class="hint">serial + semihosting · click to type</span>
+    </div>
+    <div id="term" data-testid="console" role="region" aria-label="Terminal"></div>
+    <pre id="console-text" data-testid="console-text" class="sr-only" role="log" aria-label="Console transcript" aria-live="off"></pre>
+  </section>
+
+  <section class="panel side">
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="log" data-testid="tab-log" aria-selected="true">Log</button>
+      <button role="tab" data-tab="coverage" data-testid="tab-coverage">Coverage <b id="cov-count">0</b></button>
+      <button role="tab" data-tab="monitor" data-testid="tab-monitor">Monitor</button>
+      <button role="tab" data-tab="events" data-testid="tab-events">Events</button>
+    </nav>
+
+    <div class="tab-body" data-panel="log">
+      <p class="hint">QEMU <code>-d</code> log and QEMU's own messages.</p>
+      <pre id="log" data-testid="log-lines" class="scroll" role="log" aria-label="QEMU log"></pre>
+    </div>
+
+    <div class="tab-body" data-panel="coverage" hidden>
+      <p class="hint">What the guest touched that the model does not provide. Each row is either fixed or listed as a gap.</p>
+      <table data-testid="coverage-table" aria-label="Coverage">
+        <thead><tr><th>Kind</th><th>Access</th><th>Where</th><th>Size</th><th>Count</th></tr></thead>
+        <tbody id="coverage"></tbody>
+      </table>
+    </div>
+
+    <div class="tab-body" data-panel="monitor" hidden>
+      <div class="chips">
+        <button data-cmd="info mtree -f" data-testid="monitor-mtree">mtree</button>
+        <button data-cmd="info qtree" data-testid="monitor-qtree">qtree</button>
+        <button data-cmd="info roms" data-testid="monitor-roms">roms</button>
+        <button data-cmd="info registers" data-testid="monitor-registers">registers</button>
+        <button data-cmd="info pic" data-testid="monitor-pic">pic</button>
+      </div>
+      <form id="monitor-form" class="row">
+        <input id="monitor-input" data-testid="monitor-input" aria-label="Monitor command" placeholder="info …" autocomplete="off" spellcheck="false">
+        <button data-testid="monitor-run">Run</button>
+      </form>
+      <pre id="monitor-out" data-testid="monitor-output" class="scroll" role="log" aria-label="Monitor output"></pre>
+    </div>
+
+    <div class="tab-body" data-panel="events" hidden>
+      <p class="hint">QMP events.</p>
+      <pre id="events" data-testid="events" class="scroll" role="log" aria-label="QMP events"></pre>
+    </div>
+  </section>
+</main>
+
+<script src="/static/vendor/xterm.js"></script>
+<script src="/static/vendor/addon-fit.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
