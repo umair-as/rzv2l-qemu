@@ -35,6 +35,15 @@ The workflow procedures become committed skills, agents and hooks, shared by bot
 - **Verification.** Each hook check is mutation-checked, and each skill is replayed on past M1 work before it is relied on.
 - **Rollout** in six phases: foundation, review, coverage, onboarding, emulation and debug, EVK. Each is committed to `main` after operator review.
 
+## Amendment (2026-10-27, same day)
+
+The skill list above is replaced. Skills are for the technical work, not for process: each agent harness already gives a working review, commit and handoff flow, and the rules for those stay in AGENTS.md.
+
+- **Landed:** `register-evidence`, `device-model`, `soc-wiring`, `qtest-golden`, `guest-probe`, `mutation-check`, `guest-bringup`, and the existing `learning-docs`. They draw on this repo's M1 work and on the method of the qemu-imx95 and qemu-imxrt1180 ports (method only, no RZ/V2L facts).
+- **Dropped:** `/onboard`, `/emulate`, `/debug`, `/review`, `/evk-read` as process skills. `/debug` became `guest-bringup`; the `/qemu-cov` coverage list is a section of it.
+- **Not landed:** the three subagents. Add them only if a session shows a need.
+- The hooks stay as committed; no further gate work is planned.
+
 ## Consequences
 
 - One copy of each procedure serves both agents, versioned and reviewed.

@@ -56,9 +56,16 @@ The procedures above are packaged as skills, so every agent runs them the same w
 
 | Stage | Skill | What it does |
 |---|---|---|
+| Before modelling a block | `register-evidence` | the consumer-scoped register table: offsets, reset values, field classes, start states, cites |
+| Writing the model | `device-model` | register file, field classes, IRQ equations, virtual-time completion, honest faults (patterns in its `reference.md`) |
+| Into the machine | `soc-wiring` | SoC child, memory map, GIC SPI wiring, chardev, Kconfig; acceptance expectations from the device map |
+| Register tests | `qtest-golden` | qtests that assert manual values, by field class |
+| CPU-side tests | `guest-probe` | bare-metal probes for aborts, PSCI, IRQ delivery, firmware access order, console output |
+| Proving a test | `mutation-check` | plausible wrong value, confirmed rebuild, the right red line, restore |
+| Running guests | `guest-bringup` | the rule 5 loop in practice: triage by symptom, hangs, allowed fixes, coverage list |
 | Explanations for the operator | `learning-docs` | writes or rewrites `docs/learning/` per `docs/learning/STYLE.md` |
 
-Rows are added as skills land.
+Skills cover modelling and testing. Process (review, commits, handoff) stays in this file and the agent harness.
 
 - **Skills** live in `.agents/skills/<name>/SKILL.md`. Codex reads them there; Claude Code reads them through the `.claude/skills` symlink. A skill stops at the operator checkpoints above and never commits or pushes.
 - **Agent briefs** in `.claude/agents/*.md` are Claude Code subagents. Codex reads them as task briefs.
