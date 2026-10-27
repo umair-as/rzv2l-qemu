@@ -7,6 +7,8 @@ Checks:
   reqs     requirements.md and traceability.md list the same REQ IDs,
            and every REQ ID cited in the docs exists
   commits  commit messages follow AGENTS.md "Commit style"
+  skills   each .agents/skills/<name>/SKILL.md has name == <name> and a
+           description; .claude/skills links to .agents/skills
   style    docs/learning/ prose follows docs/learning/STYLE.md (warnings only;
            not in the default set until every file is rewritten)
 
@@ -26,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 LAYOUT_PARENTS = ("docs", "tests")
 LAYOUT_SKIP_TOP = {"docs", "tests"}  # covered through their children
 
-SCOPES = {"spec", "docs", "learning", "research", "evidence", "tests", "probe", "acceptance", "scripts", "artifacts", "qemu"}
+SCOPES = {"spec", "docs", "learning", "research", "evidence", "tests", "probe", "acceptance", "scripts", "artifacts", "qemu", "tooling"}
 TYPES = {"feat", "fix", "docs", "test", "chore", "refactor", "build", "ci", "revert"}
 
 REQ_RE = re.compile(r"\bREQ-[A-Z]+-\d{3}\b")
@@ -251,18 +253,36 @@ def check_commits(rep, rng):
                 rep.warn("commits", f"{short}: scope '{m.group(2)}' not in AGENTS.md list")
         for line in lines:
             if line.startswith("Assisted-by:"):
-                if not re.fullmatch(r"Assisted-by: [a-z0-9-]+:[a-z0-9][a-z0-9._-]*", line):
-                    rep.error("commits", f"{short}: malformed trailer '{line}'")
+                rep.error("commits", f"{short}: AI attribution line '{line}'; "
+                          "provenance is stated once in the README")
             if re.match(r"Co-Authored-By:", line, re.I) and \
                     re.search(r"claude|codex|anthropic|openai|gpt|\bai\b", line, re.I):
-                rep.error("commits", f"{short}: AI tool credited with Co-Authored-By; use Assisted-by")
+                rep.error("commits", f"{short}: AI tool credited with Co-Authored-By; "
+                          "provenance is stated once in the README")
+
+
+# --- skills -----------------------------------------------------------------
+
+def check_skills(rep):
+    skills = ROOT / ".agents" / "skills"
+    link = ROOT / ".claude" / "skills"
+    if not link.is_symlink() or link.resolve() != skills.resolve():
+        rep.error("skills", ".claude/skills is not a symlink to .agents/skills")
+    for md in sorted(skills.glob("*/SKILL.md")):
+        name = md.parent.name
+        m = re.match(r"---\n(.*?)\n---\n", md.read_text(), re.S)
+        fields = dict(re.findall(r"^(\w[\w-]*):[ \t]*(.*)$", m.group(1), re.M)) if m else {}
+        if fields.get("name") != name:
+            rep.error("skills", f"{md.relative_to(ROOT)}: name is not '{name}'")
+        if not fields.get("description"):
+            rep.error("skills", f"{md.relative_to(ROOT)}: no description")
 
 
 # --- main -------------------------------------------------------------------
 
 CHECKS = {"layout": check_layout, "links": check_links, "reqs": check_reqs,
-          "style": check_style}
-DEFAULT = ["layout", "links", "reqs", "commits"]
+          "skills": check_skills, "style": check_style}
+DEFAULT = ["layout", "links", "reqs", "skills", "commits"]
 
 
 def main():

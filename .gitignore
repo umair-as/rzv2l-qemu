@@ -32,3 +32,6 @@ tests/acceptance/**/out/
 
 # Operator-local reference notes copied into the artifacts collection.
 artifacts/**/project-notes/
+
+# Python bytecode
+__pycache__/

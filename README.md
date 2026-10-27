@@ -100,6 +100,6 @@ The QEMU port lives in a fork, included as the `qemu/` submodule. It carries onl
 ## 🤖 How it is built
 
 > [!IMPORTANT]
-> Specifications, designs and reviews are human-led. Much of the research and code is written by AI agents under that review, and every agent-assisted commit carries an `Assisted-by:` trailer. QEMU's contribution policy declines AI-generated code, so the device models here serve as a working prototype and test oracle and cannot go upstream as they are. Whether an upstream path exists at all is an open question.
+> Specifications, designs and reviews are human-led. Much of the research and code is written by AI agents under that review; all model code on the fork's `rzv2l-dev` branch is agent-assisted. QEMU's contribution policy declines AI-generated code, so the device models here serve as a working prototype and test oracle and cannot go upstream as they are. Whether an upstream path exists at all is an open question.
 
 Agent instructions are in [AGENTS.md](AGENTS.md).

@@ -2,27 +2,18 @@
 
 This file guides Claude Code (claude.ai/code) in this repository.
 
-Project orientation, rules, layout and conventions live in the agent-agnostic file:
+Project orientation, rules, layout, workflow and conventions live in the agent-agnostic file:
 
 @AGENTS.md
 
-The rest of this file is Claude-Code-specific.
+The rest of this file covers Claude Code mechanics only.
 
-## Attribution mechanics
+## Attribution
 
-- The operator's convention (AGENTS.md "Commit style") **overrides** Claude Code's default commit and PR footers. Use `Assisted-by: claude-code:<model-id>` with the model this session is actually running as. Never add `Co-Authored-By:` or the "Generated with Claude Code" footer.
-- On `rzv2l-dev` (the QEMU fork) the trailer matters doubly: it marks AI-assisted commits, which cannot go upstream as they are (QEMU code-provenance policy).
+- AGENTS.md "Commit style" overrides Claude Code's default commit and PR attribution: no `Co-Authored-By:` lines, no "Generated with Claude Code" footer, no `Assisted-by:` trailer.
 
-## Serial console MCP (physical EVK)
+## Skills, agents, hooks
 
-- The `mcp-serial-rs` tools reach the EVK console. The RZ/V2L is normally `/dev/ttyUSB0` @ 115200 8N1. Confirm with `serial_list_ports` and don't assume.
-- The read-only oracle policy in AGENTS.md applies. Ask before any command that writes registers, flash or boot media, or that reboots the board.
-- Make the policy server-enforced, not a promise. `write_policy: "deny"` refuses every write, so it only suits passive listening (capturing a boot log). For U-Boot `md` reads, open with `write_policy: "confirm"` plus `deny_patterns` that block state-changing commands (`mw`, `mm`, `nm`, `cp`, `mmc write`, `sf`, `env save`/`saveenv`, `reset`, `boot*`, `go`). `md` itself can have side effects: follow the per-register notes in `docs/evidence/requests.md` (never read the SCIF FIFO data registers).
-- The server's journal records metadata only. Copy the console output you need into the evidence file yourself.
-- Capture logs into `docs/evidence/` with board, image and boot stage noted.
-
-## Subagents
-
-- Use subagents for broad source reading: TF-A, U-Boot, kernel drivers, the hardware manual text. Have them write findings to a local working file and return a summary.
-- **Verify their surprising claims yourself** against the effective build configuration before relaying or recording them. Subagent reports are leads, not evidence.
-- The independent reviewer of AGENTS.md "How work flows" must be a different model from the implementer, starting from a fresh context with only the filled-in review prompt: Codex, another Claude model in a separate session, or a non-forked subagent with a different `model`. A forked subagent, or one on the implementer's model, does not count.
+- Skills come from `.claude/skills`, a symlink to `.agents/skills/` (shared with Codex). Add a skill there, never as a separate copy under `.claude/`.
+- Subagents in `.claude/agents/` pin their own `model`. For the independent reviewer, use a non-forked subagent whose `model` differs from this session's.
+- `.claude/hooks/git_gate.py` runs as a PreToolUse hook on Bash (`.claude/settings.json`). It denies builds inside `qemu/` and asks before a push, a PR or a submodule bump. A deny or ask is a policy decision: do not rephrase the command around it.

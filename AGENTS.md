@@ -41,12 +41,31 @@ qemu-rzv2l/                 this repo: spec, research, evidence, tests, guest bu
 
 - The operator sees only what review cannot settle: source conflicts, inferences, assumptions and design choices. Do not ask the operator to proofread citations.
 - The reviewer works from `docs/units/templates/review-prompt.md`. Its findings are leads too: the implementer re-checks each one before acting on it.
-- One review checkpoint at a time. The project has no deadline; review matters more than speed.
+- The independent reviewer starts from a fresh context with only the filled-in review prompt, on a model different from the implementer's: Codex, or another Claude model. A forked agent, or one on the implementer's model, does not count.
+- Delegate broad source reading (TF-A, U-Boot, kernel drivers, the hardware manual) to research agents. They write findings to a working file and return a summary. Their reports are leads, not evidence: verify surprising claims against the effective build configuration before relaying or recording them.
+- One review checkpoint at a time. The project has no deadline; review matters more than speed. Slow means reviewable checkpoints, not process overhead.
 - **Explanations land in the repo.** Whatever the implementer explains to the operator (a QEMU concept, how a device works, a build or test step) goes into `docs/learning/` before the task's commit, written along the way or batched per task. Text about uncommitted code is committed with that code.
 
-**Session state** (the current handoff and task board) is kept outside the tracked tree, in the operator's local working area. At the start of a session, read the handoff the operator points you to; at the end, update it with the current state and the next step. Durable results are promoted into `docs/`; working material stays out of tracked files.
+**Session state** (the current handoff and task board) is kept outside the tracked tree, in the operator's local working area. At the start of a session, read the handoff the operator points you to; at the end, update it with the current state and the next step. Durable results are promoted into `docs/`; working material stays out of tracked files. Keep both files short: the handoff about one page, rewritten each session (never appended); the task board current state only. Never delete working-area material (research, reviews, source trees) without operator approval.
 
-**Public terms only.** Tracked files and commit messages describe this project in its own public terms: repo-relative paths, and public upstream sources cited as repository + commit + `file:line`.
+**Public terms only.** Tracked files and commit messages describe this project in its own public terms: repo-relative paths, and public upstream sources cited as repository + commit + `file:line`. Committed tooling names the operator's working area only as `$RZV2L_WORKAREA`.
+
+## Workflow (skills, agents, gates)
+
+The procedures above are packaged as skills, so every agent runs them the same way ([DR-0004](docs/decisions/DR-0004-agent-workflow-tooling.md)). Skills hold steps; the rules stay in this file and in the templates.
+
+| Stage | Skill | What it does |
+|---|---|---|
+| Explanations for the operator | `learning-docs` | writes or rewrites `docs/learning/` per `docs/learning/STYLE.md` |
+
+Rows are added as skills land.
+
+- **Skills** live in `.agents/skills/<name>/SKILL.md`. Codex reads them there; Claude Code reads them through the `.claude/skills` symlink. A skill stops at the operator checkpoints above and never commits or pushes.
+- **Agent briefs** in `.claude/agents/*.md` are Claude Code subagents. Codex reads them as task briefs.
+- **Gates.** What is enforced depends on who runs the command:
+  - **Every committer** (git hooks, wired locally in each clone; see the docstring of `.claude/hooks/git_gate.py`): commits on `rzv2l-base` and fork commits with `Signed-off-by:` are refused; `scripts/lint.py` runs before each project commit.
+  - **Claude Code only** (tool hook): builds inside `qemu/` are refused; a push, a PR or a submodule bump asks the operator first.
+  - **Codex** follows the build and push rules from this file; nothing enforces them for it.
 
 ## Upstream provenance: read this before writing QEMU code
 
@@ -55,7 +74,7 @@ QEMU's policy (`qemu/docs/devel/code-provenance.rst`, section "Use of AI-generat
 Consequences for this project:
 - Device-model code an agent writes on `rzv2l-dev` is **not upstreamable as-is**. Agent-written code serves as the working prototype and test oracle. Human authorship would be necessary for any submission but is **not sufficient**: the policy also declines contributions *derived from* AI-generated content. Whether and how anything goes upstream is an open operator decision, not a rewrite step.
 - Agents can contribute freely to the parts upstream never sees: evidence packets, research notes, device maps, test plans, guest build scripts, oracle captures, validation reviews and debugging.
-- Every agent-touched commit in **both** repos carries an `Assisted-by:` trailer (see Commit style). That way it is always mechanically clear which commits are AI-assisted. Never omit or strip it.
+- Provenance is stated once, project-wide, in the README. Everything on `rzv2l-dev` beyond `rzv2l-base` counts as agent-assisted. A commit the operator writes by hand says so in its message.
 
 ## Engineering rules (from the spec, non-negotiable)
 
@@ -110,6 +129,8 @@ tests/guests/       scripts that build or fetch guest artifacts (outputs untrack
 scripts/            repo tooling (lint, build and run helpers)
 artifacts/rzv2l/    manuals index, manifest and checksums (the manuals are not tracked)
 qemu/               submodule: the QEMU fork
+.agents/            skills shared by Claude Code and Codex
+.claude/            Claude Code agents, hooks and settings (skills: symlink to .agents/skills)
 ```
 
 ## Sources
@@ -144,14 +165,20 @@ Useful QEMU debugging (see `docs/imx95/methodology.md` in qemu-imx95):
 - Use a project-owned debug image (G1) or U-Boot `md`. Hardened images typically block `/dev/mem`.
 - Record whether a register read has side effects (FIFO pop, write-1-to-clear, read-to-clear).
 - A measurement answers a specific question stated beforehand. Store it under `docs/evidence/`.
+- **Serial console** (the `mcp-serial-rs` tools). The RZ/V2L is normally `/dev/ttyUSB0` @ 115200 8N1; confirm it with `serial_list_ports` instead of assuming. Ask before any command that writes registers, flash or boot media, or reboots the board.
+  - Make the policy server-enforced, not a promise. `write_policy: "deny"` refuses every write, so it suits only passive listening (capturing a boot log). For U-Boot `md` reads, open with `write_policy: "confirm"` plus `deny_patterns` that block state-changing commands (`mw`, `mm`, `nm`, `cp`, `mmc write`, `sf`, `env save`/`saveenv`, `reset`, `boot*`, `go`).
+  - `md` itself can have side effects: follow the per-register notes in `docs/evidence/requests.md` (never read the SCIF FIFO data registers).
+  - The server's journal records metadata only. Copy the console output you need into the evidence file, with board, image and boot stage noted.
 - **Provenance.** Every evidence file names the image or build it came from. When the image was not built by this project, the operator keeps the raw originals and their SHA-256 privately, so an excerpt can always be checked against its source. Over time, prefer re-measuring on G0/G1 images this project builds; such evidence replaces downstream-image evidence.
 
 ## Commit style
 
-- **Project repo:** Conventional Commits, `<type>(<scope>): <subject>`, imperative mood, ≤72 chars. Scopes: `spec`, `docs`, `learning`, `research`, `evidence`, `tests`, `probe`, `acceptance`, `scripts`, `artifacts`, `qemu` (submodule bumps). Test changes use the type `test` (e.g. `test(acceptance): …`), not `tests`.
-- **QEMU fork (`rzv2l-dev`):** upstream QEMU style, `<subsystem>: <subject>` (e.g. `hw/arm: add RZ/V2L SoC skeleton`), `scripts/checkpatch.pl --no-signoff` clean, one logical change per commit. No `Signed-off-by:` on agent-written commits: it certifies the DCO, which QEMU holds cannot be given for AI-generated code (`qemu/docs/devel/code-provenance.rst`). The operator signs off only code they wrote, if a submission is ever considered.
-- **Commit body:** say what was verified and how, and what was not verified. A test that has never been seen to fail does not count as verification (rule 7).
-- **AI attribution, both repos:** end every agent-touched commit with `Assisted-by: <tool>:<exact-model-id-you-are-running-as>`. Use one line per model that touched the change, in order. Never copy a model id from a doc or a past commit. **Do not add `Co-Authored-By:` lines for AI tools.**
+- **Project repo:** Conventional Commits, `<type>(<scope>): <subject>`, imperative mood, ≤72 chars. Scopes: `spec`, `docs`, `learning`, `research`, `evidence`, `tests`, `probe`, `acceptance`, `scripts`, `artifacts`, `qemu` (submodule bumps), `tooling` (skills, agents, hooks). Test changes use the type `test` (e.g. `test(acceptance): …`), not `tests`.
+- **QEMU fork (`rzv2l-dev`):** upstream QEMU style, `<subsystem>: <subject>` (e.g. `hw/arm: add RZ/V2L SoC skeleton`), `scripts/checkpatch.pl --no-signoff` clean, one logical change per commit. No `Signed-off-by:` on agent-written commits: it certifies the DCO, which QEMU holds cannot be given for AI-generated code (`qemu/docs/devel/code-provenance.rst`). The fork's `commit-msg` hook refuses every sign-off; a human-authored submission, if ever prepared, is a separate operator decision.
+- **Commit body: short.** About 5–6 lines in all: the subject, two lines of what and why, and one `Verified:` line (how it was verified; add what was not, if it matters). Do not restate the diff. Test counts and full detail go in the PR body. A test that has never been seen to fail does not count as verification (rule 7).
+- **Subject names the change,** so it still reads well months later in `git log --oneline`. Review dates and finding IDs go in the body, if anywhere.
+- **What goes in one commit** is decided per case. Batch small edits into one commit at a natural review point instead of proposing a commit per edit. Group a task that cannot be tested yet with the task that makes it testable.
+- **No AI attribution lines, both repos:** no `Assisted-by:`, no `Co-Authored-By:`, no tool-generated footers. Provenance is in the README (see Upstream provenance).
 - Run `scripts/lint.py` before every commit; it must report 0 errors. Warnings are reviewed, not ignored.
 - **Do not run `git commit`, `git push`, or submodule bumps without operator confirmation.**
 
@@ -160,5 +187,5 @@ Useful QEMU debugging (see `docs/imx95/methodology.md` in qemu-imx95):
 - **Project repo (`main`):** small docs and process changes are committed straight to `main` after operator confirmation. Each work unit gets a branch `unit/<unit-id>` (e.g. `unit/M1-machine-skeleton`) and merges to `main` through a PR, after the independent reviewer pass.
 - **QEMU fork:** `rzv2l-dev` is the integration branch; never commit to `rzv2l-base`. Each unit gets a topic branch `unit/<unit-id>`, merged into `rzv2l-dev` through a PR on the fork, with `scripts/checkpatch.pl` clean. PRs target the fork only, never upstream `qemu/qemu`: an upstream submission is a separate operator decision and needs human-authored code.
 - **Linking the two:** a unit's project-repo PR carries the submodule bump to the merged `rzv2l-dev` commit, so `main` only ever points at reviewed fork code.
-- **PR body:** sections **What**, **Verification**, **Not verified**, **Scope**, and the same `Assisted-by:` lines as the commits. No tool-generated footers.
+- **PR body:** sections **What**, **Verification**, **Not verified**, **Scope**. No tool-generated footers.
 - Opening, merging and pushing PRs needs operator confirmation, as for commits.

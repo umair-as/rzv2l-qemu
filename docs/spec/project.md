@@ -289,7 +289,7 @@ Findings are classed BLOCKER / FIDELITY GAP / LATER SCOPE / DOCUMENTATION.
 
   See DR-0001.
 - The fork carries only upstream-shaped content. Before any submission, the port is rebased onto QEMU master.
-- **Upstream provenance.** QEMU declines contributions that include or derive from AI-generated content (`qemu/docs/devel/code-provenance.rst`). Agent-written device code is a prototype and test oracle. Upstream submission, if pursued, needs human-authored code. Every agent-touched commit carries an `Assisted-by:` trailer so the provenance is mechanically traceable.
+- **Upstream provenance.** QEMU declines contributions that include or derive from AI-generated content (`qemu/docs/devel/code-provenance.rst`). Agent-written device code is a prototype and test oracle. Upstream submission, if pursued, needs human-authored code. Provenance is stated once, in the README: all of `rzv2l-dev` beyond `rzv2l-base` is agent-assisted.
 
 ## 17. Milestones
 
@@ -359,6 +359,10 @@ M0 is incomplete until both answers can be defended from evidence.
 RZ/V2L, with hardware available, calibrates the method: build the model, measure it against silicon, and refine the evidence, retrieval and validation process. A later SoC without hardware is where the method itself becomes the experiment.
 
 ## 22. Changes
+
+### v0.3 errata (2026-10-27)
+
+- §16 Upstream provenance: per-commit `Assisted-by:` trailers dropped; provenance is stated once in the README (DR-0004).
 
 ### v0.3 errata (2026-10-09)
 
