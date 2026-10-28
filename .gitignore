@@ -35,3 +35,6 @@ artifacts/**/project-notes/
 
 # Python bytecode
 __pycache__/
+
+# uv-managed Python env for repo tooling (pyproject.toml).
+.venv/

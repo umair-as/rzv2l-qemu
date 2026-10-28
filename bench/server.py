@@ -12,7 +12,9 @@ the fork knows the bench exists.
 
 import argparse
 import asyncio
+import codecs
 import collections
+import ctypes
 import json
 import os
 import re
@@ -38,8 +40,46 @@ MONITOR_ALLOW = re.compile(r"^info (mtree( -f)?|qtree|roms|registers|pic|irq|"
 CONSOLE_KEEP = 256 * 1024   # bytes of console transcript kept for replay
 LOG_KEEP = 5000             # lines of the -d log kept in memory
 
-INVALID = re.compile(r"Invalid (read|write) at addr 0x([0-9A-Fa-f]+), size (\d+)")
-UNIMP = re.compile(r"^(\w+): unimplemented (read|write) at offset 0x([0-9A-Fa-f]+)")
+# Every -d line lands in exactly one coverage row: the forms QEMU's memory core
+# and unimplemented-device code print are parsed, anything else (guest_errors,
+# other LOG_UNIMP text) is counted verbatim as "other". Nothing is dropped.
+# Sources: qemu system/memory.c (rejected/unaligned/invalid size),
+# system/physmem.c (non-RAM device), hw/misc/unimp.c, per-device
+# "unimplemented read/write at offset" messages.
+LOG_FORMS = [
+    ("invalid_mem", re.compile(
+        r"Invalid (?P<access>read|write) at addr 0x(?P<addr>[0-9A-Fa-f]+), "
+        r"size (?P<size>\d+), region '[^']*', reason: (?P<reason>.+)$")),
+    ("invalid_mem", re.compile(
+        r"Invalid access to non-RAM device at addr 0x(?P<addr>[0-9A-Fa-f]+), "
+        r"size (?P<size>\d+), region '(?P<reason>[^']*)'")),
+    ("unimp", re.compile(
+        r"^(?P<dev>[\w.-]+): unimplemented device (?P<access>read|write)\s+"
+        r"\(size (?P<size>\d+), offset 0x(?P<off>[0-9A-Fa-f]+)")),
+    ("unimp", re.compile(
+        r"^(?P<dev>\w+): unimplemented (?P<access>read|write) at offset "
+        r"0x(?P<off>[0-9A-Fa-f]+)")),
+]
+
+
+def classify(line):
+    """Coverage row key (kind, access, where, size, detail) for one log line."""
+    for kind, rx in LOG_FORMS:
+        if m := rx.search(line):
+            g = m.groupdict()
+            if "addr" in g:
+                where = f"0x{int(g['addr'], 16):08x}"
+            else:
+                where = f"{g['dev']}+0x{int(g['off'], 16):x}"
+            return (kind, g.get("access") or "access", where,
+                    g.get("size") or "", g.get("reason") or "")
+    return ("other", "", line.strip(), "", "")
+
+
+def _die_with_parent():
+    """Child side of fork: QEMU gets SIGKILL if the bench process dies."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.prctl(1, signal.SIGKILL)          # PR_SET_PDEATHSIG
 
 
 def load_profiles():
@@ -95,19 +135,23 @@ class QMP:
         await self.cmd("qmp_capabilities")
 
     async def _read(self):
-        while True:
-            line = await self.reader.readline()
-            if not line:
-                break
-            msg = json.loads(line)
-            if "event" in msg:
-                await self.on_event(msg)
-            elif msg.get("id") in self.pending:
-                self.pending.pop(msg["id"]).set_result(msg)
-        for fut in self.pending.values():
-            if not fut.done():
-                fut.set_exception(ConnectionError("QMP closed"))
-        self.pending.clear()
+        try:
+            while True:
+                line = await self.reader.readline()
+                if not line:
+                    break
+                msg = json.loads(line)
+                if "event" in msg:
+                    await self.on_event(msg)
+                elif msg.get("id") in self.pending:
+                    fut = self.pending.pop(msg["id"])
+                    if not fut.done():          # a timed-out caller is gone
+                        fut.set_result(msg)
+        finally:
+            for fut in self.pending.values():
+                if not fut.done():
+                    fut.set_exception(ConnectionError("QMP closed"))
+            self.pending.clear()
 
     async def cmd(self, execute, arguments=None, timeout=10.0):
         self.next_id += 1
@@ -118,7 +162,10 @@ class QMP:
             req["arguments"] = arguments
         self.writer.write(json.dumps(req).encode() + b"\n")
         await self.writer.drain()
-        msg = await asyncio.wait_for(fut, timeout)
+        try:
+            msg = await asyncio.wait_for(fut, timeout)
+        finally:
+            self.pending.pop(req["id"], None)
         if "error" in msg:
             raise RuntimeError(msg["error"].get("desc", "QMP error"))
         return msg.get("return")
@@ -137,9 +184,9 @@ class Session:
         self.bench = bench
         self.profile_id = profile_id
         self.profile = profile
-        stamp = time.strftime("%Y%m%d-%H%M%S")
+        stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{time.time_ns() // 10**6 % 1000:03d}"
         self.run_dir = RUNS / f"{stamp}-{profile_id}"
-        self.run_dir.mkdir(parents=True, exist_ok=True)
+        self.run_dir.mkdir(parents=True)
         # Unix socket paths are limited to ~108 bytes: keep them short
         self.sock_dir = Path(tempfile.mkdtemp(prefix="bench-"))
         self.log_path = self.run_dir / "qemu.log"
@@ -151,8 +198,12 @@ class Session:
         self.proc = None
         self.qmp = QMP(self._on_qmp_event)
         self.con_writer = None
+        self.semi_writer = None     # kept: a dropped writer closes the socket on GC
         self.console = bytearray()
         self.log_lines = collections.deque(maxlen=LOG_KEEP)
+        self.log_total = 0
+        self.cov = collections.Counter()   # all lines, not just the kept ones
+        self.tail_task = None
         self.tasks = []
 
     # -- lifecycle ---------------------------------------------------------
@@ -185,7 +236,7 @@ class Session:
             self.proc = await asyncio.create_subprocess_exec(
                 *self.argv, cwd=ROOT, stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
-                start_new_session=True)
+                start_new_session=True, preexec_fn=_die_with_parent)
             self.tasks.append(asyncio.create_task(self._pump_stderr()))
             self.tasks.append(asyncio.create_task(self._watch_exit()))
             await self.qmp.connect(str(self.sock_dir / "qmp.sock"),
@@ -194,10 +245,11 @@ class Session:
                 str(self.sock_dir / "con.sock"))
             self.tasks.append(asyncio.create_task(self._pump_console(reader)))
             if self.profile["semihosting"]:
-                semi, _ = await asyncio.open_unix_connection(
+                semi, self.semi_writer = await asyncio.open_unix_connection(
                     str(self.sock_dir / "semi.sock"))
                 self.tasks.append(asyncio.create_task(self._pump_console(semi)))
-            self.tasks.append(asyncio.create_task(self._tail_log()))
+            self.tail_task = asyncio.create_task(self._tail_log())
+            self.tasks.append(self.tail_task)
             if paused:
                 await self._set_state("paused")
             else:
@@ -208,6 +260,8 @@ class Session:
             await self._emit("stderr", f"bench: start failed: {self.error}\n")
             await self.kill()
             await self._set_state("exited")
+            if not self.proc:       # no exit watcher will clean up
+                shutil.rmtree(self.sock_dir, ignore_errors=True)
 
     async def _prepare(self):
         cmd = self.profile["prepare"]
@@ -249,6 +303,11 @@ class Session:
         await asyncio.sleep(0.2)            # let the last console bytes arrive
         self.qmp.close()
         await self._set_state("exited")
+        if self.tail_task:                  # one last read of the -d log
+            try:
+                await asyncio.wait_for(asyncio.shield(self.tail_task), 5)
+            except asyncio.TimeoutError:
+                pass
         for t in self.tasks:
             if t is not asyncio.current_task() and not t.done():
                 t.cancel()
@@ -256,14 +315,31 @@ class Session:
 
     # -- streams -----------------------------------------------------------
 
+    async def _reported(self, name, coro):
+        """Run a stream task; if it dies, say so instead of going quiet."""
+        try:
+            await coro
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001 - reported to the UI
+            await self._emit("stderr", f"bench: {name} stopped: {e!r}\n")
+
     async def _pump_stderr(self):
+        await self._reported("stderr pump", self._pump_stderr_inner())
+
+    async def _pump_stderr_inner(self):
+        dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
         with (self.run_dir / "stderr.log").open("ab") as f:
             while line := await self.proc.stdout.readline():
                 f.write(line)
                 f.flush()
-                await self._emit("stderr", line.decode(errors="replace"))
+                await self._emit("stderr", dec.decode(line))
 
     async def _pump_console(self, reader):
+        await self._reported("console pump", self._pump_console_inner(reader))
+
+    async def _pump_console_inner(self, reader):
+        dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
         with (self.run_dir / "console.log").open("ab") as f:
             while data := await reader.read(4096):
                 f.write(data)
@@ -271,20 +347,32 @@ class Session:
                 self.console += data
                 if len(self.console) > CONSOLE_KEEP:
                     del self.console[:len(self.console) - CONSOLE_KEEP]
-                await self._emit("con", data.decode(errors="replace"))
+                await self._emit("con", dec.decode(data))
 
     async def _tail_log(self):
+        await self._reported("log tail", self._tail_log_inner())
+
+    async def _tail_log_inner(self):
         pos = 0
+        partial = ""
         while True:
+            exited = self.state == "exited"     # read once more after exit
             if self.log_path.exists():
                 with self.log_path.open("r", errors="replace") as f:
                     f.seek(pos)
                     chunk = f.read()
                     pos = f.tell()
-                for line in chunk.splitlines():
+                lines = (partial + chunk).split("\n")
+                partial = lines.pop()           # keep an unfinished line
+                if exited and partial:
+                    lines.append(partial)
+                    partial = ""
+                for line in lines:
                     self.log_lines.append(line)
+                    self.log_total += 1
+                    self.cov[classify(line)] += 1
                     await self._emit("log", line)
-            if self.state == "exited":
+            if exited:
                 return
             await asyncio.sleep(0.3)
 
@@ -310,15 +398,10 @@ class Session:
     # -- views -------------------------------------------------------------
 
     def coverage(self):
-        """What the guest touched that the model does not provide."""
-        rows = collections.Counter()
-        for line in self.log_lines:
-            if m := INVALID.search(line):
-                rows[("invalid_mem", m[1], f"0x{int(m[2], 16):08x}", m[3])] += 1
-            elif m := UNIMP.search(line):
-                rows[("unimp", m[2], f"{m[1]}+0x{int(m[3], 16):x}", "")] += 1
-        return [{"kind": k, "access": a, "where": w, "size": s, "count": n}
-                for (k, a, w, s), n in rows.most_common()]
+        """Every -d log line of the run, grouped (see LOG_FORMS)."""
+        return [{"kind": k, "access": a, "where": w, "size": s, "detail": d,
+                 "count": n}
+                for (k, a, w, s, d), n in self.cov.most_common()]
 
     def status(self):
         return {"state": self.state, "profile": self.profile_id,
@@ -360,7 +443,24 @@ def json_error(status, msg):
     return web.json_response({"error": msg}, status=status)
 
 
-def make_app():
+def same_origin_guard(port):
+    hosts = {f"{h}:{port}" for h in ("127.0.0.1", "localhost", "[::1]")}
+
+    @web.middleware
+    async def guard(req, handler):
+        if req.host not in hosts:
+            return json_error(403, f"unexpected Host {req.host!r}")
+        origin = req.headers.get("Origin")
+        if origin is not None and origin not in {f"http://{h}" for h in hosts}:
+            return json_error(403, f"cross-origin request from {origin!r}")
+        if req.method == "POST" and req.can_read_body \
+                and req.content_type != "application/json":
+            return json_error(415, "POST bodies must be application/json")
+        return await handler(req)
+    return guard
+
+
+def make_app(port=8090):
     bench = Bench()
     routes = web.RouteTableDef()
 
@@ -445,6 +545,7 @@ def make_app():
         if not s:
             return web.json_response({"lines": [], "coverage": []})
         return web.json_response({"lines": list(s.log_lines),
+                                  "lines_total": s.log_total,
                                   "coverage": s.coverage()})
 
     @routes.get("/ws")
@@ -474,7 +575,7 @@ def make_app():
         for ws in list(bench.clients):
             await ws.close()
 
-    app = web.Application()
+    app = web.Application(middlewares=[same_origin_guard(port)])
     app.add_routes(routes)
     app.router.add_static("/static/", STATIC)
     app.on_shutdown.append(on_shutdown)
@@ -489,7 +590,7 @@ def main():
                     help="bind address (default 127.0.0.1; the bench has no auth)")
     ap.add_argument("--port", type=int, default=8090)
     args = ap.parse_args()
-    web.run_app(make_app(), host=args.host, port=args.port, print=None)
+    web.run_app(make_app(args.port), host=args.host, port=args.port, print=None)
 
 
 if __name__ == "__main__":

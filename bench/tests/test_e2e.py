@@ -11,6 +11,7 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -118,3 +119,50 @@ def test_start_failure_is_reported(server):
     with pytest.raises(urllib.error.HTTPError) as err:
         urllib.request.urlopen(req, timeout=120)
     assert err.value.code == 500
+
+
+def post(url, path, body, headers=None):
+    req = urllib.request.Request(url + path, data=body, method="POST",
+                                 headers=headers or {})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+
+
+def test_cross_site_requests_are_refused(server):
+    # A foreign page can send these without a CORS preflight; all must fail.
+    json_h = {"content-type": "application/json"}
+    assert post(server, "/api/session/stop", b"{}",
+                {**json_h, "Origin": "http://evil.example"}) == 403
+    assert post(server, "/api/session/stop", b"{}",
+                {"content-type": "text/plain"}) == 415
+    assert post(server, "/api/session/stop", b"{}",
+                {**json_h, "Host": "rebound.example:80"}) == 403
+    assert post(server, "/api/session/stop", b"{}", json_h) == 200
+
+
+M1_QEMU = ROOT / "build" / "qemu" / "qemu-system-aarch64"
+
+
+@pytest.mark.skipif(not M1_QEMU.exists(), reason="needs the project QEMU build")
+def test_m1_probe_through_the_bench(server):
+    # Semihosting output and the -d log of a sub-second run must all arrive.
+    import json
+    json_h = {"content-type": "application/json"}
+    post(server, "/api/session/stop", b"{}", json_h)
+    assert post(server, "/api/session", b'{"profile": "rzv2l-smarc-m1-probe"}',
+                {"content-type": "application/json"}) == 200
+    for _ in range(100):
+        st = json.load(urllib.request.urlopen(server + "/api/session"))
+        if st["state"] == "exited":
+            break
+        time.sleep(0.1)
+    assert st["exit_code"] == 0
+    con = json.load(urllib.request.urlopen(server + "/api/session/console"))
+    assert "RESULT: PASS" in con["text"]
+    log = json.load(urllib.request.urlopen(server + "/api/session/log"))
+    on_disk = (ROOT / st["run_dir"] / "qemu.log").read_text().splitlines()
+    assert on_disk and log["lines_total"] == len(on_disk)
+    assert sum(r["count"] for r in log["coverage"]) == len(on_disk)
