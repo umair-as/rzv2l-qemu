@@ -9,6 +9,7 @@ Contents:
 2. [A program inside the machine: the M1 probe](#2-a-program-inside-the-machine-the-m1-probe)
 3. [The acceptance run: is M1 done?](#3-the-acceptance-run-is-m1-done)
 4. [What QEMU does to a device tree you give it (M1-T07)](#4-what-qemu-does-to-a-device-tree-you-give-it-m1-t07)
+5. [From tests to requirement status: the status ledger](#5-from-tests-to-requirement-status-the-status-ledger)
 
 ---
 
@@ -282,3 +283,46 @@ The `ram_size` mutation shows a blind spot again. The memory map, the ROM list a
 **Not covered:**
 - the initrd fixup, because M1 gives no `-initrd`
 - whether Linux boots with this DT. That is M3.
+
+---
+
+## 5. From tests to requirement status: the status ledger
+
+Each requirement has a status. The status records how far the requirement has come, from an idea to a proven behaviour. This section explains the states and shows how the M1 closure set them.
+
+### 5.1 The states
+
+The states come from [`../spec/project.md` §15](../spec/project.md#15-workflow). The last column of [`../spec/requirements.md`](../spec/requirements.md) holds the status, and the traceability table repeats it ([`../spec/traceability.md`](../spec/traceability.md)).
+
+| Letter | State | It means |
+|---|---|---|
+| P | PROPOSED | The requirement is written, with its evidence and its test method. |
+| A | ACCEPTED | The operator agrees that the model must do this. |
+| I | IMPLEMENTING | Work on it has started in a unit. |
+| D | IMPLEMENTED | The model does it, and the unit's tests pass. |
+| V | VERIFIED | The test named in the requirement proved it, in the milestone that accepts it, after the independent validation. |
+| — | DEFERRED | It moves to a later milestone. |
+| — | REJECTED | It is not wanted. |
+
+The spec gives the order as a pipeline: requirement, research, evidence packet, design decision, implementation, focused test, independent validation, VERIFIED. It also states one rule: IMPLEMENTED ≠ VERIFIED. Code that exists and tests that pass do not prove a requirement. V needs the acceptance test of the requirement, and each test must have been seen to fail on a mutation ([§1](#1-qtest-and-guest-probes)).
+
+Note: The M1 requirements went from P to D or V directly. The operator had already reviewed them in the spec review, so A was not set as a separate step.
+
+### 5.2 Built in one milestone, accepted in another
+
+A requirement can be built in one milestone and accepted in a later one. The traceability table shows both: the column "Implemented in" and the column "Accepted in". For example, M1 enters the kernel at EL1 (`has_el2=false`, SMC conduit). But only a Linux boot in M3 proves that EL1 entry and PSCI work for a real guest (REQ-MACH-004). Until then the status is D, not V.
+
+### 5.3 Example: the M1 closure (2026-10-28)
+
+The M1 closure set 13 requirements. Their acceptance column decided each status:
+
+| Status | Requirements | Reason |
+|---|---|---|
+| V | REQ-MACH-001, REQ-MACH-002, REQ-SYSC-001 | M1 accepts them. The acceptance run, the probe and the qtests check them, and each check was seen red on a mutation ([`tasks.md`](../units/M1-machine-skeleton/tasks.md)). |
+| D | REQ-MACH-003, REQ-MACH-004, REQ-MACH-006, REQ-MAP-001, REQ-GUEST-004 | M1 builds them. Their acceptance includes a Linux boot (M3 or M3b). |
+| D | REQ-MACH-007 | The GIC identity matches the GIC-600 TRM in a qtest. DR-0003 also asks for the EVK reads EVK-R60–R66, which confirm the values on the silicon. These reads are not done yet. |
+| D | REQ-MACH-008, REQ-SYSC-002, REQ-TEST-003 | Each device milestone, M7 or M3+ accepts them. |
+| I | REQ-TEST-002 | It applies to every unit, so it stays in progress. |
+
+When a later milestone runs the missing acceptance test, that milestone moves the requirement from D to V.
+
