@@ -97,6 +97,23 @@ class ClaudeGateTest(unittest.TestCase):
         self.dirty_mock.return_value = True
         self.assertIsNone(self.decide("git commit -m qemu"))
 
+    def test_heredoc_message_with_apostrophe_parses(self):
+        cmd = ("git add -A docs && git commit -q -F - <<'EOF' && git log -1\n"
+               "fix(docs): qtest's limit, a \"quoted\" word\n\nEOF")
+        self.assertIsNone(self.decide(cmd))
+
+    def test_heredoc_body_is_not_a_command(self):
+        cmd = "cat > notes.txt <<'EOF'\ngit push origin main\nEOF"
+        self.assertIsNone(self.decide(cmd))
+
+    def test_push_after_heredoc_asks(self):
+        cmd = "git commit -F - <<'EOF'\nit's done\nEOF\ngit push"
+        self.assertEqual(self.decide(cmd), "ask")
+
+    def test_unquoted_heredoc_substitution_raises(self):
+        with self.assertRaises(ValueError):
+            self.decide("cat <<EOF\n$(git push)\nEOF")
+
     def test_plain_commands_silent(self):
         for cmd in ("ls -la", "git status", "git log --oneline -5"):
             with self.subTest(cmd=cmd):

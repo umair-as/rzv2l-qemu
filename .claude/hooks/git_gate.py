@@ -57,8 +57,35 @@ def inside(path, parent):
 
 # --- Claude Code hook -------------------------------------------------------
 
+HEREDOC = re.compile(r"<<(-?)[ \t]*(['\"]?)([A-Za-z_]\w*)\2")
+
+
+def strip_heredocs(command):
+    """Drop heredoc bodies: they are data (a commit message, a file), not
+    commands, and their quotes would break shlex. An unquoted body that
+    substitutes commands is kept as an error, so the hook asks."""
+    lines = command.split("\n")
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        for dash, quote, word in HEREDOC.findall(line):
+            body = []
+            while i < len(lines):
+                end = lines[i].lstrip("\t") if dash else lines[i]
+                i += 1
+                if end == word:
+                    break
+                body.append(lines[i - 1])
+            text = "\n".join(body)
+            if not quote and ("$(" in text or "`" in text):
+                raise ValueError("command substitution in a heredoc body")
+    return "\n".join(out)
+
+
 def segments(command):
-    lex = shlex.shlex(command, posix=True, punctuation_chars=";&|\n")
+    lex = shlex.shlex(strip_heredocs(command), posix=True, punctuation_chars=";&|\n")
     lex.whitespace = " \t\r"  # a newline separates commands, like ";"
     lex.whitespace_split = True
     seg = []
