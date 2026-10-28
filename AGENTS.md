@@ -65,10 +65,10 @@ The procedures above are packaged as skills, so every agent runs them the same w
 | Running guests | `guest-bringup` | the rule 5 loop in practice: triage by symptom, hangs, allowed fixes, coverage list |
 | Explanations for the operator | `learning-docs` | writes or rewrites `docs/learning/` per `docs/learning/STYLE.md` |
 
-Skills cover modelling and testing. Process (review, commits, handoff) stays in this file and the agent harness.
+Technical skills do one piece of modelling or testing work. Process skills (review, unit onboarding, one task) put them in order and stop at the operator checkpoints; they land as listed in DR-0004. Commits and handoff stay in this file.
 
 - **Skills** live in `.agents/skills/<name>/SKILL.md`. Codex reads them there; Claude Code reads them through the `.claude/skills` symlink. A skill stops at the operator checkpoints above and never commits or pushes.
-- **Agent briefs** in `.claude/agents/*.md` are Claude Code subagents. Codex reads them as task briefs.
+- **Agent briefs** go in `.claude/agents/*.md` as Claude Code subagents (none landed yet; DR-0004 lists them). Codex reads them as task briefs.
 - **Gates.** What is enforced depends on who runs the command:
   - **Every committer** (git hooks, wired locally in each clone; see the docstring of `.claude/hooks/git_gate.py`): commits on `rzv2l-base` and fork commits with `Signed-off-by:` are refused; `scripts/lint.py` runs before each project commit.
   - **Claude Code only** (tool hook): builds inside `qemu/` are refused; a push, a PR or a submodule bump asks the operator first.

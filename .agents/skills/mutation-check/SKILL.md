@@ -5,18 +5,18 @@ description: Prove a qtest, guest probe or acceptance check can fail — break t
 
 # Mutation check
 
-A test that was never seen to fail proves nothing. Examples with real output: `docs/learning/testing.md` (mutation tables per task).
+A test that was never seen to fail proves nothing. Examples with real output: the mutation tables in `docs/learning/testing.md`.
 
 ## Steps
 
-1. **Choose the mutation:** a *plausible* wrong value the test claims to guard, not a crash. Good: a reset value off by one bit, a field moved by one bit, an IRQ line swapped, a timer 3× too long, a flag that clears without the read. Bad: deleting the device (QEMU aborts before any assertion runs).
-2. Write it down first: file, the change, and the assertion you expect to fail.
-3. Apply it in `qemu/` (a `sed` or one edit). Don't commit it.
-4. **Rebuild and confirm the rebuild happened:** `cd build/qemu && ninja qemu-system-aarch64 <test target>` must show a `Linking target` line. If the mutation does not compile, the old binary stays and the test runs green against it: that green means nothing.
-5. Kill stale QEMU processes from earlier runs by PID (`pgrep -f qemu-system-aarch64`, then `kill <pid>`). A broad `pkill -f` inside a script can match its own command line.
-6. Run only the targeted test. Read the red **line**: it must be the assertion from step 2. A different red (QEMU aborting at startup, a timeout, another case) does not count; choose a better mutation.
-7. Restore: `git -C qemu checkout -- <file>`, rebuild, run the test green again.
-8. Record in the unit's `tasks.md`: mutation, test, red line (one row each, as in `docs/units/M1-machine-skeleton/tasks.md`).
+1. **Choose a plausible wrong value** the test claims to guard, not a crash: a reset value off by one bit, a field moved by one bit, an IRQ line swapped, a timer 3× too long, a flag that clears without the read. Deleting the device is not a mutation (QEMU aborts before any assertion runs).
+2. Write down the file, the change and the assertion you expect to fail, before running.
+3. Apply it in `qemu/`, uncommitted, in a form you can reverse exactly (a saved patch of just that change).
+4. **Rebuild and confirm the binary was actually relinked.** A mutation that fails to compile leaves the old binary, and the test runs green against it: that green means nothing.
+5. Make sure no QEMU from an earlier run is still alive (stop it by PID; a `pkill -f` pattern can match your own shell).
+6. Run only the targeted test. The red **line** must be the assertion from step 2. A different red (startup abort, timeout, another case) does not count: choose a better mutation.
+7. **Reverse only the mutation.** Never `git checkout -- <file>`: it also throws away your uncommitted work in that file. Confirm the file's diff is your own work again, rebuild, and see the test green.
+8. Record it: the task's Mutation column and status in the unit's `tasks.md`, the red line in the task's mutation table in `docs/learning/testing.md`.
 
 ## Choosing mutations by test type
 
@@ -32,8 +32,8 @@ A test that was never seen to fail proves nothing. Examples with real output: `d
 | a memory map / qtree check | move the base, or add a window |
 | a log gate | add one extra `LOG_GUEST_ERROR` line |
 
-## Pitfalls
+## Traps
 
-- A test that only checks "a bit is set" survives most value mutations: if the mutation stays green, the test is too weak; strengthen it, don't pick an easier mutation.
+- A test that only checks "a bit is set" survives most value mutations. If the mutation stays green, strengthen the test; don't pick an easier mutation.
 - When the model improves, re-run old mutations of negative tests; they can rot green.
 - Checker-only tests (e.g. the DTB comparator in `tests/acceptance/m1/check.py`) are mutated through their **input**, not the model.

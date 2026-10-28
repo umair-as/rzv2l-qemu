@@ -53,13 +53,16 @@ Use when firmware reads status between "start" and "done" (SCIFA TEND: TF-A and 
 
 ```c
 s->tx_timer = timer_new_ns(QEMU_CLOCK_VIRTUAL, blk_tx_done, s);   /* realize */
-/* on the triggering write */
+/* on the triggering write: the write itself has effects, then the timer */
+s->fsr &= ~FSR_TEND;          /* manual: FSR TEND clears on an FTDR write (p.1281) */
+/* push the byte into the TX FIFO, recompute TDFE from the FIFO count, update_irq() */
 timer_mod(s->tx_timer, qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + char_time_ns(s));
 /* blk_tx_done(): send the byte, update FIFO, set the event flag, update_irq() */
 ```
 
 - Derive the duration from the programmed registers (bit rate, frame length). If the inputs are not modelled yet, use a documented fixed value and list it as a gap.
-- Delete or reset the timer in the reset phase.
+- Between the trigger and the timer, status must read "in progress" (TEND = 0 here): take each flag's clearing conditions from the manual, not only the guest's own clear.
+- Cancel it (`timer_del`) in the reset phase; free it (`timer_free`) in `unrealize`/`finalize`. `timer_del` only stops it.
 
 ## 5. Chardev (UARTs)
 
@@ -78,11 +81,16 @@ qemu_chr_fe_set_handlers(&s->chr, blk_can_receive, blk_receive,
 static void blk_reset_hold(Object *obj, ResetType type)
 {
     BlkState *s = BLK(obj);
+    /* every guest-visible and internal field, not only the registers */
     s->fsr = FSR_RESET;          /* manual Table x.y */
+    s->fsr_armed = 0;
+    s->scr = SCR_RESET;
+    fifo8_reset(&s->tx_fifo);
+    timer_del(s->tx_timer);      /* no completion from before the reset */
     if (s->direct_boot) {
-        s->scr = SCR_POST_FW;    /* measured or (I); see header comment */
+        s->scr = SCR_POST_FW;    /* overlay: measured or (I); see header comment */
     }
-    timer_del(s->tx_timer);
+    blk_update_irq(s);           /* lines follow the reset state (§3) */
 }
 /* class_init */
 ResettableClass *rc = RESETTABLE_CLASS(klass);
@@ -93,7 +101,7 @@ rc->phases.hold = blk_reset_hold;
 
 | Situation | Do |
 |---|---|
-| offset not modelled | `LOG_UNIMP` + `return MEMTX_DECODE_ERROR` (guest takes an external abort) |
+| offset not modelled | `LOG_UNIMP` + `return MEMTX_DECODE_ERROR` (guest takes an external abort). Needs the `.read_with_attrs`/`.write_with_attrs` callbacks; plain `.read` cannot return a bus error (as in `renesas_rzg2l_sysc.c`) |
 | guest breaks a manual rule (write to read-only, bad width) | `LOG_GUEST_ERROR`; behave as silicon does (ignore, or the documented error) |
 | mode or feature not supported | the block's own error status/IRQ if it has one; otherwise decode error on the register that selects it |
 | result the model cannot compute | never report success; leave the documented "busy/error" state |
