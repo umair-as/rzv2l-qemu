@@ -18,11 +18,8 @@ class ClaudeGateTest(unittest.TestCase):
         self.root = Path(self.tmp.name)
         (self.root / "qemu").mkdir()
         (self.root / "build" / "qemu").mkdir(parents=True)
-        self.dirty = mock.patch.object(git_gate, "submodule_dirty", return_value=False)
-        self.dirty_mock = self.dirty.start()
 
     def tearDown(self):
-        self.dirty.stop()
         self.tmp.cleanup()
 
     def decide(self, command, cwd=None):
@@ -47,55 +44,11 @@ class ClaudeGateTest(unittest.TestCase):
         self.assertIsNone(self.decide("cd build/qemu && ninja qemu-system-aarch64"))
 
     # ask gate
-    def test_push_asks(self):
-        self.assertEqual(self.decide("git push origin main"), "ask")
-
-    def test_push_dash_C_asks(self):
-        self.assertEqual(self.decide("git -C qemu push origin unit/x"), "ask")
-
-    def test_gh_pr_create_asks(self):
-        self.assertEqual(self.decide("gh pr create --fill"), "ask")
-
-    def test_gh_pr_merge_asks(self):
-        self.assertEqual(self.decide("gh pr merge 3"), "ask")
-
-    def test_push_in_quoted_text_is_not_push(self):
-        self.assertIsNone(self.decide('git commit -m "run tests before git push"'))
-
-    def test_add_qemu_clean_allowed(self):
-        self.assertIsNone(self.decide("git add qemu"))
-
-    def test_add_qemu_dirty_asks(self):
-        self.dirty_mock.return_value = True
-        self.assertEqual(self.decide("git add qemu"), "ask")
-
-    def test_broad_add_with_dirty_pointer_asks(self):
-        self.dirty_mock.return_value = True
-        for cmd in ("git add -A", "git add .", "git commit -a -m x"):
-            with self.subTest(cmd=cmd):
-                self.assertEqual(self.decide(cmd), "ask")
-
-    def test_broad_add_with_clean_pointer_allowed(self):
-        self.assertIsNone(self.decide("git add -A"))
-
     def test_newline_separated_build_denied(self):
         self.assertEqual(self.decide("cd qemu\nninja"), "deny")
 
     def test_nested_shell_build_denied(self):
         self.assertEqual(self.decide('bash -lc "cd qemu && ninja"'), "deny")
-
-    def test_nested_shell_push_asks(self):
-        self.assertEqual(self.decide("sh -c 'git push origin main'"), "ask")
-
-    def test_commit_pathspec_qemu_dirty_asks(self):
-        self.dirty_mock.return_value = True
-        for cmd in ("git commit -m x -- qemu", "git commit qemu -m x"):
-            with self.subTest(cmd=cmd):
-                self.assertEqual(self.decide(cmd), "ask")
-
-    def test_commit_message_word_qemu_is_not_pathspec(self):
-        self.dirty_mock.return_value = True
-        self.assertIsNone(self.decide("git commit -m qemu"))
 
     def test_heredoc_message_with_apostrophe_parses(self):
         cmd = ("git add -A docs && git commit -q -F - <<'EOF' && git log -1\n"
@@ -106,13 +59,18 @@ class ClaudeGateTest(unittest.TestCase):
         cmd = "cat > notes.txt <<'EOF'\ngit push origin main\nEOF"
         self.assertIsNone(self.decide(cmd))
 
-    def test_push_after_heredoc_asks(self):
-        cmd = "git commit -F - <<'EOF'\nit's done\nEOF\ngit push"
-        self.assertEqual(self.decide(cmd), "ask")
-
     def test_unquoted_heredoc_substitution_raises(self):
         with self.assertRaises(ValueError):
             self.decide("cat <<EOF\n$(git push)\nEOF")
+
+    def test_agent_git_cycle_is_silent(self):
+        for cmd in ("git push origin main", "gh pr create --fill", "git add qemu",
+                    "git commit -am 'bump'", "git -C qemu push origin unit/x"):
+            self.assertIsNone(self.decide(cmd), cmd)
+
+    def test_build_after_heredoc_denied(self):
+        cmd = "git commit -F - <<'EOF'\nit's done\nEOF\ncd qemu && ninja"
+        self.assertEqual(self.decide(cmd), "deny")
 
     def test_plain_commands_silent(self):
         for cmd in ("ls -la", "git status", "git log --oneline -5"):

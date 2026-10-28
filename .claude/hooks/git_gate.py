@@ -3,9 +3,9 @@
 
 Entry points:
   claude                       Claude Code PreToolUse hook (Bash). Reads the hook
-                               JSON on stdin. Denies builds inside qemu/; asks
-                               before a push, a PR, or staging the qemu pointer.
-                               Undecidable input or an internal error -> ask.
+                               JSON on stdin. Denies builds inside qemu/.
+                               Commits, pushes and PRs are the agent's normal
+                               cycle and pass. Undecidable input -> ask.
   commit-msg --repo fork FILE  git hook for the fork. Denies Signed-off-by: and
                                commits on rzv2l-base.
   pre-commit --repo project    git hook for the project. Runs scripts/lint.py
@@ -29,22 +29,12 @@ from pathlib import Path
 BUILD_TOOLS = {"configure", "ninja", "make", "meson"}
 SEPARATORS = {"&&", "||", ";", "|", "&", "\n"}
 SHELLS = {"bash", "sh", "zsh", "dash"}
-COMMIT_VALUE_OPTS = {"-m", "--message", "-F", "--file", "-C", "-c", "--reuse-message",
-                     "--reedit-message", "--author", "--date", "-t", "--template",
-                     "--fixup", "--squash", "--cleanup", "--trailer"}
 WRAPPERS = {"time", "env", "nohup", "sudo"}
-WHOLE_TREE_ADD = {"-A", "--all", "-u", "--update"}
 SCISSORS = "# ------------------------ >8 ------------------------"
 
 
 def project_root():
     return Path(__file__).resolve().parents[2]
-
-
-def submodule_dirty(root):
-    r = subprocess.run(["git", "-C", str(root), "diff", "--quiet", "--", "qemu"],
-                       capture_output=True)
-    return r.returncode == 1
 
 
 def inside(path, parent):
@@ -116,59 +106,11 @@ def dash_c(tokens, cwd):
     return cwd
 
 
-def commit_paths(args):
-    """Pathspecs of a git commit: positional args, skipping option values."""
-    paths, i = [], 0
-    while i < len(args):
-        a = args[i]
-        if a == "--":
-            return paths + args[i + 1:]
-        if a in COMMIT_VALUE_OPTS:
-            i += 2
-            continue
-        if not a.startswith("-"):
-            paths.append(a)
-        i += 1
-    return paths
-
-
 def shell_script(tokens):
     """The script of `bash -c "<script>"` (also -lc, -ec ...), else None."""
     for i, tok in enumerate(tokens[1:], 1):
         if re.fullmatch(r"-[a-zA-Z]*c[a-zA-Z]*", tok) and i + 1 < len(tokens):
             return tokens[i + 1]
-    return None
-
-
-def classify_git(tokens, cwd, root):
-    args = tokens[1:]
-    repo_dir = cwd
-    while args and args[0].startswith("-"):
-        if args[0] == "-C" and len(args) > 1:
-            repo_dir = repo_dir / args[1]
-            args = args[2:]
-        elif args[0] in ("-c", "--git-dir", "--work-tree") and len(args) > 1:
-            args = args[2:]
-        else:
-            args = args[1:]
-    if not args:
-        return None
-    sub, rest = args[0], args[1:]
-    if sub == "push":
-        return ("ask", "git push needs operator confirmation")
-    if inside(repo_dir, root / "qemu"):
-        return None  # the fork's own index; the pointer lives in the project
-    if sub == "add":
-        paths = [a for a in rest if not a.startswith("-")]
-        touches = any(inside(root / "qemu", repo_dir / p) for p in paths)
-        if (touches or WHOLE_TREE_ADD & set(rest)) and submodule_dirty(root):
-            return ("ask", "this stages the qemu submodule pointer (a submodule bump)")
-    if sub == "commit":
-        all_flag = any(a == "--all" or re.fullmatch(r"-[a-zA-Z]*a[a-zA-Z]*", a) for a in rest)
-        paths = commit_paths(rest)
-        if (all_flag or any(inside(root / "qemu", repo_dir / p) for p in paths)) \
-                and submodule_dirty(root):
-            return ("ask", "this commit includes the qemu submodule pointer (a submodule bump)")
     return None
 
 
@@ -192,12 +134,6 @@ def classify_command(command, cwd, root):
             d = classify_command(script, cwd, root) if script else None
             if d:
                 decisions.append(d)
-        elif prog == "git":
-            d = classify_git(tokens, cwd, root)
-            if d:
-                decisions.append(d)
-        elif prog == "gh" and tokens[1:3] in (["pr", "create"], ["pr", "merge"]):
-            decisions.append(("ask", f"gh pr {tokens[2]} needs operator confirmation"))
     for kind in ("deny", "ask"):
         for d in decisions:
             if d[0] == kind:

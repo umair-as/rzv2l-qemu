@@ -43,6 +43,7 @@ The skills are split in two layers. The procedure in each lives in one place.
 - **Process skills** are thin: they put technical skills in order and stop at the operator checkpoints, without repeating their steps. `/review` and the `reviewer` agent come first (first use: the M1 closure review). `/onboard` with its two researchers and `/emulate` land with M2. `/evk-read` lands with the EVK session.
 - `/debug` is replaced by `guest-bringup`. `/qemu-cov` becomes one coverage parser shared by `guest-bringup`, the acceptance log gate and the bench.
 - Verification is unchanged: each skill is replayed on past work before it is relied on. The technical skills were not replayed yet.
+- The Claude Code hook keeps only the build deny inside `qemu/`. Commits, pushes, PRs and submodule bumps are the agent's normal cycle; the push/PR/bump asks are removed. The git hooks (fork sign-off, `rzv2l-base`, lint) stay.
 
 ## Consequences
 

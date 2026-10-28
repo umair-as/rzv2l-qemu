@@ -35,7 +35,7 @@ qemu-rzv2l/                 this repo: spec, research, evidence, tests, guest bu
 
 | Role | Who | Does | Does not |
 |---|---|---|---|
-| Operator | the human owner | designs and reviews specs, unit specs, decisions; approves EVK actions, commits and pushes | write the model code |
+| Operator | the human owner | designs and reviews specs, unit specs, decisions; approves EVK actions | write the model code |
 | Implementer | an agent (usually Claude Code) | writes research, unit tasks, model code, tests, per an operator-reviewed unit spec | start a unit before its spec is reviewed |
 | Reviewer | a *different* model (Codex, or another Claude model) | tries to disprove the implementer's claims: checks every manual citation (page, register, bit, reset value) and every guest `file:line` against the source; keeps verified and inferred apart | edit source; review its own work |
 
@@ -72,7 +72,7 @@ Technical skills do one piece of modelling or testing work. Process skills (revi
 - **Agent briefs** go in `.claude/agents/*.md` as Claude Code subagents (none landed yet; DR-0004 lists them). Codex reads them as task briefs.
 - **Gates.** What is enforced depends on who runs the command:
   - **Every committer** (git hooks, wired locally in each clone; see the docstring of `.claude/hooks/git_gate.py`): commits on `rzv2l-base` and fork commits with `Signed-off-by:` are refused; `scripts/lint.py` runs before each project commit.
-  - **Claude Code only** (tool hook): builds inside `qemu/` are refused; a push, a PR or a submodule bump asks the operator first.
+  - **Claude Code only** (tool hook): builds inside `qemu/` are refused.
   - **Codex** follows the build and push rules from this file; nothing enforces them for it.
 
 ## Upstream provenance: read this before writing QEMU code
@@ -80,7 +80,7 @@ Technical skills do one piece of modelling or testing work. Process skills (revi
 QEMU's policy (`qemu/docs/devel/code-provenance.rst`, section "Use of AI-generated content") is to **decline contributions that include or derive from AI-generated content**. It **allows** AI for research, API/algorithm investigation, static analysis and debugging, provided that output is not included in the contribution.
 
 Consequences for this project:
-- Device-model code an agent writes on `rzv2l-dev` is **not upstreamable as-is**. Agent-written code serves as the working prototype and test oracle. Human authorship would be necessary for any submission but is **not sufficient**: the policy also declines contributions *derived from* AI-generated content. Whether and how anything goes upstream is an open operator decision, not a rewrite step.
+- Device-model code an agent writes on `rzv2l-dev` is **not upstreamable as-is**. Agent-written code serves as the working prototype and test oracle. Human authorship would be necessary for any submission but is **not sufficient**: the policy also declines contributions *derived from* AI-generated content. Upstream submission is not a goal (operator, 2026-10-28): the project shows what agent-driven QEMU modelling can do.
 - Agents can contribute freely to the parts upstream never sees: evidence packets, research notes, device maps, test plans, guest build scripts, oracle captures, validation reviews and debugging.
 - Provenance is stated once, project-wide, in the README. Everything on `rzv2l-dev` beyond `rzv2l-base` counts as agent-assisted. A commit the operator writes by hand says so in its message.
 
@@ -189,12 +189,11 @@ Useful QEMU debugging (see `docs/imx95/methodology.md` in qemu-imx95):
 - **What goes in one commit** is decided per case. Batch small edits into one commit at a natural review point instead of proposing a commit per edit. Group a task that cannot be tested yet with the task that makes it testable.
 - **No AI attribution lines, both repos:** no `Assisted-by:`, no `Co-Authored-By:`, no tool-generated footers. Provenance is in the README (see Upstream provenance).
 - Run `scripts/lint.py` before every commit; it must report 0 errors. Warnings are reviewed, not ignored.
-- **Do not run `git commit`, `git push`, or submodule bumps without operator confirmation.**
+- **Commits, pushes, PRs and submodule bumps are the agent's normal cycle** (operator, 2026-10-28): no confirmation needed. Destructive remote actions (force-push, deleting branches or tags) are still confirmed first.
 
 ## Branches and PRs
 
-- **Project repo (`main`):** small docs and process changes are committed straight to `main` after operator confirmation. Each work unit gets a branch `unit/<unit-id>` (e.g. `unit/M1-machine-skeleton`) and merges to `main` through a PR, after the independent reviewer pass.
-- **QEMU fork:** `rzv2l-dev` is the integration branch; never commit to `rzv2l-base`. Each unit gets a topic branch `unit/<unit-id>`, merged into `rzv2l-dev` through a PR on the fork, with `scripts/checkpatch.pl` clean. PRs target the fork only, never upstream `qemu/qemu`: an upstream submission is a separate operator decision and needs human-authored code.
+- **Project repo (`main`):** small docs and process changes are committed straight to `main`. Each work unit gets a branch `unit/<unit-id>` (e.g. `unit/M1-machine-skeleton`) and merges to `main` through a PR, after the independent reviewer pass.
+- **QEMU fork:** `rzv2l-dev` is the integration branch; never commit to `rzv2l-base`. Each unit gets a topic branch `unit/<unit-id>`, merged into `rzv2l-dev` through a PR on the fork, with `scripts/checkpatch.pl` clean. PRs target the fork only, never upstream `qemu/qemu`.
 - **Linking the two:** a unit's project-repo PR carries the submodule bump to the merged `rzv2l-dev` commit, so `main` only ever points at reviewed fork code.
 - **PR body:** sections **What**, **Verification**, **Not verified**, **Scope**. No tool-generated footers.
-- Opening, merging and pushing PRs needs operator confirmation, as for commits.
