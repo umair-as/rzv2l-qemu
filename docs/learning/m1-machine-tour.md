@@ -56,11 +56,11 @@ The SoC object (`qemu/hw/arm/r9a07g054.c`, M1-T03) has no registers of its own. 
 - It **places** them at their addresses.
 - It **wires** them together.
 
-The template for the SoC is the QEMU i.MX 8M Plus SoC (`qemu/hw/arm/fsl-imx8mp.c`). The line numbers are at fork commit `0e2a93b8e9`.
+The template for the SoC is the QEMU i.MX 8M Plus SoC (`qemu/hw/arm/fsl-imx8mp.c`). The line numbers are at fork commit `51378195d3`.
 
 **Two stages, as for all devices ([`qemu-basics.md` §4](qemu-basics.md#4-objects-properties-realize)).**
-1. `r9a07g054_init` (`:52`) only creates the children: two `cortex-a55` CPUs, the GIC and the SYSC.
-2. `r9a07g054_realize` (`:71`) then sets their properties and switches each child on, in a fixed order:
+1. `r9a07g054_init` (`:60`) only creates the children: two `cortex-a55` CPUs, the GIC and the SYSC.
+2. `r9a07g054_realize` (`:79`) then sets their properties and switches each child on, in a fixed order:
 
 ```mermaid
 flowchart LR
@@ -92,9 +92,9 @@ input index:  0 ............ 479 | 480 ........ 511 | 512 ........ 543
 carries:      SPI INTID 32 … 511 | CPU0 INTID 0…31  | CPU1 INTID 0…31
 ```
 
-Example: the timer of CPU1 at INTID 30 goes to input `480 + 1 × 32 + 30` = 542. The code calculates this as the sum `intidbase + timer_irqs[j]` (`:124`, `:137`).
+Example: the timer of CPU1 at INTID 30 goes to input `480 + 1 × 32 + 30` = 542. The code calculates this as the sum `intidbase + timer_irqs[j]` (`:132`, `:145`).
 
-The outputs of the GIC are in groups by kind (`:147-154`):
+The outputs of the GIC are in groups by kind (`:155-162`):
 
 | GIC outputs | Kind |
 |---|---|
@@ -105,7 +105,7 @@ The outputs of the GIC are in groups by kind (`:147-154`):
 
 A wrong wire does not stop the build or the start. Nothing finds it until a guest waits for an interrupt that does not come. The timer tick of Linux in M3 is the first real test of this wiring.
 
-**Pass-through properties.** On the EVK, the boot mode and DEBUGEN are pins. The DIP switches and the JTAG header set them. In the model they are SYSC properties. The SoC exports them again under its own name, with `object_property_add_alias` (`:66-68`). The board in M1-T04 forwards them one more time. Thus `-M rzv2l-smarc,boot-mode=3` has the same effect as setting the switches to QSPI before power-on.
+**Pass-through properties.** On the EVK, the boot mode and DEBUGEN are pins. The DIP switches and the JTAG header set them. In the model they are SYSC properties. The SoC exports them again under its own name, with `object_property_add_alias` (`:74-76`). The board in M1-T04 forwards them one more time. Thus `-M rzv2l-smarc,boot-mode=3` has the same effect as setting the switches to QSPI before power-on.
 
 **What the SoC does not map, on purpose.** imx8mp fills address ranges that it does not model with *unimplemented device* placeholders. These placeholders read as zero. This SoC maps only SYSC, the GIC and (from the board) RAM. No region owns the other addresses. Thus a guest access to them aborts, and `-d invalid_mem` gives the address ([`qemu-basics.md` §2](qemu-basics.md#2-the-memory-map); `qemu/system/memory.c:1410-1416`, "reason: rejected"). This applies the honest-fault rule to the full address space.
 
@@ -117,14 +117,14 @@ This selection is the step that adds the SYSC file to the build. The board (M1-T
 
 ### 1.2 Reading the board: `rzv2l-smarc.c`
 
-The board (`qemu/hw/arm/rzv2l-smarc.c`, M1-T04) is the object that `-M rzv2l-smarc` selects. It holds the parts around the chip on the SMARC module. The line numbers are at fork commit `0e2a93b8e9`.
+The board (`qemu/hw/arm/rzv2l-smarc.c`, M1-T04) is the object that `-M rzv2l-smarc` selects. It holds the parts around the chip on the SMARC module. The line numbers are at fork commit `51378195d3`.
 
 | Piece | Code | Why |
 |---|---|---|
 | 2 GiB DDR at `0x40000000` | `memory_region_add_subregion(...)` (`:70`); any other `-m` refused (`:50`) | the 2 GB EVK; the Linux memory window below only fits that size |
 | SoC | `object_initialize_child(..., TYPE_R9A07G054)`, then realize | the chip from §1.1 |
-| Board switches | class properties `boot-mode`, `debugen` (`:123-131`), forwarded to the SoC (`:64-67`), which forwards them to SYSC ([§1.1](#11-reading-the-soc-r9a07g054c)) | `-M rzv2l-smarc,boot-mode=3,debugen=on` = DIP switches on QSPI, JTAG DEBUGEN high |
-| Exactly 2 × `cortex-a55` | `mc->min_cpus = max_cpus = 2`, `mc->valid_cpu_types` (`:116-119`) | QEMU's machine core refuses `-smp 1` or `-cpu cortex-a53` with a clear message |
+| Board switches | class properties `boot-mode`, `debugen` (`:115-123`), forwarded to the SoC (`:64-67`), which forwards them to SYSC ([§1.1](#11-reading-the-soc-r9a07g054c)) | `-M rzv2l-smarc,boot-mode=3,debugen=on` = DIP switches on QSPI, JTAG DEBUGEN high |
+| Exactly 2 × `cortex-a55` | `mc->min_cpus = max_cpus = 2`, `mc->valid_cpu_types` (`:108-111`) | QEMU's machine core refuses `-smp 1` or `-cpu cortex-a53` with a clear message |
 | Direct kernel boot | `arm_boot_info` (`:56-61`), `arm_load_kernel` (`:74`) | below |
 
 **Direct kernel boot.** On the EVK, TF-A and U-Boot run first. They give Linux the memory `0x48000000` + `0x78000000`. The first 128 MiB of DDR hold BL31 and OP-TEE ([`docs/device-map.md`](../device-map.md), DDR row). With `-kernel`, QEMU does the work of that firmware:
@@ -142,7 +142,7 @@ The board (`qemu/hw/arm/rzv2l-smarc.c`, M1-T04) is the object that `-M rzv2l-sma
 - QEMU enters the kernel at non-secure EL1, as on the EVK. The reason is that the model switches off EL2 in the CPUs ([§1.1](#11-reading-the-soc-r9a07g054c)). The real Cortex-A55 has EL2: this is fidelity gap 14 in [`docs/device-map.md` §4](../device-map.md#4-known-fidelity-gaps-req-guest-004-list-and-model-limits).
 - In qtest mode, QEMU loads nothing (`:73`), as in imx8mp. The tests read registers. They do not run a kernel.
 
-**Machine properties are class properties.** `object_class_property_add` declares a property one time, for the machine *type*. The property has a getter and a setter (`:78-104`). The setter only stores the value. Later, the `realize` of SYSC checks the value ([`qemu-basics.md` §3.1](qemu-basics.md#31-reading-a-real-device-sysc)). For this reason, the command line accepts `boot-mode=6`. QEMU then refuses it at start-up, with the message from SYSC.
+**Machine properties are class properties.** `object_class_property_add` declares a property one time, for the machine *type*. The property has a getter and a setter (`:78-96`); for `boot-mode` one visitor function serves as both, because a visitor either reads or writes the value. The setter only stores the value. Later, the `realize` of SYSC checks the value ([`qemu-basics.md` §3.1](qemu-basics.md#31-reading-a-real-device-sysc)). For this reason, the command line accepts `boot-mode=6`. QEMU then refuses it at start-up, with the message from SYSC.
 
 ## 2. Hands-on recipe
 

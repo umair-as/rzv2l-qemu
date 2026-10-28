@@ -79,7 +79,7 @@
 | GIC | `arm_gicv3` rev 3, `num-cpu=2`, `num-irq=512`, security extensions on (DS=0, O), no LPI/ITS | all | cpu-gic §2, §6 |
 | SYSC `SYS_LSI_DEVID` @ `0x11020A04` | `0x18447447` (rev 1; `[27:0]` = `0x8447447`; Table 6.1's `x841_C447` is the G2L value) | both start states (latched) | EVK boot log (O, ~150 boots); sysc §4 |
 | SYSC `SYS_LSI_PRR` @ `0x11020A08` | `0x00000000` (dual core) | latched | EVK boot log (O) |
-| SYSC `SYS_LSI_MODE` @ `0x11020A00` | machine property: b16 `STAT_SEC_EN`=1, b9 `DEBUGEN`, b2:0 `MD_BOOT` (0 eSD, 1 eMMC 1.8 V, 3 QSPI 1.8 V); observed `0x10000/0x10001/0x10200/0x10201/0x10203` | latched | EVK boot log (O); sysc §3; Manual §6.3.42 p.207 |
+| SYSC `SYS_LSI_MODE` @ `0x11020A00` | machine property: b16 `STAT_SEC_EN`=1 (SoC-set), b15:14 `MD_OSCDRV` and b12 `MD_CLKS` = 0 (EVK straps), b9 `DEBUGEN`, b2:0 `MD_BOOT` (0 eSD, 1 eMMC 1.8 V, 3 QSPI 1.8 V); observed `0x10000/0x10001/0x10200/0x10201/0x10203` | latched | EVK boot log (O); sysc §3; Manual §6.3.42 p.207 |
 | RAM layout (direct mode) | 2 GiB RAM at `0x40000000`; `loader_start=0x48000000`, `ram_size=0x78000000`; stub at `0x48000000`; Image at `0x48200000`; initrd at `0x50000000`; DTB after initrd (2 MiB aligned); nothing in `0x40000000-0x47FFFFFF` | Stage A | cpu-gic §5.1 |
 | `/chosen` | DTB `bootargs` kept unless `-append`; `stdout-path = "serial0:115200n8"` | Stage A | boot-dependency-graph §5 |
 | Clock rates Linux must compute | I 1200 MHz, P0 100 MHz (O via OSTM), P1 200 MHz, P2 100 MHz, OSC 24 MHz, SD0 533.33 MHz | all | cpg-reset §3 |

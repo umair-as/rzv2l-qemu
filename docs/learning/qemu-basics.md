@@ -138,7 +138,7 @@ Note: the monitor is not a CPU, so at the hole it only reports a failure. A gues
 
 ### 3.1 Reading a real device: SYSC
 
-The GIC is a large device. The SYSC model is small: it has approximately 160 lines, written in M1-T02. It shows all the parts of a QEMU device in one file, `qemu/hw/misc/renesas_rzg2l_sysc.c`. The line numbers are at fork commit `0e2a93b8e9`.
+The GIC is a large device. The SYSC model is small: it has approximately 180 lines, written in M1-T02. It shows all the parts of a QEMU device in one file, `qemu/hw/misc/renesas_rzg2l_sysc.c`. The line numbers are at fork commit `51378195d3`.
 
 **What SYSC models.** SYSC has three read-only registers. BL2, U-Boot and Linux read them to identify the chip and its boot settings (manual §6.3.42–6.3.44 p.207–209):
 
@@ -148,7 +148,7 @@ The GIC is a large device. The SYSC model is small: it has approximately 160 lin
 | `SYS_LSI_DEVID` | `0xA04` | `0x18447447` on RZ/V2L | property `lsi-devid`, set by the SoC |
 | `SYS_LSI_PRR` | `0xA08` | `0x0` | property `lsi-prr` |
 
-**Names for registers: `REG32` and `FIELD`** (`renesas_rzg2l_sysc.c:27-32`). These macros come from `qemu/include/hw/core/registerfields.h`. They give names to offsets and to bit fields:
+**Names for registers: `REG32` and `FIELD`** (`renesas_rzg2l_sysc.c:27-34`). These macros come from `qemu/include/hw/core/registerfields.h`. They give names to offsets and to bit fields:
 
 ```c
 REG32(SYS_LSI_MODE, 0xa00)                      /* A_SYS_LSI_MODE = 0xa00 (byte offset)       */
@@ -158,7 +158,7 @@ REG32(SYS_LSI_MODE, 0xa00)                      /* A_SYS_LSI_MODE = 0xa00 (byte 
 - `REG32` defines `A_SYS_LSI_MODE` = `0xa00`. This is the byte offset that the `switch` uses.
 - `REG32` also defines `R_SYS_LSI_MODE` = `0x280`. This is the index in 32-bit words, for devices that keep an array of registers.
 - `FIELD` defines the shift, the length and the mask of one field.
-- `FIELD_DP32(value, REG, FIELD, x)` ("deposit") writes `x` into that field (`renesas_rzg2l_sysc.c:41-44`).
+- `FIELD_DP32(value, REG, FIELD, x)` ("deposit") writes `x` into that field (`renesas_rzg2l_sysc.c:43-47`).
 
 Thus the bit position is in one place only: the `FIELD` line. The value comes directly from the bit table in the manual. The T02 mutation "`debugen` on bit 8" changes only that line.
 
@@ -183,21 +183,22 @@ sequenceDiagram
 
 | Access | Who refuses it | Result for the guest | Logged under |
 |---|---|---|---|
-| 8- or 16-bit read | QEMU's memory core, before our code (`.valid` sizes, `renesas_rzg2l_sysc.c:105-106`; `qemu/system/memory.c:1404`) | synchronous external abort | `-d invalid_mem` |
-| any offset other than the three | our `default:` case returns `MEMTX_DECODE_ERROR` (`renesas_rzg2l_sysc.c:69`, `:95`) | synchronous external abort | `-d unimp` |
-| write to one of the three | our write callback ignores it, returns `MEMTX_OK` (`renesas_rzg2l_sysc.c:84-90`) | nothing; value unchanged | `-d guest_errors` |
+| 8- or 16-bit read | QEMU's memory core, before our code (`.valid` sizes, `renesas_rzg2l_sysc.c:108-109`; `qemu/system/memory.c:1404`) | synchronous external abort | `-d invalid_mem` |
+| any offset other than the three | our `default:` case returns `MEMTX_DECODE_ERROR` (`renesas_rzg2l_sysc.c:72`, `:98`) | synchronous external abort | `-d unimp` |
+| write to one of the three | our write callback ignores it, returns `MEMTX_OK` (`renesas_rzg2l_sysc.c:87-93`) | nothing; value unchanged | `-d guest_errors` |
 
 **Why an unknown offset aborts and does not return 0.** The real SYSC has many other registers. Many of them have a reset value that is not zero (manual Table 6.1 p.167-168).
 - A model that returns 0 is *silent-wrong*. The guest continues with a wrong value. The guest then fails much later, far from the cause.
 - An abort is *honest-fault*. The guest stops at the exact instruction, and `-d unimp` gives the offset.
 
-The model uses `read_with_attrs` / `write_with_attrs`, not the plain `read` / `write`. Only these two functions can return a `MemTxResult` (`renesas_rzg2l_sysc.c:99-107`).
+The model uses `read_with_attrs` / `write_with_attrs`, not the plain `read` / `write`. Only these two functions can return a `MemTxResult` (`renesas_rzg2l_sysc.c:102-110`).
 
-**Properties and realize** (`renesas_rzg2l_sysc.c:109-141`). The macros `DEFINE_PROP_*` declare the four settings. `realize` refuses a setting that the hardware cannot have:
+**Properties and realize** (`renesas_rzg2l_sysc.c:112-152`). The macros `DEFINE_PROP_*` declare the seven settings: the latched pins (`boot-mode`, `debugen`, `md-clks`, `md-oscdrv`), the part's security function (`sec-en`) and the two ID values. Where the manual gives a pin- or part-dependent value ("-"), the SoC sets what the EVK reads. `realize` refuses a setting that the hardware cannot have:
 - `boot-mode` 6 or 7: manual Table 4.1 gives these values as reserved. QEMU stops with "boot-mode 6 is reserved (valid: 0-5)".
 - `lsi-devid` 0: the ID is different for each SoC, and no default is correct. QEMU stops with "lsi-devid property must be set". It does not show a wrong ID.
+- `md-oscdrv` above 3: the field has two bits. QEMU stops with "md-oscdrv 4 does not fit MD_OSCDRV[1:0]".
 
-**No reset and no migration state** (`renesas_rzg2l_sysc.c:146-150`). The guest cannot change the device: all values come from properties. Thus a reset has nothing to restore, and a snapshot has nothing to save.
+**No reset and no migration state** (`renesas_rzg2l_sysc.c:157-161`). The guest cannot change the device: all values come from properties. Thus a reset has nothing to restore, and a snapshot has nothing to save.
 
 **Build wiring.** Three small changes add the file to the QEMU build:
 
