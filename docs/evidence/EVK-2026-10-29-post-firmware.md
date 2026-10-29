@@ -10,6 +10,13 @@
 | U-Boot | `U-Boot 2024.07 (Sep 22 2025 - 10:51:32 +0000)` | `v2024.07/rz_dev`, `4eebfbaa4e` | unknown: no commit in the banner |
 | Linux (not used here) | `Linux version 6.12.59-cip14-yocto-standard` | — | — |
 
+**Which build (checked 2026-10-29).** The image's build recipes pin the same source revisions this project researched: TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b`. Those pins have not changed since 2026-06-17. On top of them the image carries downstream patches:
+- TF-A: BL2 parses the OP-TEE header for BL32, and BL2 prints a boot marker (`plat/renesas/rz/common/bl2_plat_setup.c`). That is the `-dirty` suffix.
+- U-Boot: defconfig additions (redundant env, FIT signature, a keyed autoboot with a 3 s delay, bootcount, RNG via OP-TEE, board FDT setup), FDT fixups, boot markers, a `bootm` fix, the boot source in `/chosen`, and two CVE fixes (ext4, FIT signature).
+- OP-TEE: a TSIP RNG cast, a gcc-14 build relaxation, one CVE fix (ldelf).
+
+None of these patches touches SCIF, CPG, SDHI, PFC, WDT or GIC code. The banner strings and build dates are identical in every archived capture from June 2026 to today, including the 2026-10-08 capture (`EVK-2026-10-08-boot-log.md`). U-Boot's boot-source marker (`boot-source=esd`) appears on 2026-10-08 and today but not in the 2026-10-07 captures. The flashed U-Boot is therefore at least the 2026-10-08 build; no later U-Boot change touches these blocks. Identical build dates do not prove identical binaries, because the dates are fixed by the build system. **The values below belong to that firmware:** the researched revisions plus the downstream patches above.
+
 **Boot mode:** BL2 prints `SYS_LSI_MODE: 0x10200`: MD_BOOT[2:0] = 0 (eSD), DEBUGEN (bit 9) = 1, STAT_SEC_EN (bit 16) = 1 (§6.3.42 p.207).
 **Stage:** U-Boot prompt, post-firmware, before `bootm`. Autoboot stopped with the image's keyed autoboot string. No `mmc`, `boot` or other probing command was run before the reads.
 **Method:** `md.b`/`md.w`/`md.l` only, rows of `requests.md` section 1 one at a time. Never FTDR or FRDR. The server-enforced deny list blocked `mw`/`mm`/`nm`/`cp`, `mmc write`, `sf`, `saveenv`, `reset`, `boot*` and `go`.
@@ -101,6 +108,24 @@ U-Boot echoes each command on SCIF0, so a read straight after the echo sees the 
 | EVK-R51 | no abort. `0xE33E0947 0x00000009 0 0` | CNTCV advancing | MATCH: the read frame mirrors CNTCV |
 | EVK-R70 | no abort. SCIF0 `+0x18` reads `0x0000` | `0x0000` or abort | answered: zero, no bus error (scif.md Q4) |
 | EVK-R71 | no abort. PFC `+0x3100` reads `0x00000000` | `0` or abort | answered: zero (pinctrl.md Q4) |
+
+## Cause of each DIFFERS row
+
+"Firmware" means the value depends on what TF-A or U-Boot did before the prompt, so it is a direct-mode start value for this firmware, not a reset value. "Silicon" means no firmware write can explain it.
+
+| ID | Likely cause | Basis | Label |
+|---|---|---|---|
+| R04, R05 | undetermined: either TF-A's security setup or the silicon reset state makes the access-control registers secure-only | an abort from non-secure U-Boot; the security state that would tell them apart cannot be read from U-Boot | (A) |
+| R11 `0x218` SEL_SDHI0/1 = 2 | firmware: U-Boot's SDHI driver (`sh_sdhi`) probes both channels before the prompt (`MMC: sd@11c00000: 0, sd@11c10000: 1`) | boot log; U-Boot SDHI probe | (I) |
+| R11 `0x208` DIVPL3C = 1, `0x408` b8 = 0 | firmware: TF-A BL2 or U-Boot clock setup | no write traced to a file:line yet | (I) |
+| R15 GTM clocks off | firmware: something gates the OSTM clocks off after reset | reset value is on; no write traced yet | (I) |
+| R16 WDT CLK_ON `0xFF`, RST `0xF`, RSTMON 0 | firmware: U-Boot's board code writes the WDT clock and reset registers directly, and its WDT driver autostarts (`WDT: Started watchdog@12800800`) | boot log; U-Boot board code | (I) |
+| R16 / X01 CLK_MON_WDT b7:6 = 0 | **silicon**: these reserved bits are not clock enables, so no firmware write changes what CLK_MON reports for them | Table 7.5 / §7.2.4.44 p.308 vs the observed value | (O) |
+| R17 SDHI on, resets released | firmware: U-Boot probes SDHI0 (env, boot) and SDHI1 | boot log | (I) |
+| R34 ETH OEN `0x00` | firmware: written by TF-A or U-Boot pin setup | reset value `0x03`; no write traced yet | (I) |
+| R64 GICR1 WAKER awake | firmware: TF-A's GICv3 driver performs the WAKER handshake during BL31 GIC setup, and the redistributors are left awake | TF-A `drivers/arm/gic/v3` `gicv3_rdistif_init`; `GICV3_SUPPORT_GIC600=1` @ `f59ed5a31` | (I) |
+
+The SCIF0 rows (R20-R26) come from the same TF-A and U-Boot source revisions that `../research/scif.md` §6.2 reasons from. No downstream patch touches the SCIF code (`scifa.S`, `serial_sh.c`). The observed overlay therefore applies to the researched firmware, and also to this build.
 
 ## What this changes
 
