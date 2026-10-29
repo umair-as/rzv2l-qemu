@@ -38,7 +38,7 @@ RUNS = ROOT / "build" / "bench"
 DEVICE_MAP = ROOT / "docs" / "device-map.md"
 # Who starts runs: "test" when the bench's own tests run it (BENCH_RUN_ORIGIN)
 ORIGIN = os.environ.get("BENCH_RUN_ORIGIN") or "manual"
-RUN_ID = re.compile(r"^(?P<stamp>\d{8}-\d{6}-\d{3})-(?P<profile>[\w.-]+)$")
+RUN_ID = re.compile(r"^(?P<stamp>\d{8}-\d{6}-\d{3})-(?P<profile>[\w.-]+)\Z")
 
 # Read-only HMP commands the monitor panel may run (no writes to host files,
 # no state changes; those have their own buttons).
@@ -286,28 +286,33 @@ def memory_map(windows, mtree_text, qtree_text, cov):
     regions = parse_flat_mtree(mtree_text)
     devices = qtree_devices(parse_qtree(qtree_text))
     unimp_names = {d["name"] for d in devices if d["type"] == UNIMP_TYPE}
-    unimp_base = {d["name"]: d["mmio"][0][0] for d in devices
-                  if d["type"] == UNIMP_TYPE and d["mmio"] and d["name"]}
+    unimp_base = unimp_bases(qtree_text)
 
     hits = collections.Counter()
+    unplaced = collections.Counter()    # hits the Map cannot honestly place
     for (kind, _access, where, _size, _detail), n in cov.items():
-        addr = None
-        if where.startswith("0x"):
-            addr = int(where, 16)
-        elif "+0x" in where and where.split("+")[0] in unimp_base:
-            dev, off = where.split("+0x")
-            addr = unimp_base[dev] + int(off, 16)
-        if addr is not None and (w := find_window(windows, addr)):
+        addr = place(where, unimp_base)
+        if addr is None:
+            if kind != "other":         # a device's own message: no address
+                unplaced[(where, "no address in the log line")] += n
+        elif w := find_window(windows, addr):
             hits[(w["name"], w["base"])] += n
+        else:
+            unplaced[(where, "in no window")] += n
 
     rows, used = [], set()
     for w in sorted(windows, key=lambda w: w["base"]):
         end = w["base"] + w["size"] - 1
-        inside = [r for r in regions if r["base"] <= end and r["end"] >= w["base"]]
+        over = [r for r in regions if r["base"] <= end and r["end"] >= w["base"]]
+        # Only a region that fits in the window speaks for it; a larger one
+        # merely lies across it (virt's PCIe window over the RZ/V2L map)
+        inside = [r for r in over if r["base"] >= w["base"] and r["end"] <= end]
         used.update(id(r) for r in inside)
         covered = _covered(w["base"], end, [(r["base"], r["end"]) for r in inside])
-        if not inside:
+        if not over:
             status = "missing"
+        elif not inside:
+            status, inside = "covered", over
         elif all(r["name"] in unimp_names for r in inside):
             status = "unimp"
         elif all(r["kind"] == "ram" for r in inside):
@@ -316,40 +321,61 @@ def memory_map(windows, mtree_text, qtree_text, cov):
             status = "modelled"
         rows.append({"name": w["name"], "base": f"0x{w['base']:08x}",
                      "size": f"0x{w['size']:x}", "status": status,
-                     "partial": bool(inside) and covered < w["size"],
+                     "partial": status not in ("missing", "covered") and covered < w["size"],
                      "regions": sorted({r["name"] for r in inside}),
                      "hits": hits[(w["name"], w["base"])],
                      "milestone": w.get("milestone", ""), "plan": w.get("plan", "")})
     extra = [{"name": r["name"], "base": f"0x{r['base']:08x}",
               "size": f"0x{r['end'] - r['base'] + 1:x}", "kind": r["kind"]}
              for r in regions if id(r) not in used]
-    return rows, extra
+    lost = [{"where": where, "why": why, "count": n}
+            for (where, why), n in unplaced.most_common()]
+    return rows, extra, lost
+
+
+def place(where, unimp_base):
+    """An absolute address for a coverage row: its own address, or an
+    unimplemented-device's base plus the logged offset; else None."""
+    if where.startswith("0x"):
+        return int(where, 16)
+    dev, sep, off = where.partition("+0x")
+    if sep and dev in unimp_base:
+        return unimp_base[dev] + int(off, 16)
+    return None
+
+
+def unimp_bases(qtree_text):
+    """{name: base} of every unimplemented-device in `info qtree`."""
+    return {d["name"]: d["mmio"][0][0]
+            for d in qtree_devices(parse_qtree(qtree_text))
+            if d["type"] == UNIMP_TYPE and d["mmio"] and d["name"]}
 
 
 CSV_FIELDS = ["name", "base", "size", "kind", "access", "count"]
 
 
-def coverage_csv(cov, windows):
+def coverage_csv(cov, windows, unimp_base=None):
     """CSV of a coverage counter, addresses grouped by device-map window.
 
     One row per (window, kind, access) with the window's base and size; an
     address in no window is its own "unmapped" row (base = the address,
-    size = the access size). unimp rows carry a device offset, not an
-    address: name = the device, base and size blank. Free-text lines are
-    summed into one "other" row.
+    size = the access size). An unimp offset is placed through its
+    unimplemented-device's base (unimp_base, from the run's qtree); one that
+    cannot be (a device's own message names a function) is an
+    "unplaced:<prefix>+<offset>" row with base and size blank. Free-text
+    lines are summed into one "other" row.
     """
     rows = collections.Counter()
     for (kind, access, where, size, _detail), n in cov.items():
         if kind == "other":
             key = ("other", "", "", kind, "")
-        elif where.startswith("0x"):
-            addr = int(where, 16)
+        elif (addr := place(where, unimp_base or {})) is not None:
             w = find_window(windows, addr)
             key = ((w["name"], f"0x{w['base']:08x}", f"0x{w['size']:x}",
                     kind, access) if w else
-                   ("unmapped", where, size, kind, access))
+                   ("unmapped", f"0x{addr:08x}", size, kind, access))
         else:
-            key = (where.split("+")[0], "", "", kind, access)
+            key = (f"unplaced:{where}", "", "", kind, access)
         rows[key] += n
     out = io.StringIO()
     wr = csv.writer(out, lineterminator="\n")
@@ -545,6 +571,9 @@ class Session:
         self.tail_task = None
         self.tasks = []
         self.watch_task = None
+        self.prep_proc = None       # the prepare step, while it runs
+        self.cancelled = False      # Stop before QEMU was launched
+        self.finished = asyncio.Event()   # exited and recorded
         self.con_tasks = []
         self.found = set()          # expect markers seen since Start/Reset
         self.resets = 0             # QMP RESET events: the pumps drop their tails
@@ -579,6 +608,8 @@ class Session:
     async def start(self, paused):
         try:
             await self._prepare()
+            if self.cancelled:
+                raise RuntimeError("stopped by the bench before QEMU started")
             self.argv = self.build_argv()
             (self.run_dir / "cmdline.txt").write_text(" ".join(self.argv) + "\n")
             self.write_meta()
@@ -609,8 +640,11 @@ class Session:
                 await self.qmp.cmd("cont")
                 await self._set_state("running")
         except Exception as e:  # noqa: BLE001 - reported to the UI
-            self.error = str(e) or type(e).__name__
-            await self._emit("stderr", f"bench: start failed: {self.error}\n")
+            if self.cancelled:          # a Stop, not a failure to start
+                await self._emit("stderr", "bench: stopped before QEMU started\n")
+            else:
+                self.error = str(e) or type(e).__name__
+                await self._emit("stderr", f"bench: start failed: {self.error}\n")
             self.stopped = True
             await self.kill()
             self.ended = time.time()
@@ -618,6 +652,7 @@ class Session:
             self.write_meta()
             if not self.proc:       # no exit watcher will clean up
                 shutil.rmtree(self.sock_dir, ignore_errors=True)
+                self.finished.set()
 
     async def _capture_views(self):
         """The memory map and device tree before the guest runs: the run keeps
@@ -633,10 +668,13 @@ class Session:
         if not cmd:
             return
         await self._emit("stderr", "$ " + " ".join(cmd) + "\n")
-        proc = await asyncio.create_subprocess_exec(
+        proc = self.prep_proc = await asyncio.create_subprocess_exec(
             *cmd, cwd=ROOT, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT)
-        out, _ = await asyncio.wait_for(proc.communicate(), 600)
+            stderr=asyncio.subprocess.STDOUT, start_new_session=True)
+        try:
+            out, _ = await asyncio.wait_for(proc.communicate(), 600)
+        finally:
+            self.prep_proc = None
         if out:
             await self._emit("stderr", out.decode(errors="replace"))
         if proc.returncode:
@@ -647,6 +685,19 @@ class Session:
             return
         # The guest may have exited already, with the watcher not done yet
         self.stopped = self.proc is None or self.proc.returncode is None
+        if self.proc is None:
+            # Still preparing: end the prepare step and cancel the launch
+            self.cancelled = True
+            if self.prep_proc and self.prep_proc.returncode is None:
+                try:
+                    os.killpg(self.prep_proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            try:
+                await asyncio.wait_for(self.finished.wait(), 10)
+            except asyncio.TimeoutError:
+                pass
+            return
         try:
             await self.qmp.cmd("quit", timeout=3)
         except Exception:  # noqa: BLE001 - fall back to a kill
@@ -693,6 +744,7 @@ class Session:
                 t.cancel()
         self.write_meta()
         shutil.rmtree(self.sock_dir, ignore_errors=True)
+        self.finished.set()
 
     # -- streams -----------------------------------------------------------
 
@@ -818,12 +870,14 @@ class Session:
             if want is None and not missing:
                 return "pass", []
             return "running", []
-        reasons = [f"missing on the console: {m!r}" for m in missing]
+        reasons = []
         if want is not None:
             if self.stopped:
                 reasons.append("stopped by the bench before the guest exited")
             elif self.exit_code != want:
                 reasons.append(f"exit {self.exit_code}, expected {want}")
+        where = "since the last reset" if self.resets else "on the console"
+        reasons += [f"missing {where}: {m!r}" for m in missing]
         return ("fail" if reasons else "pass"), reasons
 
     def status(self):
@@ -840,7 +894,7 @@ class Session:
                 "gdb_port": self.gdb_port,
                 "origin": ORIGIN,
                 "machine": machine_of(self.profile),
-                "uptime": round(time.time() - self.started, 1),
+                "uptime": round((self.ended or time.time()) - self.started, 1),
                 "started": self.started, "ended": self.ended,
                 "run": self.run_dir.name,
                 "run_dir": str(self.run_dir.relative_to(ROOT)),
@@ -1061,8 +1115,12 @@ def make_app(port=8090):
     async def run_coverage_csv(_, path):
         s = bench.session
         cov = s.cov if s and s.run_dir == path else count_log(path / "qemu.log")
+        try:
+            unimp_base = unimp_bases((path / "qtree.txt").read_text())
+        except OSError:
+            unimp_base = {}
         return web.Response(
-            text=coverage_csv(cov, bench.windows), content_type="text/csv",
+            text=coverage_csv(cov, bench.windows, unimp_base), content_type="text/csv",
             headers={"Content-Disposition":
                      f'attachment; filename="{path.name}-coverage.csv"'})
 
@@ -1084,8 +1142,12 @@ def make_app(port=8090):
             return json_error(404, "this run has no memory map (captured at start)")
         s = bench.session
         cov = s.cov if s and s.run_dir == path else count_log(path / "qemu.log")
-        rows, extra = memory_map(bench.windows, mtree, qtree, cov)
-        return web.json_response({"windows": rows, "extra": extra,
+        rows, extra, unplaced = memory_map(bench.windows, mtree, qtree, cov)
+        info = bench.run_info(path)
+        return web.json_response({"run": path.name, "profile": info.get("profile"),
+                                  "machine": info.get("machine"),
+                                  "windows": rows, "extra": extra,
+                                  "unplaced": unplaced,
                                   "map_warnings": bench.map_warnings})
 
     @routes.get("/api/runs/{run}/devices")
@@ -1095,7 +1157,10 @@ def make_app(port=8090):
             qtree = (path / "qtree.txt").read_text()
         except OSError:
             return json_error(404, "this run has no device tree (captured at start)")
-        return web.json_response({"tree": parse_qtree(qtree)})
+        info = bench.run_info(path)
+        return web.json_response({"run": path.name, "profile": info.get("profile"),
+                                  "machine": info.get("machine"),
+                                  "tree": parse_qtree(qtree)})
 
     @routes.get("/api/runs/{run}/{file:console|log|stderr|cmdline|mtree|qtree}")
     @need_run

@@ -2,7 +2,7 @@
 # A bare-metal program on virt's PL011: prints a banner, echoes keys,
 # exits with status 0 through semihosting on 'q'.
 name = "virt · bench self-test (echo)"
-description = "Stock QEMU virt + PL011 echo program. Type to echo; 'q' exits with status 0."
+description = "Stock QEMU virt + PL011 echo program. Type to echo; 'u' reads an unmapped address (one coverage hit); 'q' exits with status 0. PASS needs both."
 qemu = "qemu-system-aarch64"
 prepare = ["make", "-s", "-C", "bench/tests/virt-echo"]
 args = ["-M", "virt", "-cpu", "cortex-a55", "-kernel", "bench/tests/virt-echo/out/echo.elf"]

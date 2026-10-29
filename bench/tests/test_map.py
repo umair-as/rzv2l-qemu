@@ -31,7 +31,7 @@ def test_flat_view_reads_the_memory_address_space_only():
 
 
 def test_windows_against_the_live_map():
-    rows, extra = server.memory_map(WINDOWS, MTREE, QTREE, collections.Counter())
+    rows, extra, unplaced = server.memory_map(WINDOWS, MTREE, QTREE, collections.Counter())
     w = by_base(rows)
     assert (w["0x1004b800"]["status"], w["0x1004b800"]["regions"]) == \
         ("modelled", ["renesas-rz-scifa"])                              # SCIF0
@@ -42,7 +42,7 @@ def test_windows_against_the_live_map():
     assert not w["0x11940000"]["partial"]                              # redistributors
     assert w["0x11980000"]["status"] == "missing"                      # GIC remainder
     assert w["0x1004b800"]["milestone"].startswith("M2")
-    assert extra == []
+    assert extra == [] and unplaced == []
 
 
 UNIMP_MTREE = """FlatView #0
@@ -65,7 +65,7 @@ def test_unimp_windows_hits_and_unlisted_regions():
         ("unimp", "write", "wdt0+0x14", "4", ""): 4,           # device offset
         ("invalid_mem", "read", "0x12800804", "4", "x"): 1,    # absolute address
     })
-    rows, extra = server.memory_map(WINDOWS, UNIMP_MTREE, UNIMP_QTREE, cov)
+    rows, extra, _ = server.memory_map(WINDOWS, UNIMP_MTREE, UNIMP_QTREE, cov)
     wdt0 = by_base(rows)["0x12800800"]
     assert (wdt0["status"], wdt0["hits"]) == ("unimp", 5)
     assert extra == [{"name": "mystery", "base": "0x12900000", "size": "0x1000",
@@ -101,3 +101,38 @@ def test_assets(tmp_path, monkeypatch):
     assert p(["-kernel", "img"], q=str(tmp_path / "no-qemu"))["status"] == "missing"
     qemu.chmod(0o644)                                   # present, not executable
     assert p(["-kernel", "img"])["status"] == "missing"
+
+
+SPAN_MTREE = """FlatView #0
+ AS "memory", root: system
+ Root memory region: system
+  0000000010000000-000000003efeffff (prio 0, i/o): gpex_mmio_window @0000000010000000
+  0000000040000000-0000000047ffffff (prio 0, ram): mach-virt.ram
+"""
+
+
+def test_a_larger_region_only_covers_a_window():
+    """virt's PCIe window lies across the RZ/V2L peripherals: "covered", not
+    "modelled"; and it is listed, since no window holds it."""
+    rows, extra, _ = server.memory_map(WINDOWS, SPAN_MTREE, "", collections.Counter())
+    w = by_base(rows)
+    assert (w["0x1004b800"]["status"], w["0x1004b800"]["regions"]) == \
+        ("covered", ["gpex_mmio_window"])
+    assert not w["0x1004b800"]["partial"]
+    assert w["0x40000000"]["status"] == "ram" and w["0x40000000"]["partial"]
+    assert [e["name"] for e in extra] == ["gpex_mmio_window"]
+
+
+def test_hits_the_map_cannot_place_are_listed():
+    """A device's own LOG_UNIMP line names a function and an offset (SYSC in
+    the M1 probe): no address, so it is listed, never dropped."""
+    cov = collections.Counter({
+        ("unimp", "read", "rzg2l_sysc_read+0x0", "", ""): 1,
+        ("invalid_mem", "read", "0x0c000000", "4", "rejected"): 2,
+        ("other", "", "free text", "", ""): 3,
+    })
+    _, _, unplaced = server.memory_map(WINDOWS, MTREE, QTREE, cov)
+    assert unplaced == [
+        {"where": "0x0c000000", "why": "in no window", "count": 2},
+        {"where": "rzg2l_sysc_read+0x0", "why": "no address in the log line", "count": 1},
+    ]

@@ -12,7 +12,7 @@ uv run bench/server.py           # http://127.0.0.1:8090
 uv run bench/server.py --port 8091   # a second bench next to the first
 ```
 
-Pick a profile, press **Start**. Click the console to type.
+Pick a profile, press **Start**. Click the console to type; the line above it says where keys go in each state. The console takes every key, Tab included: **Ctrl+]** (as in telnet) hands focus back to the page, to the side panel's tabs, which the arrow keys walk.
 
 The header readout is the one status line: session state, then PASS or FAIL once a profile with markers is decided (marker progress while it runs), the exit status and the run time. A FAIL names what was missing just below the header. **System / Light / Dark** sets the theme, terminal included; the choice is kept per browser. The full QEMU command line sits in a collapsed, copyable block at the top of the Log tab.
 
@@ -34,13 +34,13 @@ Like a serial terminal's map options, per profile, and in the console's **Settin
 | `[console] lf_to_crlf` | Show lone LF as CRLF | `false` | the terminal draws a bare `\n` as a new line at column 0 |
 | `[console] enter` | Enter sends | `"cr"` | what the Enter key sends: `"cr"`, `"lf"` or `"crlf"` |
 
-The defaults are raw, so a Linux shell is untouched. The M1 probe sets `lf_to_crlf = true`: semihosting text ends lines with a bare `\n`. The map is display only: the transcript, `console.log`, the API and the verdict always hold the guest's bytes. A menu change lasts until another profile is picked.
+The defaults are raw, so a Linux shell is untouched. The M1 probe sets `lf_to_crlf = true`: semihosting text ends lines with a bare `\n`. The map is display only: the transcript, `console.log`, the API and the verdict always hold the guest's bytes. A menu change is kept per profile in this browser; **Profile defaults** in the menu goes back to the TOML.
 
 ## What emulation shows that silicon can't
 
 Read-only views, from stock QEMU monitor commands the bench runs itself at start (before the guest runs), kept with the run as `mtree.txt` and `qtree.txt`:
 
-- **Map:** `info mtree -f` (the `memory` address space) against the windows of `docs/device-map.md` §1. Each window is *modelled*, *RAM*, *UNIMP* (an `unimplemented-device`, known by its `name` property in `info qtree`) or *missing*, marked *part* when the live regions cover only part of it. Each window also shows the live region names, the coverage hits from the `-d` log (absolute addresses, and `unimp` offsets placed through the device's base), and the milestone that needs it, with the full plan on hover. Live regions in no window are listed below the table. Filters: in this build, missing, hit. `GET /api/runs/<run>/map`.
+- **Map:** `info mtree -f` (the `memory` address space) against the windows of `docs/device-map.md` §1. Each window is *modelled*, *RAM*, *UNIMP* (an `unimplemented-device`, known by its `name` property in `info qtree`), *covered* (only a larger region lies across it, such as virt's PCIe window; nothing in the build fits the window) or *missing*, marked *part* when the regions that fit cover only part of it. Each window also shows the live region names, the coverage hits from the `-d` log (absolute addresses, and `unimp` offsets placed through the device's base), and the milestone that needs it, with the full plan on hover. Regions that fit in no window are listed below the table. Hits the Map cannot place are listed above it, never dropped: an address in no window, or a device's own unimplemented-access message, which logs a function name and an offset but no address (SYSC's `rzg2l_sysc_read+0x0`). The tab names the run it shows; picking a run in **Runs** shows that run's map, until **Show the current session**. Filters: in this build, missing, hit. `GET /api/runs/<run>/map`.
 - **Devices:** `info qtree` as a tree you can filter by type, name or property. `GET /api/runs/<run>/devices`.
 - **Readiness:** next to the profile picker, before Start. *ready*; *builds on Start* (guest files missing, but the prepare step makes them); *missing* (no executable QEMU, or files nothing builds). The tooltip lists each file. `GET /api/profiles` returns it as `assets`.
 
@@ -60,7 +60,7 @@ Not built yet, because nothing in the model needs them:
 | `expect = ["…"]` | exact strings that must all appear on the console: serial and semihosting output. QEMU's stderr and the `-d` log never count |
 | `expect_exit = N` | optional: QEMU must exit with status `N`. A run ended by the bench (Stop, a failed start) fails, because QMP `quit` also exits 0 |
 
-The session shows **RUNNING** until the verdict is decided. With `expect_exit` set, **PASS** needs every marker and that exit status. Without it, the verdict turns PASS as soon as the last marker appears, even if the guest keeps running; a run that ends first is **FAIL**. Only console output since the last Start or reset counts: a QMP `RESET` event (the Reset button or a guest-initiated reset) forgets every marker seen before it. A profile with neither field has no verdict. `GET /api/session` returns `verdict` (`"pass"`, `"fail"`, `"running"` or `null`), `verdict_reasons` and `expect_missing`.
+The session shows **RUNNING** until the verdict is decided. With `expect_exit` set, **PASS** needs every marker and that exit status. Without it, the verdict turns PASS as soon as the last marker appears, even if the guest keeps running; a run that ends first is **FAIL**. Only console output since the last Start or reset counts: a QMP `RESET` event (the Reset button or a guest-initiated reset) forgets every marker seen before it, and the terminal draws a reset line there (display only). The reasons then say *missing since the last reset*. A profile with neither field has no verdict. `GET /api/session` returns `verdict` (`"pass"`, `"fail"`, `"running"` or `null`), `verdict_reasons` and `expect_missing`.
 
 ## Coverage export
 
@@ -68,7 +68,7 @@ The session shows **RUNNING** until the verdict is decided. With `expect_exit` s
 
 - An address inside a window of `docs/device-map.md` §1 is counted in one row per window, kind and access; `name`, `base` and `size` are the window's. When windows overlap, the smallest wins.
 - An address in no window is its own row: `name` is `unmapped`, `base` is the address, `size` is the access size.
-- `unimp` lines give a device and an offset, not an address: `name` is the device, `base` and `size` are blank.
+- `unimp` lines give a name and an offset, not an address. An `unimplemented-device`'s offset is placed through its base from the run's `info qtree`. Any other (a device's own message, often a function name) is an `unplaced:<prefix>+<offset>` row with `base` and `size` blank.
 - Free-text lines (`other`) are summed into one row.
 
 The map's tables are prose. Rows whose bases and sizes do not pair are listed in `map_warnings` of `GET /api/runs/<run>/coverage`; never edit the map to suit the parser.
