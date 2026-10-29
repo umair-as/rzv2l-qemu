@@ -373,7 +373,8 @@ class Session:
         self.tail_task = None
         self.tasks = []
         self.con_tasks = []
-        self.found = set()          # expect markers seen on the console
+        self.found = set()          # expect markers seen since Start/Reset
+        self.resets = 0             # QMP RESET events: the pumps drop their tails
         self.stopped = False        # ended by the bench (Stop, failed start)
         self.ended = None
         self.gdb_port = free_port() if gdb else None
@@ -532,10 +533,13 @@ class Session:
         markers = [m.encode() for m in self.profile["expect"]]
         keep = max((len(m) for m in markers), default=1) - 1
         tail = b""                  # a marker may straddle two reads
+        resets = self.resets
         with (self.run_dir / "console.log").open("ab") as f:
             while data := await reader.read(4096):
                 f.write(data)
                 f.flush()
+                if resets != self.resets:   # nothing before a reset counts
+                    resets, tail = self.resets, b""
                 if markers and len(self.found) < len(markers):
                     window = tail + data
                     before = len(self.found)
@@ -587,7 +591,12 @@ class Session:
     async def _on_qmp_event(self, msg):
         await self.bench.broadcast({"t": "event", "d": msg})
         name = msg["event"]
-        if name == "STOP":
+        if name == "RESET":
+            # Bench Reset or a guest reset: the verdict restarts from here
+            self.found.clear()
+            self.resets += 1
+            await self._set_state(self.state, force=True)
+        elif name == "STOP":
             await self._set_state("paused")
         elif name == "RESUME":
             await self._set_state("running")
@@ -650,8 +659,8 @@ class Session:
         meta.update(started=self.started, ended=self.ended)
         (self.run_dir / "run.json").write_text(json.dumps(meta, indent=1) + "\n")
 
-    async def _set_state(self, state):
-        if self.state != state:
+    async def _set_state(self, state, force=False):
+        if self.state != state or force:
             self.state = state
             await self.bench.broadcast({"t": "status", "d": self.status()})
 

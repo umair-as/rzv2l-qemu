@@ -30,7 +30,7 @@ Each run keeps its command line, console, stderr, QEMU log and `run.json` (profi
 | `expect = ["…"]` | exact strings that must all appear on the console: serial and semihosting output. QEMU's stderr and the `-d` log never count |
 | `expect_exit = N` | optional: QEMU must exit with status `N`. A run ended by the bench (Stop, a failed start) fails, because QMP `quit` also exits 0 |
 
-The session shows **RUNNING** until the verdict is decided. With `expect_exit` set, **PASS** needs every marker and that exit status. Without it, the verdict turns PASS as soon as the last marker appears, even if the guest keeps running; a run that ends first is **FAIL**. A profile with neither field has no verdict. `GET /api/session` returns `verdict` (`"pass"`, `"fail"`, `"running"` or `null`), `verdict_reasons` and `expect_missing`.
+The session shows **RUNNING** until the verdict is decided. With `expect_exit` set, **PASS** needs every marker and that exit status. Without it, the verdict turns PASS as soon as the last marker appears, even if the guest keeps running; a run that ends first is **FAIL**. Only console output since the last Start or reset counts: a QMP `RESET` event (the Reset button or a guest-initiated reset) forgets every marker seen before it. A profile with neither field has no verdict. `GET /api/session` returns `verdict` (`"pass"`, `"fail"`, `"running"` or `null`), `verdict_reasons` and `expect_missing`.
 
 ## Coverage export
 
@@ -77,7 +77,8 @@ The test drives the UI on stock QEMU `virt` with a small bare-metal echo program
 
 - One session, no authentication: it binds to `127.0.0.1` and refuses requests whose `Host` is not a loopback name or whose `Origin` is another site (a web page in your browser cannot drive it). Don't expose it.
 - The coverage list counts every `-d` log line of the run: known forms are grouped by address, anything else is listed verbatim as `other`.
-- The verdict is cumulative over the run: a marker seen before a Reset still counts, and console bytes include what the guest echoes back from typed input. Prefer markers the guest prints itself, and `expect_exit` where the guest can exit.
+- Console bytes include what the guest echoes back from typed input: typing a marker string can satisfy it. Never type a profile's marker into the run you are checking.
+- A reset clears the markers when QMP reports it; output still in flight at that instant (a few bytes printed just before the reset) can still count.
 - A run whose `run.json` never reached `exited` (the bench was killed) is listed as `lost`, with no verdict.
 - The device-map parser reads sizes from the Size column and per-base `(N MiB)` notes only: a size in other parenthesised text (Display DSI's `0x20000`) is not used, and multi-block rows carry the whole row name.
 - Run files and logs are read whole: fine for probes, slow for a long Linux `-d` log.

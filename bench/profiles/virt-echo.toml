@@ -7,7 +7,7 @@ qemu = "qemu-system-aarch64"
 prepare = ["make", "-s", "-C", "bench/tests/virt-echo"]
 args = ["-M", "virt", "-cpu", "cortex-a55", "-kernel", "bench/tests/virt-echo/out/echo.elf"]
 semihosting = true
-# Verdict: the banner, then 'bye' and status 0 after 'q'; a Stop before that fails
-expect = ["echo ready", "bye"]
+# Verdict: the banner, "read hole" after 'u', then 'bye' and status 0 after 'q'
+expect = ["echo ready", "read hole", "bye"]
 expect_exit = 0
 log = "unimp,guest_errors"   # QEMU 8.x has no invalid_mem; holes log under guest_errors there
