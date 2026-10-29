@@ -77,6 +77,10 @@ The test drives the UI on stock QEMU `virt` with a small bare-metal echo program
 
 - One session, no authentication: it binds to `127.0.0.1` and refuses requests whose `Host` is not a loopback name or whose `Origin` is another site (a web page in your browser cannot drive it). Don't expose it.
 - The coverage list counts every `-d` log line of the run: known forms are grouped by address, anything else is listed verbatim as `other`.
+- The verdict is cumulative over the run: a marker seen before a Reset still counts, and console bytes include what the guest echoes back from typed input. Prefer markers the guest prints itself, and `expect_exit` where the guest can exit.
+- A run whose `run.json` never reached `exited` (the bench was killed) is listed as `lost`, with no verdict.
+- The device-map parser reads sizes from the Size column and per-base `(N MiB)` notes only: a size in other parenthesised text (Display DSI's `0x20000`) is not used, and multi-block rows carry the whole row name.
+- Run files and logs are read whole: fine for probes, slow for a long Linux `-d` log.
 - `run.sh` stays the source of truth for a probe's verdict (timeout, missing `RESULT:`). The bench verdict is for looking and for scripts: it has no timeout, so a hung guest stays RUNNING until stopped.
 - No display panel yet: the board has no display model before M4.
 - Profiles for G0 Linux land with M3, when its Image and initramfs are built.

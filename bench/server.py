@@ -86,7 +86,7 @@ def count_log(path):
     cov = collections.Counter()
     if path.exists():
         with path.open("r", errors="replace") as f:
-            for line in f.read().split("\n"):
+            for line in f.read().splitlines():   # no phantom last line
                 cov[classify(line)] += 1
     return cov
 
@@ -460,7 +460,8 @@ class Session:
     async def stop(self):
         if self.state == "exited":
             return
-        self.stopped = True
+        # The guest may have exited already, with the watcher not done yet
+        self.stopped = self.proc is None or self.proc.returncode is None
         try:
             await self.qmp.cmd("quit", timeout=3)
         except Exception:  # noqa: BLE001 - fall back to a kill
@@ -693,6 +694,10 @@ class Bench:
                 meta = json.loads((path / "run.json").read_text())
             except (OSError, ValueError):
                 meta = {}           # a run from before run.json: name only
+            if meta.get("state", "exited") != "exited":
+                # Not this bench's session, never finished: the bench died
+                meta.update(state="lost", verdict=None, verdict_reasons=[
+                    "the bench stopped before the run ended"])
         m = RUN_ID.match(path.name)
         meta.setdefault("profile", m["profile"])
         meta.setdefault("state", "exited")
@@ -763,7 +768,7 @@ def make_app(port=8090):
         if bench.live():
             return json_error(409, "a session is running; stop it first")
         bench.session = Session(bench, pid, bench.profiles[pid],
-                                gdb=bool(body.get("gdb")))
+                                gdb=body.get("gdb") is True)
         await bench.session.start(bool(body.get("paused")))
         status = bench.session.status()
         return web.json_response(status, status=500 if status["error"] else 200)

@@ -98,3 +98,26 @@ def test_verdict_rules(session):
     assert s.verdict() == ("fail", ["missing on the console: 'hello'"])
 
     assert session([]).verdict() == (None, [])  # no expectations, no verdict
+
+
+def test_past_run_log_has_no_phantom_line(tmp_path):
+    log = tmp_path / "qemu.log"
+    log.write_text("Invalid read at addr 0x10000000, size 4, region '(null)', "
+                   "reason: rejected\n"
+                   "rzg2l_sysc_read: unimplemented read at offset 0x0\n")
+    cov = server.count_log(log)
+    assert sum(cov.values()) == 2
+    assert not any(k[0] == "other" for k in cov)
+
+
+def test_unfinished_run_is_listed_as_lost(tmp_path, monkeypatch):
+    """run.json left at "starting" by a bench that died: not shown as live."""
+    monkeypatch.setattr(server, "RUNS", tmp_path)
+    run = tmp_path / "20261029-000000-000-virt-echo"
+    run.mkdir()
+    (run / "run.json").write_text('{"state": "starting", "verdict": "running"}')
+
+    class NoSession:
+        session = None
+    info = server.Bench.run_info(NoSession(), run)
+    assert info["state"] == "lost" and info["verdict"] is None
