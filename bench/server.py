@@ -83,17 +83,6 @@ def classify(line):
     return ("other", "", line.strip(), "", "")
 
 
-def crlf(data, after_cr=False):
-    """(data with each lone \n as \r\n, whether data ends in \r).
-
-    after_cr: the previous chunk ended in \r, so a leading \n is not lone.
-    """
-    out = re.sub(rb"(?<!\r)\n", b"\r\n", data)
-    if after_cr and data.startswith(b"\n"):
-        out = out[1:]                       # undo the \r added at the start
-    return out, data.endswith(b"\r")
-
-
 def count_log(path):
     """Coverage counter of a -d log file on disk (a finished or past run)."""
     cov = collections.Counter()
@@ -275,6 +264,13 @@ def load_profiles():
             raise SystemExit(f"{path}: 'expect' must be a list of non-empty strings")
         if p["expect_exit"] is not None and type(p["expect_exit"]) is not int:
             raise SystemExit(f"{path}: 'expect_exit' must be an integer")
+        # Terminal display and keyboard settings; the bytes stay raw
+        con = {"lf_to_crlf": False, "enter": "cr", **p.get("console", {})}
+        if set(con) != {"lf_to_crlf", "enter"} or type(con["lf_to_crlf"]) is not bool \
+                or con["enter"] not in ("cr", "lf", "crlf"):
+            raise SystemExit(f"{path}: [console] takes lf_to_crlf (bool) and "
+                             f"enter (\"cr\", \"lf\" or \"crlf\")")
+        p["console"] = con
         profiles[path.stem] = p
     return profiles
 
@@ -439,8 +435,7 @@ class Session:
             if self.profile["semihosting"]:
                 semi, self.semi_writer = await asyncio.open_unix_connection(
                     str(self.sock_dir / "semi.sock"))
-                self.con_tasks.append(asyncio.create_task(
-                    self._pump_console(semi, semihosting=True)))
+                self.con_tasks.append(asyncio.create_task(self._pump_console(semi)))
             self.tasks += self.con_tasks
             self.tail_task = asyncio.create_task(self._tail_log())
             self.tasks.append(self.tail_task)
@@ -487,6 +482,13 @@ class Session:
             await asyncio.wait_for(self.proc.wait(), 5)
         except (asyncio.TimeoutError, AttributeError):
             await self.kill()
+        # Return once the run is recorded, so "exited" holds and a new Start
+        # is accepted right away
+        if self.watch_task:
+            try:
+                await asyncio.wait_for(asyncio.shield(self.watch_task), 10)
+            except asyncio.TimeoutError:
+                pass
 
     async def kill(self):
         if self.proc and self.proc.returncode is None:
@@ -541,23 +543,17 @@ class Session:
                 f.flush()
                 await self._emit("stderr", dec.decode(line))
 
-    async def _pump_console(self, reader, semihosting=False):
-        await self._reported("console pump",
-                             self._pump_console_inner(reader, semihosting))
+    async def _pump_console(self, reader):
+        await self._reported("console pump", self._pump_console_inner(reader))
 
-    async def _pump_console_inner(self, reader, semihosting=False):
+    async def _pump_console_inner(self, reader):
         dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
-        after_cr = False            # semihosting: a \r ending the last read
         markers = [m.encode() for m in self.profile["expect"]]
         keep = max((len(m) for m in markers), default=1) - 1
         tail = b""                  # a marker may straddle two reads
         resets = self.resets
         with (self.run_dir / "console.log").open("ab") as f:
             while data := await reader.read(4096):
-                if semihosting:
-                    # SYS_WRITE0 text ends lines with a bare \n; a terminal
-                    # needs \r\n. Serial output is passed on byte-exact.
-                    data, after_cr = crlf(data, after_cr)
                 f.write(data)
                 f.flush()
                 if resets != self.resets:   # nothing before a reset counts
@@ -783,7 +779,8 @@ def make_app(port=8090):
     @routes.get("/api/profiles")
     async def profiles(_):
         return web.json_response([
-            {"id": k, "name": p["name"], "description": p["description"]}
+            {"id": k, "name": p["name"], "description": p["description"],
+             "console": p["console"]}
             for k, p in bench.profiles.items()])
 
     @routes.get("/api/session")
@@ -929,12 +926,7 @@ def make_app(port=8090):
     async def on_shutdown(_):
         s = bench.session
         if s:
-            await s.stop()
-            if s.watch_task:        # let it write run.json before the loop ends
-                try:
-                    await asyncio.wait_for(asyncio.shield(s.watch_task), 10)
-                except asyncio.TimeoutError:
-                    pass
+            await s.stop()          # returns once run.json is written
         for ws in list(bench.clients):
             await ws.close()
 

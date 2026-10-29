@@ -181,7 +181,8 @@ def test_stop_before_exit_fails(server):
     assert st["verdict"] == "running"
     assert st["expect_missing"] == ["read hole", "bye"]
     post(server, "/api/session/stop", b"{}", JSON_H)
-    st = wait_state(server, "exited")
+    st = get_json(server, "/api/session")       # Stop returns once recorded
+    assert st["state"] == "exited"
     assert st["verdict"] == "fail"
     assert "missing on the console: 'bye'" in st["verdict_reasons"]
     assert "stopped by the bench before the guest exited" in st["verdict_reasons"]
@@ -335,7 +336,10 @@ def test_m1_probe_through_the_bench(server):
     assert meta["verdict"] == "pass" and meta["exit_code"] == 0
 
 
-# ---- UX: theme toggle and the semihosting staircase --------------------------
+# ---- UX: theme toggle and console settings -----------------------------------
+
+ROWS_JS = """[...document.querySelectorAll('#term .xterm-rows > div')]
+    .map((r) => r.textContent.trimEnd()).filter((r) => r)"""
 
 LIGHT_BG, DARK_BG = "rgb(238, 241, 245)", "rgb(13, 17, 23)"          # --bg
 LIGHT_TERM, DARK_TERM = "rgb(246, 248, 250)", "rgb(10, 14, 19)"      # --term-bg
@@ -393,27 +397,87 @@ def test_theme_toggle(server):
 
 @pytest.mark.skipif(not PROJECT_QEMU.exists(),
                     reason="needs the project QEMU (BENCH_QEMU or build/qemu)")
-def test_semihosting_lines_start_at_column_0(server):
-    """The M1 probe prints through semihosting with bare \\n; each line must
-    start at column 0 in the terminal, and the transcript carries \\r\\n."""
+def test_profile_display_map_draws_lf_as_crlf(server):
+    """The M1 probe prints through semihosting with bare LF. Its profile maps
+    LF to CRLF for display: lines start at column 0, the transcript stays raw."""
     post(server, "/api/session/stop", b"{}", JSON_H)
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 860})
         page.goto(server)
         page.get_by_test_id("profile-select").select_option("rzv2l-smarc-m1-probe")
+        expect(page.get_by_test_id("console-lf-crlf")).to_be_checked()
         page.get_by_test_id("btn-start").click()
         expect(page.get_by_test_id("status")).to_have_attribute(
             "data-state", "exited", timeout=60_000)
         expect(page.get_by_test_id("console-text")).to_contain_text("RESULT: PASS")
-        rows = page.evaluate("""() => [...document.querySelectorAll(
-            '#term .xterm-rows > div')].map((r) => r.textContent)""")
+        page.wait_for_function(ROWS_JS + ".some((r) => r.includes('RESULT: PASS'))")
+        rows = page.evaluate(ROWS_JS)
+        shown = page.get_by_test_id("console-text").text_content()
         browser.close()
-    printed = [r.rstrip() for r in rows if r.strip()]
-    assert any(r.startswith("RESULT: PASS") for r in printed), printed
-    assert all(r == r.lstrip() for r in printed), printed     # no staircase
+    # The page's transcript keeps the bare LF as well: only the drawing maps it
+    assert re.search(r"(?<!\r)\n", shown), "page transcript must stay raw"
+    assert any(r.startswith("RESULT: PASS") for r in rows), rows
+    assert all(r == r.lstrip() for r in rows), rows           # no staircase
     text = get_json(server, "/api/session/console")["text"]
-    assert "RESULT: PASS" in text and re.search(r"(?<!\r)\n", text) is None
+    assert re.search(r"(?<!\r)\n", text), "transcript must keep the bare LF"
+
+
+def echo_page(pw, server):
+    """virt-echo running in a fresh page; returns (browser, page)."""
+    post(server, "/api/session/stop", b"{}", JSON_H)
+    browser = pw.chromium.launch()
+    page = browser.new_page(viewport={"width": 1280, "height": 860})
+    page.goto(server)
+    page.get_by_test_id("profile-select").select_option("virt-echo")
+    page.get_by_test_id("btn-start").click()
+    expect(page.get_by_test_id("console-text")).to_contain_text(
+        "echo ready", timeout=60_000)
+    return browser, page
+
+
+def wait_rows_end(page, text):
+    page.wait_for_function(ROWS_JS + f".slice(-1)[0]?.endsWith({text!r})")
+    return page.evaluate(ROWS_JS)
+
+
+def test_display_map_toggle(server):
+    """Raw by default (a bare LF steps right); the menu maps it for display."""
+    with sync_playwright() as pw:
+        browser, page = echo_page(pw, server)
+        expect(page.get_by_test_id("console-lf-crlf")).not_to_be_checked()
+        post(server, "/api/session/console", b'{"data": "1\\n2"}', JSON_H)
+        wait_rows_end(page, "2")
+        page.get_by_test_id("console-settings").locator("summary").click()
+        page.get_by_test_id("console-lf-crlf").check()
+        post(server, "/api/session/console", b'{"data": "\\r3\\n4"}', JSON_H)
+        rows = wait_rows_end(page, "4")
+        page.get_by_test_id("btn-stop").click()
+        browser.close()
+    assert rows[-4:] == ["1", " 2", "3", "4"], rows
+    text = get_json(server, "/api/session/console")["text"]
+    assert text.endswith("1\n2\r\n3\n4"), repr(text[-20:])  # raw bytes
+
+
+@pytest.mark.parametrize("choice,sent", [("cr", "a\r\n"), ("lf", "a\n"),
+                                         ("crlf", "a\r\n\n")])
+def test_enter_sends(server, choice, sent):
+    """Enter sends CR, LF or CRLF; virt-echo answers CR with CRLF and echoes
+    LF as is, so the raw transcript shows what went out."""
+    with sync_playwright() as pw:
+        browser, page = echo_page(pw, server)
+        expect(page.get_by_test_id("console-enter")).to_have_value("cr")
+        page.get_by_test_id("console-settings").locator("summary").click()
+        page.get_by_test_id("console-enter").select_option(choice)
+        page.get_by_test_id("console").click()
+        page.keyboard.type("a")
+        page.keyboard.press("Enter")
+        page.keyboard.type("z")
+        expect(page.get_by_test_id("console-text")).to_contain_text("z")
+        page.get_by_test_id("btn-stop").click()
+        browser.close()
+    text = get_json(server, "/api/session/console")["text"]
+    assert text.endswith(sent + "z"), repr(text[-12:])
 
 
 def test_serial_output_stays_byte_exact(server):

@@ -149,24 +149,3 @@ def test_reset_restarts_the_verdict(session):
     assert s.verdict() == ("running", [])
     s.state = "exited"
     assert s.verdict()[0] == "fail"
-
-
-def test_crlf_only_for_lone_newlines():
-    assert server.crlf(b"a\nb\n") == (b"a\r\nb\r\n", False)
-    assert server.crlf(b"a\r\nb") == (b"a\r\nb", False)
-    assert server.crlf(b"x\r") == (b"x\r", True)
-    assert server.crlf(b"\ny", after_cr=True) == (b"\ny", False)   # \r|\n split
-    assert server.crlf(b"\ny") == (b"\r\ny", False)
-
-
-def test_semihosting_stream_only_is_normalised(session):
-    async def run(s, semihosting):
-        r = asyncio.StreamReader()
-        t = asyncio.create_task(trickle(r, [b"one\ntwo\r", b"\nthree\n"]))
-        await s._pump_console_inner(r, semihosting)
-        await t
-    serial, semi = session([]), session([])
-    asyncio.run(run(serial, False))
-    asyncio.run(run(semi, True))
-    assert bytes(serial.console) == b"one\ntwo\r\nthree\n"      # byte-exact
-    assert bytes(semi.console) == b"one\r\ntwo\r\nthree\r\n"

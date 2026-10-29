@@ -58,6 +58,20 @@
     <div class="panel-head">
       <h2>Console</h2>
       <span class="hint">serial + semihosting · click to type</span>
+      <details class="con-menu" data-testid="console-settings">
+        <summary>Settings</summary>
+        <div class="con-menu-body">
+          <label class="toggle" title="Display only: the transcript, files and verdict keep the guest's bytes">
+            <input type="checkbox" id="lf-crlf" data-testid="console-lf-crlf"> Show lone LF as CRLF
+          </label>
+          <label class="toggle">Enter sends
+            <select id="enter-sends" data-testid="console-enter" aria-label="Enter sends">
+              <option value="cr">CR</option><option value="lf">LF</option><option value="crlf">CRLF</option>
+            </select>
+          </label>
+          <p class="hint">Defaults come from the profile. Changes last until another profile is picked.</p>
+        </div>
+      </details>
     </div>
     <div id="term" data-testid="console" role="region" aria-label="Terminal"></div>
     <pre id="console-text" data-testid="console-text" class="sr-only" role="log" aria-label="Console transcript" aria-live="off"></pre>
