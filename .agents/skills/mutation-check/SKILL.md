@@ -36,4 +36,5 @@ A test that was never seen to fail proves nothing. Examples with real output: th
 
 - A test that only checks "a bit is set" survives most value mutations. If the mutation stays green, strengthen the test; don't pick an easier mutation.
 - When the model improves, re-run old mutations of negative tests; they can rot green.
+- Never pipe a check (build, `checkpatch`, qtest, `scripts/lint.py`) through `tail`, `head` or `grep` in a way that hides its exit status: a failed check then looks like a pass, and the next step (a commit, a push) runs anyway. Use `set -o pipefail`, or run the check on its own line and test `$?` before going on.
 - Checker-only tests (e.g. the DTB comparator in `tests/acceptance/m1/check.py`) are mutated through their **input**, not the model.

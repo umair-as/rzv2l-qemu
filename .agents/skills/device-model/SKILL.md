@@ -29,3 +29,4 @@ Then: `soc-wiring`, `qtest-golden`, `mutation-check`.
 - Model all of what the consumer polls: if a poll loop walks several status bits, every bit it can read.
 - Don't extend a QEMU model whose semantics conflict with the manual (e.g. `hw/char/sh_serial.c` vs SCIFA, `docs/research/scif.md` §9). Write a new type.
 - The fork carries only upstream-shaped code: no project paths, spec IDs or agent files.
+- Never pipe a check (build, `checkpatch`, qtest, `scripts/lint.py`) through `tail`, `head` or `grep` in a way that hides its exit status: a failed check then looks like a pass, and the next step (a commit, a push) runs anyway. Use `set -o pipefail`, or run the check on its own line and test `$?` before going on.
