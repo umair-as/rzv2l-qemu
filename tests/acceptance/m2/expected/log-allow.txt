@@ -1,0 +1,4 @@
+# Lines allowed in the -d unimp,guest_errors,invalid_mem log of the hello
+# probe run: exactly its two deliberate accesses (M2 spec AC09, AC10).
+rz_scifa_read: read at undefined offset 0x18
+rz_scifa_write: clock synchronous mode not supported
