@@ -939,7 +939,12 @@ def same_origin_guard(port):
         if req.method == "POST" and req.can_read_body \
                 and req.content_type != "application/json":
             return json_error(415, "POST bodies must be application/json")
-        return await handler(req)
+        resp = await handler(req)
+        if req.path == "/" or req.path.startswith("/static/"):
+            # Revalidate on every load (a 304 when unchanged): a browser must
+            # never keep showing an old page after the bench changes
+            resp.headers["Cache-Control"] = "no-cache"
+        return resp
     return guard
 
 
