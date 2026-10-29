@@ -39,6 +39,7 @@ We use the STE writing rules as guidelines, not as strict limits. We do not use 
 2. **Cite the source of each fact,** as in AGENTS.md "Sources": the manual by section and page, guest and QEMU code by `file:line`.
 3. **Link project files.** Write a project file as a relative Markdown link. For a section of a file, link to its heading. The README gives the conventions.
 4. **Give the context of a milestone.** A file about a milestone starts with a context box. The box links the milestone's goal and its unit files.
+5. **End a milestone file with a Pitfalls section.** One list, one item per pitfall, each item for both readers (README): the QEMU concept or the Renesas fact in one sentence, what went wrong or would go wrong, and the cite (manual page, `file:line` or EVK row).
 
 ## 5. Terms
 
