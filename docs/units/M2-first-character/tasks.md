@@ -22,10 +22,10 @@ Part 1 (Ticket 1) is T01-T07, with T07 (SoC wiring) done before T05 if decision 
 | M2-T14 | Recheck response (N1, N2, N4): timing cases for SEMR.ABCS0, SEMR.BGDM, both, and CKS = 3; a chardev byte while ORER is set is lost; AC08 and design §5 citations; the mutation count is 39, not 40 | SCIF-001, TEST-001 | fork `tests/qtest/rzv2l-scifa-test.c`; project `tests/eval/m2/`, `spec.md`, `design.md`, learning doc | S06 extended; X06 `rx-chardev-while-orer` | S06f-abcs0-ignored, S06g-bgdm-ignored, S06h-cks-capped, X06-orer-holds-host-off | DONE: see the dispositions file, round 2 |
 
 ## Closure checklist (before closing the unit)
-- [ ] every REQ in spec.md appears in at least one task
-- [ ] every task names a test; each test's result **and** its mutation check (the test seen to fail on a broken model) are recorded
-- [ ] `../../spec/traceability.md` updated; `scripts/lint.py` reports 0 errors
-- [ ] independent review done on the final revision: project commit `…`, fork commit `…`
-- [ ] every review finding has a disposition (fixed / gap / rejected with evidence); **no unresolved BLOCKER**, since a recorded blocker is still a blocker
-- [ ] material fixes rechecked by the reviewer on that final revision
-- [ ] fidelity gaps accepted by the operator are listed (spec decision (b); design §7)
+- [x] every REQ in spec.md appears in at least one task
+- [x] every task names a test; each test's result **and** its mutation check (the test seen to fail on a broken model) are recorded
+- [x] `../../spec/traceability.md` updated; `scripts/lint.py` reports 0 errors
+- [x] independent review done on the final revision: project commit `1c5e157`, fork commit `d2222c06e1` (2026-10-29, changes requested R1-R6; T13)
+- [x] every review finding has a disposition (fixed / gap / rejected with evidence); **no unresolved BLOCKER**, since a recorded blocker is still a blocker (R1 fixed)
+- [x] material fixes rechecked by the reviewer on that final revision: round 1 on fork `11f6e3f5aa` / project `8a6fa9a` (R4 reopened, N1-N4), round 2 on fork `1c74716c64` / project `6c85cf6`: approved for merge
+- [ ] fidelity gaps accepted by the operator are listed (spec decision (b); design §7): recorded, acceptance at merge: the `-append earlycon` gap (decision (b)), 7-bit receive, TE cleared mid-frame (N3), chardev byte lost while ORER is set (R2 choice)

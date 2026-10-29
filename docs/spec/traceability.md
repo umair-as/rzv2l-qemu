@@ -20,7 +20,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-SYSC-001 | M1 | M1 | M1-machine-skeleton | M1-T02, T05 | qtest `rzv2l-smarc-test` `/sysc/id`; probe (abort on a non-ID offset) | `../research/sysc.md`; EVK BL2 print `0x18447447` | V |
 | REQ-SYSC-002 | M1 (board property) | M7 (BL2/U-Boot boot-device selection) | M1-machine-skeleton | M1-T02 | qtest `rzv2l-smarc-test` `/sysc/boot-pins`, `/sysc/boot-mode-reserved` | `../research/sysc.md`; EVK BL2 LSI_MODE values | D |
 | REQ-SYC-001 | M7 | M7 | — | — | — | `../research/sysc.md` §5 (inference); EVK-R50 pending | P |
-| REQ-SCIF-001 | M2 | M2 (qtest + hello); M3 | M2-first-character | M2-T01–T07, M2-T13 | qtest `rzv2l-scifa-test` (24 paths); eval `tests/eval/m2/checks.yaml` S01–S15, X01–X05 with their mutations; hello probe (A03, A06) | `../research/scif.md`; `../evidence/EVK-2026-10-29-post-firmware.md` | D |
+| REQ-SCIF-001 | M2 | M2 (qtest + hello); M3 | M2-first-character | M2-T01–T07, M2-T13, T14 | qtest `rzv2l-scifa-test` (25 paths); eval `tests/eval/m2/checks.yaml` S01–S15, X01–X06 with their mutations; hello probe (A03, A06) | `../research/scif.md`; `../evidence/EVK-2026-10-29-post-firmware.md`; review and recheck 2026-10-29 (unit `tasks.md` T13, T14). Recorded gaps: 7-bit receive, TE cleared mid-frame, chardev byte lost while ORER is set (design §4, §7) | V |
 | REQ-CPG-001 | M3b | M3b | — | — | — | `../research/cpg-reset.md`; HW manual p.327/368/409/450 | P |
 | REQ-PFC-001 | M3b | M3b | — | — | — | `../research/pinctrl.md` | P |
 | REQ-OSTM-001 | M3b | M3b | — | — | — | `../research/boot-dependency-graph.md`; EVK boot log | P |
@@ -33,6 +33,6 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-GUEST-003 | — (process) | M7 | — | — | — | spec §8; `../research/boot-chain-firmware.md` | P |
 | REQ-GUEST-004 | — (process) | M3 | M1-machine-skeleton | M1-T07 (M1 fixups) | acceptance `dumpdtb` vs DTB-U | spec §8; `../research/scif.md` (earlycon gap) | D |
 | REQ-GUEST-005 | M4 (loader) | M4 | — | — | — | `../research/boot-chain-firmware.md` §4 | P |
-| REQ-TEST-001 | M2 | M2 | M2-first-character | M2-T08, T09 | `tests/acceptance/m2/run.sh` (A01: exact serial bytes); eval A01–A06 with mutations | spec §17 | D |
+| REQ-TEST-001 | M2 | M2 | M2-first-character | M2-T08, T09, T13 | `tests/acceptance/m2/run.sh` (A01: exact serial bytes); eval A01–A06 with mutations | spec §17; review and recheck 2026-10-29 | V |
 | REQ-TEST-002 | M1+ | every unit | M1-machine-skeleton | M1-T01–T07 | mutations per task in `../units/M1-machine-skeleton/tasks.md`; T04 has none of its own (covered by T03/T05); `/sysc/boot-mode-reserved`, `/gic/identity` and the PRR/default `LSI_MODE` reads have no recorded mutation | spec §13 | I |
 | REQ-TEST-003 | M3+ | M3+ | M1-machine-skeleton | M1-T06 (M1 log gate) | acceptance log gate (`-d unimp,guest_errors,invalid_mem`) | spec §13 | D |
