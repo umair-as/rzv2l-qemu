@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..4aa89b80d5 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -123,7 +123,7 @@ REG16(FTCR, 0x16)
+     FIELD(FTCR, RTRGS, 15, 1)
+ 
+ /* Writable bits; the others are reserved and read as 0 */
+-#define SMR_WMASK   0x00fb
++#define SMR_WMASK   0x00ff
+ #define SCR_WMASK   0x00ff
+ #define FCR_WMASK   0x07ff
+ #define SPTR_WMASK  0x00ff

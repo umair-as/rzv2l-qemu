@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..65ff4f4798 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -240,7 +240,7 @@ static void rz_scifa_update_flags(RenesasRZSCIFAState *s)
+         rz_scifa_set_flags(s, R_FSR_TDFE_MASK);
+     }
+     /* after a clear, RDF is set again while the FIFO exceeds the trigger */
+-    if (fifo8_num_used(&s->rx_fifo) > rz_scifa_rx_trigger(s)) {
++    if (fifo8_num_used(&s->rx_fifo) >= rz_scifa_rx_trigger(s)) {
+         rz_scifa_set_flags(s, R_FSR_RDF_MASK);
+     }
+ }

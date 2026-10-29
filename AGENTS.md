@@ -132,6 +132,7 @@ docs/device-map.md  MMIO/IRQ/clock/reset map, with evidence per row
 docs/sources.md     source register: manuals, pinned guest and firmware sources
 tests/experiments/  sources and run scripts backing docs/experiments/
 tests/acceptance/   per-milestone acceptance runs and their expected outputs
+tests/eval/         per-milestone eval checks and the mutations that prove them
 tests/probes/       bare-metal guest programs that check a machine from inside
 tests/guests/       scripts that build or fetch guest artifacts (outputs untracked)
 scripts/            repo tooling (lint, build and run helpers)

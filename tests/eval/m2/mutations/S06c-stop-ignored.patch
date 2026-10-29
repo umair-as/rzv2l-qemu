@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..f9f753c8d9 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -301,7 +301,7 @@ static uint64_t rz_scifa_frame_ns(RenesasRZSCIFAState *s)
+ {
+     return rz_scifa_bits_ns(s, 1 + (FIELD_EX16(s->smr, SMR, CHR) ? 7 : 8) +
+                             FIELD_EX16(s->smr, SMR, PE) +
+-                            (FIELD_EX16(s->smr, SMR, STOP) ? 2 : 1));
++                            1);
+ }
+ 
+ /* A received byte, at the end of its stop bit */

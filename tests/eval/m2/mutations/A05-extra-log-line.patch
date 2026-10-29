@@ -1,0 +1,12 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..e2e6aa5404 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -606,6 +606,7 @@ static MemTxResult rz_scifa_write(void *opaque, hwaddr offset,
+         }
+         break;
+     case A_SCR:
++        qemu_log_mask(LOG_GUEST_ERROR, "%s: extra\n", __func__);
+         s->scr = value & SCR_WMASK;
+         rz_scifa_tx_start(s);
+         break;

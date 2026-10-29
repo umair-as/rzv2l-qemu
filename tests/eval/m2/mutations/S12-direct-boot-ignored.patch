@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..a2a7b5277c 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -709,7 +709,7 @@ static void rz_scifa_reset_hold(Object *obj, ResetType type)
+     fifo8_reset(&s->rx_fifo);
+     timer_del(s->dr_timer);
+ 
+-    if (s->direct_boot) {
++    if (false && s->direct_boot) {
+         s->brr = BRR_DIRECT;
+         s->mddr = MDDR_DIRECT;
+         s->scr = SCR_DIRECT;

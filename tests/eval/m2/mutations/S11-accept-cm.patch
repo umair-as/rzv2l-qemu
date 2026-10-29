@@ -1,0 +1,12 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..c03588d181 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -589,7 +589,6 @@ static MemTxResult rz_scifa_write(void *opaque, hwaddr offset,
+             qemu_log_mask(LOG_UNIMP,
+                           "%s: clock synchronous mode not supported\n",
+                           __func__);
+-            return MEMTX_DECODE_ERROR;
+         }
+         s->smr = value & SMR_WMASK;
+         break;

@@ -3,7 +3,10 @@ name = "qemu-rzv2l-tooling"
 version = "0.1.0"
 description = "Repo tooling for qemu-rzv2l: the web bench and its self-test."
 requires-python = ">=3.12"
-dependencies = ["aiohttp"]
+dependencies = [
+    "aiohttp",
+    "pyyaml>=6.0.3",
+]
 
 [dependency-groups]
 dev = ["pytest", "playwright"]

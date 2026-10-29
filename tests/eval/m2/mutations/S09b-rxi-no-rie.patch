@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..0aafb4548b 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -259,7 +259,7 @@ static void rz_scifa_update_irq(RenesasRZSCIFAState *s)
+     qemu_set_irq(s->irq[RENESAS_RZ_SCIFA_ERI], (rie || reie) && er);
+     qemu_set_irq(s->irq[RENESAS_RZ_SCIFA_BRI], (rie || reie) && (brk || orer));
+     qemu_set_irq(s->irq[RENESAS_RZ_SCIFA_RXI],
+-                 rie && FIELD_EX16(s->fsr, FSR, RDF));
++                 FIELD_EX16(s->fsr, FSR, RDF));
+     qemu_set_irq(s->irq[RENESAS_RZ_SCIFA_TXI],
+                  tie && FIELD_EX16(s->fsr, FSR, TDFE));
+     qemu_set_irq(s->irq[RENESAS_RZ_SCIFA_TEI_DRI],

@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..864caee6dd 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -499,7 +499,7 @@ static MemTxResult rz_scifa_read(void *opaque, hwaddr offset,
+         qemu_log_mask(LOG_GUEST_ERROR,
+                       "%s: read at undefined offset 0x%" HWADDR_PRIx "\n",
+                       __func__, offset);
+-        *data = 0;
++        *data = 0xffff;
+         return MEMTX_OK;
+     case RZ_SCIFA_ACCESS_OK:
+         break;

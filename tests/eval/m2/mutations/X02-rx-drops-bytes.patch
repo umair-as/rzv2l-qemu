@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..d75ad06594 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -353,7 +353,7 @@ static void rz_scifa_receive(void *opaque, const uint8_t *buf, int size)
+     RenesasRZSCIFAState *s = opaque;
+ 
+     for (int i = 0; i < size; i++) {
+-        rz_scifa_rx_byte(s, buf[i]);
++        (void)s;
+     }
+ }
+ 

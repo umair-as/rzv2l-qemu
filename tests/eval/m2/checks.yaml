@@ -1,0 +1,229 @@
+# M2-first-character eval checks (run with: uv run scripts/eval.py m2).
+#
+# A check is green when its command exits 0 and its `pass` regex matches the
+# output. A mutation is red when, with its patch applied to the fork and the
+# emulator relinked, its check exits non-zero AND its `red_line` regex
+# matches the output. A red from a crash, a timeout or another assertion does
+# not count.
+#
+# Goldens come from the manual (R01UH0936EJ0150, section 22) or the EVK
+# evidence file (docs/evidence/EVK-2026-10-29-post-firmware.md), never from
+# the model's own output.
+#
+# kind qtest: `test` is a path in the fork's tests/qtest/rzv2l-scifa-test,
+# run against the eval build of qemu-system-aarch64.
+
+checks:
+  - id: S01
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/reset
+    proves: every SCIF0-4 register reads its reset value after reset
+    golden: SMR 0, BRR = MDDR 0xFF, SCR 0, FSR 0x0020, FCR 0, FDR 0, LSR 0, SEMR 0, FTCR 0x1F1F
+    citation: Table 22.4 p.1271
+  - id: S02
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/brr-mddr-bank
+    proves: offset 0x02 is MDDR while SEMR.MDDRS = 1 and BRR otherwise, each keeping its value
+    golden: BRR write 0x35 not seen through MDDR (0xFF); MDDR write 0xC4 not seen through BRR
+    citation: 22.2.8 p.1282, 22.2.9 p.1287
+  - id: S03
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/mddr-write-rule
+    proves: MDDR accepts a write only while TE = RE = 0 (all four combinations); bit 7 reads 1
+    golden: write ignored for TE/RE = 1/0, 0/1, 1/1; 0x12 reads 0x92
+    citation: 22.2.9 p.1287; EVK-R21 (U-Boot's divisor lost on silicon)
+  - id: S04
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/fsr-read-armed
+    proves: a 0-write clears an FSR flag only after it was read as 1
+    golden: unread 0-write leaves FSR 0x0060; after the read FSR 0x0020 (TDFE set again)
+    citation: 22.2.7 p.1278
+  - id: S05
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/tdfe-level
+    proves: TDFE is set again right after a clear while the TX count <= trigger; ten FTDR writes leave 9 in the FIFO and clear TDFE
+    golden: FSR 0x0060 after the clear; FDR 0x0900, FSR 0 after ten writes
+    citation: 22.2.7 p.1280, 22.8.1 p.1327, 22.2.11 p.1292
+  - id: S06
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/tend-deferred
+    proves: TEND stays 0 until one frame per byte has passed and then becomes 1, at the programmed format and rate
+    golden: 87.08 us (8N1), 3 x 87.08 us, 95.79 us (7E2), +-0.2 us
+    citation: 22.2.8 p.1282 and 22.2.9 p.1287 formulas, P0 100 MHz; scif.md section 7; EVK-R23
+  - id: S07
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/tx-trigger
+    proves: TDFE follows the TX trigger at count = trigger and trigger + 1, for TTRG 4, TTRG 0 and FTCR.TFTC 2
+    golden: TDFE 1 at count = trigger, 0 at trigger + 1
+    citation: 22.2.10 p.1290, 22.2.15 p.1299
+  - id: S08a
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/rx-fifo
+    proves: RX FIFO count, RDF at the trigger, FRDR pops and clears RDF, RDF set again only above the trigger
+    golden: trigger 4, 6 bytes; after one read RDF 1 (5 > 4); after two reads RDF 0 (4), FDR.R 4
+    citation: 22.2.7 p.1279, 22.8.2 p.1327
+  - id: S08b
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/rx-dr-timeout
+    proves: DR sets 15 bit times after the last byte below the trigger, in 8N1 and 7E2, and clears when drained
+    golden: 130.62 us after the byte, +-0.2 us
+    citation: '22.2.7 p.1279 (note 1: 1.5 frames only for 8-bit, 1 stop)'
+  - id: S09a
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/irq-txi
+    proves: TXI = TIE & TDFE, rising and falling; no other line moves
+    golden: equation
+    citation: Table 22.19 p.1323
+  - id: S09b
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/irq-rxi
+    proves: RXI = RIE & RDF, rising and falling
+    golden: equation
+    citation: Table 22.19 p.1323
+  - id: S09c
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/irq-tei-dri
+    proves: TEI/DRI = (TEIE & TEND) | (RIE & DR), each term alone
+    golden: equation; DR at 130.62 us
+    citation: Table 22.19 p.1323
+  - id: S09d
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/irq-bri
+    proves: BRI = (RIE | REIE) & ORER through a loopback overrun with REIE alone; ERI stays low
+    golden: equation
+    citation: Table 22.19 p.1323, 22.2.13 p.1296
+  - id: S10
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/undefined-offset
+    proves: a 16-bit read at an undefined offset reads 0 without a bus error
+    golden: 0x0000 at +0x18
+    citation: EVK-R70
+  - id: S11
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/sync-mode-refused
+    proves: the SMR write that selects clock synchronous mode is refused (SMR unchanged); the CPU-side abort is A06
+    golden: SMR stays 0x0008
+    citation: 22.2.5 p.1274; spec decision (c) B
+  - id: S12
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/direct-boot
+    proves: with -kernel SCIF0 starts at the post-firmware values and SCIF1-4 at reset
+    golden: SMR 0, MDDR 0xFE, SCR 0x0030, FSR 0x0060, FCR 0, FDR 0, SPTR 0x0001, LSR 0, SEMR 0x30, FTCR 0x1F1F, BRR 0x1A
+    citation: EVK-R20-R26; BRR from TF-A scifa.S:143-148 @ f59ed5a31 (I)
+  - id: S13
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/ftdr-clears-tend
+    proves: an FTDR write clears TEND at once
+    golden: TEND 1 before, 0 right after the write
+    citation: 22.2.7 p.1281
+  - id: X01
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/smr-mask
+    proves: SMR reserved bits (15-8, 2) read 0
+    golden: 0xFF7F written reads 0x007B
+    citation: 22.2.5 p.1274
+  - id: X02
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/rx-chardev
+    proves: bytes from the serial line reach FRDR in order
+    golden: '"xyz" in, FDR.R 3, RDF 1, FRDR x, y, z'
+    citation: 22.2.2, 22.2.11 p.1292
+  - id: X03
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/rx-overrun
+    proves: a byte that finds the RX FIFO full is lost and sets ORER, which clears only after a 1-read
+    golden: FDR.R 16; LSR 0x0001 after an unread 0-write; 0 after read and 0-write
+    citation: 22.2.13 p.1296
+  - id: X04
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/rx-disabled
+    proves: with RE = 0 the receiver ignores the line
+    golden: FDR.R 0
+    citation: 22.2.6 p.1276
+
+  - id: A01
+    kind: acceptance
+    run: tests/acceptance/m2/run.sh
+    pass: '^M2 ACCEPTANCE: PASS$'
+    proves: the hello probe's greeting arrives on the serial line exactly (stderr never counts)
+    golden: '''Hello from RZ/V2L'' CR LF, byte for byte'
+    citation: REQ-TEST-001; TF-A scifa.S:188-222 (CR before LF)
+  - id: A02
+    kind: acceptance
+    run: tests/acceptance/m2/run.sh
+    pass: '^M2 ACCEPTANCE: PASS$'
+    proves: TF-A's flush (poll TEND after clearing it right after the FTDR write) finishes; a model that completes the transmission inside the write makes it time out (exit 2), not hang
+    golden: probe exit 0
+    citation: scif.md section 7; TF-A scifa.S:237-256 @ f59ed5a31
+  - id: A03
+    kind: acceptance
+    run: tests/acceptance/m2/run.sh
+    pass: '^M2 ACCEPTANCE: PASS$'
+    proves: SCIF0 TXI reaches the CPU through the GIC as INTID 415
+    golden: INTID 415 = 32 + SPI 383
+    citation: device map (SCIF0 row); DTB-U interrupts
+  - id: A04
+    kind: acceptance
+    run: tests/acceptance/m2/run.sh
+    pass: '^M2 ACCEPTANCE: PASS$'
+    proves: info mtree / info qtree show the five SCIF windows exactly as the device map, and the M1 lines unchanged
+    golden: tests/acceptance/m1/expected/mtree.txt, qtree.txt
+    citation: device map SCIF0, SCIF2, SCIF1/3/4 rows
+  - id: A05
+    kind: acceptance
+    run: tests/acceptance/m2/run.sh
+    pass: '^M2 ACCEPTANCE: PASS$'
+    proves: the probe run's -d unimp,guest_errors,invalid_mem log holds only the allow-listed lines
+    golden: tests/acceptance/m2/expected/log-allow.txt
+    citation: REQ-TEST-003
+  - id: A06
+    kind: acceptance
+    run: tests/acceptance/m2/run.sh
+    pass: '^M2 ACCEPTANCE: PASS$'
+    proves: the SMR write that selects clock synchronous mode makes the CPU take a synchronous external abort
+    golden: ESR.EC 0x25, DFSC 0x10
+    citation: spec decision (c) B; Arm ESR_EL1 encoding
+
+  - id: L02
+    kind: acceptance
+    run: tests/acceptance/m2/run.sh
+    pass: '^M2 ACCEPTANCE: PASS$'
+    proves: the unmodified G0 v6.12.59 kernel with DTB-U prints its banner and the earlycon line on SCIF0
+    golden: '"Linux version 6.12.59" and "earlycon: scif0 at MMIO 0x000000001004b800 (options ''115200n8'')", the line the EVK prints'
+    citation: docs/evidence/EVK-2026-10-08-boot-log.md; scif.md section 5; L01 (.config) in docs/units/M2-first-character/first-blocker.md
+
+mutations:
+  - {id: S01-fsr-reset, check: S01, red_line: 'check_reset_state: assertion failed \(qtest_readw\(qts, b \+ FSR\) == FSR_RESET\)'}
+  - {id: S02-ignore-mddrs, check: S02, red_line: 'test_brr_mddr_bank: assertion failed \(qtest_readb\(qts, b \+ BRR\) == MDDR_RESET\)'}
+  - {id: S03-te-and-re, check: S03, red_line: 'test_mddr_write_rule: assertion failed \(qtest_readb\(qts, b \+ BRR\) == want\)'}
+  - {id: S04-clear-unarmed, check: S04, red_line: 'test_fsr_read_armed: assertion failed \(qtest_readw\(qts, b \+ FSR\) == FSR_FW\)'}
+  - {id: S05-tdfe-stored, check: S05, red_line: 'test_tdfe_level: assertion failed \(qtest_readw\(qts, b \+ FSR\) == FSR_FW\)'}
+  - {id: S06-tend-sync, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S06b-brme-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S06c-stop-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S07-ttrg-hardwired, check: S07, red_line: 'check_tdfe_at: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TDFE == tdfe \? FSR_TDFE : 0\)'}
+  - {id: S08a-frdr-no-pop, check: S08a, red_line: "test_rx_fifo: assertion failed \\(qtest_readb\\(qts, b \\+ FRDR\\) == 'b'\\)"}
+  - {id: S08a2-rdf-set-again-ge, check: S08a, red_line: 'test_rx_fifo: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_RDF == 0\)'}
+  - {id: S08a3-frdr-keeps-rdf, check: S08a, red_line: 'test_rx_fifo: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_RDF == 0\)'}
+  - {id: S08b-dr-frames, check: S08b, red_line: 'check_dr: assertion failed \(qtest_readw\(qts, b \+ FSR\) & \(FSR_DR \| FSR_RDF\) == FSR_DR\)'}
+  - {id: S09a-txi-no-tie, check: S09a, red_line: 'check_lines: assertion failed \(qtest_get_irq\(qts, TXI\) == txi\)'}
+  - {id: S09a2-rxi-txi-swapped, check: S09a, red_line: 'check_lines: assertion failed \(qtest_get_irq\(qts, RXI\) == rxi\)'}
+  - {id: S09b-rxi-no-rie, check: S09b, red_line: 'check_lines: assertion failed \(qtest_get_irq\(qts, RXI\) == rxi\)'}
+  - {id: S09c-no-dr-term, check: S09c, red_line: 'check_lines: assertion failed \(qtest_get_irq\(qts, TEI_DRI\) == tei_dri\)'}
+  - {id: S09d-bri-no-reie, check: S09d, red_line: 'check_lines: assertion failed \(qtest_get_irq\(qts, BRI\) == bri\)'}
+  - {id: S10-undefined-ffff, check: S10, red_line: 'test_undefined_offset: assertion failed \(qtest_readw\(qts, SCIF_BASE\(0\) \+ UNDEFINED\) == 0\)'}
+  - {id: S11-accept-cm, check: S11, red_line: 'test_sync_mode_refused: assertion failed \(qtest_readw\(qts, b \+ SMR\) == 0x0008\)'}
+  - {id: S12-direct-boot-ignored, check: S12, red_line: 'test_direct_boot: assertion failed \(qtest_readb\(qts, b \+ BRR\) == MDDR_FW\)'}
+  - {id: S13-ftdr-keeps-tend, check: S13, red_line: 'test_ftdr_clears_tend: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: X01-smr-mask, check: X01, red_line: 'test_smr_mask: assertion failed \(qtest_readw\(qts, b \+ SMR\) == SMR_READBACK\)'}
+  - {id: X02-rx-drops-bytes, check: X02, red_line: 'test_rx_chardev: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 3\)'}
+  - {id: X03-no-orer, check: X03, red_line: 'test_rx_overrun: assertion failed \(qtest_readw\(qts, b \+ LSR\) == LSR_ORER\)'}
+  - {id: X03b-orer-clears-unarmed, check: X03, red_line: 'test_rx_overrun: assertion failed \(qtest_readw\(qts, b \+ LSR\) == LSR_ORER\)'}
+  - {id: X04-re-ignored, check: X04, red_line: 'test_rx_disabled: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 0\)'}
+  - {id: A01-drop-L, check: A01, red_line: '^FAIL serial line differs from expected/serial.txt \(A01\)'}
+  - {id: A02-tx-synchronous, check: A02, red_line: '^FAIL probe exited 2: no result or the flush timed out \(A02\)'}
+  - {id: A03-txi-to-spi382, check: A03, red_line: '^FAIL IRQ taken: 0 \(expected 1\)'}
+  - {id: A04-scif2-base, check: A04, red_line: '^FAIL mtree: memory map differs'}
+  - {id: A05-extra-log-line, check: A05, red_line: '^FAIL log: \d+ unexpected line'}
+  - {id: A06-accept-cm, check: A06, patch: S11-accept-cm, red_line: '^FAIL SMR CM = 1: write completed without an abort'}
+  - {id: L02-drop-L, check: L02, patch: A01-drop-L, red_line: '^FAIL kernel serial lacks .\] Linux version 6\.12\.59 . \(L02\)'}

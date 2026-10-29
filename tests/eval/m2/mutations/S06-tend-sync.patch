@@ -1,0 +1,14 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..ea54de2e01 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -470,7 +470,8 @@ static void rz_scifa_ftdr_write(RenesasRZSCIFAState *s, uint8_t value)
+         return;
+     }
+     fifo8_push(&s->tx_fifo, value);
+-    rz_scifa_clear_flags(s, R_FSR_TEND_MASK | R_FSR_TDFE_MASK);
++    rz_scifa_clear_flags(s, R_FSR_TDFE_MASK);
++    rz_scifa_set_flags(s, R_FSR_TEND_MASK);
+     rz_scifa_tx_start(s);
+     rz_scifa_update(s);
+ }

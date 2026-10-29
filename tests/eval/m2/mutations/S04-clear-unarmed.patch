@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..61865a5dc4 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -614,7 +614,7 @@ static MemTxResult rz_scifa_write(void *opaque, hwaddr offset,
+         break;
+     case A_FSR:
+         /* a 0 clears a flag only if it was read as 1; 1s do nothing */
+-        clr = ~value & s->fsr_armed & FSR_CLEARABLE;
++        clr = ~value & FSR_CLEARABLE;
+         rz_scifa_clear_flags(s, clr);
+         break;
+     case A_FCR:

@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..354b9f04c2 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -218,7 +218,7 @@ static unsigned rz_scifa_tx_trigger(RenesasRZSCIFAState *s)
+     if (FIELD_EX16(s->ftcr, FTCR, TTRGS)) {
+         return FIELD_EX16(s->ftcr, FTCR, TFTC);
+     }
+-    return ttrg[FIELD_EX16(s->fcr, FCR, TTRG)];
++    return ttrg[0];
+ }
+ 
+ /* Receive trigger: FCR.RTRG, or FTCR.RFTC when RTRGS is set */

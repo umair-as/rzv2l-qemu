@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..dcacea64e3 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -637,7 +637,7 @@ static MemTxResult rz_scifa_write(void *opaque, hwaddr offset,
+         break;
+     case A_LSR:
+         /* only ORER is writable, with the same read-1-then-write-0 rule */
+-        if (!(value & R_LSR_ORER_MASK) && (s->lsr_armed & R_LSR_ORER_MASK)) {
++        if (!(value & R_LSR_ORER_MASK)) {
+             s->lsr &= ~R_LSR_ORER_MASK;
+             s->lsr_armed &= ~R_LSR_ORER_MASK;
+         }

@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..222aaffbaf 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -323,7 +323,7 @@ static void rz_scifa_rx_byte(RenesasRZSCIFAState *s, uint8_t byte)
+     }
+     /* DR: 15 bit times (ETU) after the last stop bit (section 22.2.7) */
+     timer_mod(s->dr_timer,
+-              qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + rz_scifa_bits_ns(s, 15));
++              qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + rz_scifa_frame_ns(s) * 3 / 2);
+     rz_scifa_update(s);
+ }
+ 

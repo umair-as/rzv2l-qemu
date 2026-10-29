@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..cbe98b170b 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -510,7 +510,7 @@ static MemTxResult rz_scifa_read(void *opaque, hwaddr offset,
+         r = s->smr;
+         break;
+     case A_BRR:
+-        r = FIELD_EX8(s->semr, SEMR, MDDRS) ? s->mddr : s->brr;
++        r = s->brr;
+         break;
+     case A_SCR:
+         r = s->scr;

@@ -1,0 +1,16 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..1f6ad908b3 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -428,8 +428,9 @@ static void rz_scifa_tx_start(RenesasRZSCIFAState *s)
+     s->tx_busy = true;
+     s->tx_frame_done = false;
+     rz_scifa_tx_send(s);
+-    timer_mod(s->tx_timer,
+-              qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + rz_scifa_frame_ns(s));
++    (void)rz_scifa_frame_ns(s);
++    s->tx_frame_done = true;
++    rz_scifa_tx_complete(s);
+ }
+ 
+ /* The frame in the shift register is out and has reached the chardev */

@@ -1,0 +1,13 @@
+diff --git a/hw/arm/r9a07g054.c b/hw/arm/r9a07g054.c
+index 4ab07ef490..c82f16bb63 100644
+--- a/hw/arm/r9a07g054.c
++++ b/hw/arm/r9a07g054.c
+@@ -196,7 +196,7 @@ static void r9a07g054_realize(DeviceState *dev, Error **errp)
+             return;
+         }
+         sysbus_mmio_map(sbd, 0, r9a07g054_memmap[R9A07G054_SCIF0] +
+-                        i * RENESAS_RZ_SCIFA_MMIO_SIZE);
++                        i * RENESAS_RZ_SCIFA_MMIO_SIZE + (i == 2 ? 0x1000 : 0));
+         for (j = 0; j < RENESAS_RZ_SCIFA_NUM_IRQS; j++) {
+             sysbus_connect_irq(sbd, j, qdev_get_gpio_in(gicdev,
+                                R9A07G054_SCIF0_SPI +

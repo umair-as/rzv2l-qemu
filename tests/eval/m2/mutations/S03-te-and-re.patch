@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index b2363faa36..9aec38e620 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -596,7 +596,7 @@ static MemTxResult rz_scifa_write(void *opaque, hwaddr offset,
+     case A_BRR:
+         if (!FIELD_EX8(s->semr, SEMR, MDDRS)) {
+             s->brr = value;
+-        } else if (FIELD_EX16(s->scr, SCR, TE) ||
++        } else if (FIELD_EX16(s->scr, SCR, TE) &&
+                    FIELD_EX16(s->scr, SCR, RE)) {
+             qemu_log_mask(LOG_GUEST_ERROR,
+                           "%s: MDDR write ignored while TE or RE is set\n",

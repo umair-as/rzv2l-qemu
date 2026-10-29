@@ -1,0 +1,13 @@
+diff --git a/hw/arm/r9a07g054.c b/hw/arm/r9a07g054.c
+index 4ab07ef490..8d168f05a9 100644
+--- a/hw/arm/r9a07g054.c
++++ b/hw/arm/r9a07g054.c
+@@ -200,7 +200,7 @@ static void r9a07g054_realize(DeviceState *dev, Error **errp)
+         for (j = 0; j < RENESAS_RZ_SCIFA_NUM_IRQS; j++) {
+             sysbus_connect_irq(sbd, j, qdev_get_gpio_in(gicdev,
+                                R9A07G054_SCIF0_SPI +
+-                               i * RENESAS_RZ_SCIFA_NUM_IRQS + j));
++                               i * RENESAS_RZ_SCIFA_NUM_IRQS + j - (j == 3)));
+         }
+     }
+ }
