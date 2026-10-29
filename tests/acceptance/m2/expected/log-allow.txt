@@ -7,3 +7,7 @@ rz_scifa_write: clock synchronous mode not supported
 # Table 7.5 does not list, and CPG_CLUSTER_PCHMON, listed but not modelled.
 rzv2l_cpg_read: unimplemented read at offset 0x510
 rzv2l_cpg_read: unimplemented read at offset 0xb30
+# The two OSTM2 reads of the wrong size or offset (OS timer unit): TE
+# read as 32-bit, and +0x08, an offset the manual does not list.
+renesas_rz_ostm: 4-byte read at offset 0x10 (access size 1)
+renesas_rz_ostm: unimplemented read at offset 0x8

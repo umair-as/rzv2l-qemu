@@ -49,6 +49,7 @@ void write16(uint64_t addr, uint16_t value);
 #define GICD_ISENABLER(n)   (0x0100 + 4 * ((n) / 32))
 #define GICD_IPRIORITYR(n)  (0x0400 + (n))
 #define GICD_IROUTER(n)     (0x6000 + 8 * (n))
+#define GICD_ICFGR(n)       (0x0c00 + 4 * ((n) / 16))
 #define GICD_CTLR_RWP       (1u << 31)
 #define GICD_CTLR_ARE_NS    (1u << 4)
 #define GICD_CTLR_ENGRP1A   (1u << 1)
@@ -60,6 +61,24 @@ void write16(uint64_t addr, uint16_t value);
 
 /* SCIF0 TXI is SPI 383 (device map, DTB-U interrupts), INTID 32 + 383 */
 #define SCIF0_TXI_INTID     415
+
+/*
+ * OSTM2 (manual section 20): base Table 20.2, interrupt SPI 48 = INTID
+ * 80, edge-rising (DT). Count clock P0 = 100 MHz; the generic timer
+ * counts at 24 MHz.
+ */
+#define OSTM2               0x12801800UL
+#define OSTM_CMP            0x00
+#define OSTM_CNT            0x04
+#define OSTM_TE             0x10
+#define OSTM_TS             0x14
+#define OSTM_TT             0x18
+#define OSTM_CTL            0x20
+#define OSTM_CTL_FREERUN    0x02
+#define OSTM2_INTID         80
+#define OSTM_ONESHOT_CMP    99999       /* (CMP + 1) / 100 MHz = 1 ms */
+#define CNTFRQ_HZ           24000000UL
+#define P0_HZ               100000000UL
 #define SPURIOUS_INTID      1023
 
 #define ESR_EC_DABT_CUR     0x25        /* data abort, same EL */
@@ -76,6 +95,8 @@ static volatile int expect_abort;
 static volatile uint64_t abort_esr;
 static volatile uint64_t irq_intid = SPURIOUS_INTID;
 static volatile uint64_t irq_count;
+static volatile uint32_t ostm_cnt_at_irq;
+static volatile uint64_t cntvct_at_irq;
 static int failures;
 
 #define READ_SYSREG(r) ({ uint64_t v_; \
@@ -217,6 +238,12 @@ void irq_handler(void)
     if (intid == SCIF0_TXI_INTID) {
         /* TIE off: the level line drops before the end of interrupt */
         mmio_write16(SCIF0 + SCR, SCR_TE_RE);
+    }
+    if (intid == OSTM2_INTID) {
+        /* As Linux ends a one-shot event: stop the counter */
+        cntvct_at_irq = READ_SYSREG(cntvct_el0);
+        ostm_cnt_at_irq = mmio_read32(OSTM2 + OSTM_CNT);
+        mmio_write8(OSTM2 + OSTM_TT, 1);
     }
     irq_intid = intid;
     irq_count++;
@@ -407,6 +434,51 @@ void probe_main(void)
     }
     check("IRQ taken", irq_count, 1, 1);
     check("IRQ INTID", irq_intid, SCIF0_TXI_INTID, 1);
+
+    /*
+     * OSTM2 one-shot as Linux arms it (renesas-ostm.c:85-97): the
+     * interrupt arrives as INTID 80, no earlier than (CMP + 1) count
+     * clocks after the start (Table 20.5), and only once.
+     */
+    puts_("-- OSTM2 one-shot interrupt\n");
+    {
+        uint32_t cfg = mmio_read32(GICD + GICD_ICFGR(OSTM2_INTID));
+        uint64_t t0, min_ticks;
+
+        /* Edge-triggered, as the DT says: bit 1 of the INTID's field */
+        mmio_write32(GICD + GICD_ICFGR(OSTM2_INTID),
+                     cfg | 2u << (2 * (OSTM2_INTID % 16)));
+        gic_enable_spi(OSTM2_INTID);
+        irq_count = 0;
+        irq_intid = SPURIOUS_INTID;
+        mmio_write32(OSTM2 + OSTM_CMP, OSTM_ONESHOT_CMP);
+        mmio_write8(OSTM2 + OSTM_CTL, OSTM_CTL_FREERUN);
+        t0 = READ_SYSREG(cntvct_el0);
+        mmio_write8(OSTM2 + OSTM_TS, 1);
+        for (n = 0; !irq_count && n < SPIN_LIMIT; n++) {
+            __asm__ volatile("yield");
+        }
+        check("OSTM2 IRQ taken", irq_count, 1, 1);
+        check("OSTM2 IRQ INTID", irq_intid, OSTM2_INTID, 1);
+        check("OSTM2 CNT at IRQ >= CMP + 1",
+              ostm_cnt_at_irq >= OSTM_ONESHOT_CMP + 1, 1, 0);
+        min_ticks = (OSTM_ONESHOT_CMP + 1) * (CNTFRQ_HZ / 1000) /
+                    (P0_HZ / 1000);
+        check("generic timer ticks to IRQ >= 1 ms",
+              cntvct_at_irq - t0 >= min_ticks, 1, 0);
+        check("OSTM2 TE after the handler", mmio_read8(OSTM2 + OSTM_TE), 0, 0);
+        /* Stopped: no second interrupt in another 2 ms */
+        t0 = READ_SYSREG(cntvct_el0);
+        while (READ_SYSREG(cntvct_el0) - t0 < 2 * min_ticks) {
+            __asm__ volatile("yield");
+        }
+        check("OSTM2 IRQs in all", irq_count, 1, 0);
+    }
+
+    /* Each OSTM register takes only its own access size (20.2.1) */
+    puts_("-- OSTM2 accesses of the wrong size\n");
+    check_read_aborts("OSTM2 TE as 32-bit", OSTM2 + OSTM_TE);
+    check_read_aborts("OSTM2 +0x08 (unlisted)", OSTM2 + 0x08);
 
     puts_(failures ? "RESULT: FAIL (" : "RESULT: PASS (");
     putdec(failures);
