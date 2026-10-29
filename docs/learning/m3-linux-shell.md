@@ -1,8 +1,8 @@
 # M3: a Linux shell
 
-> **Context.** Milestone M3 (spec [§17](../spec/project.md#17-milestones)): the G0 Linux kernel boots to a shell through the real `sh-sci` driver, on both CPUs, with time advancing. The units are cut by what the kernel blocks on. Unit M3b-cpg: [spec](../units/M3b-cpg/spec.md), [tasks](../units/M3b-cpg/tasks.md). Unit M3b-ostm: [spec](../units/M3b-ostm/spec.md), [tasks](../units/M3b-ostm/tasks.md). The CPG facts are in [`cpg-reset.md`](../research/cpg-reset.md). The EVK values are in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md).
+> **Context.** Milestone M3 (spec [§17](../spec/project.md#17-milestones)): the G0 Linux kernel boots to a shell through the real `sh-sci` driver, on both CPUs, with time advancing. The units are cut by what the kernel blocks on. Unit M3b-cpg: [spec](../units/M3b-cpg/spec.md), [tasks](../units/M3b-cpg/tasks.md). Unit M3b-ostm: [spec](../units/M3b-ostm/spec.md), [tasks](../units/M3b-ostm/tasks.md). Unit M3b-pfc-irqc: [spec](../units/M3b-pfc-irqc/spec.md), [tasks](../units/M3b-pfc-irqc/tasks.md). The CPG facts are in [`cpg-reset.md`](../research/cpg-reset.md). The EVK values are in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md).
 
-Code references are at fork commit `4ae1d307eb` (§1) and `afe1e5b71b` (§2).
+Code references are at fork commit `4ae1d307eb` (§1), `afe1e5b71b` (§2) and `7cdc8ea6a8` (§3).
 
 ## 1. The clock pulse generator (unit M3b-cpg)
 
@@ -97,7 +97,34 @@ The interrupt follows the same split. Free-running mode requests one when the co
 
 `rzv2l-ostm-test.c` checks reset values, both modes, the CTL rules and the CMP = 0 level. The interrupts are checked on a real CPU, in the hello probe: a one-shot, a compare value rewritten while free-running, and a periodic interval run. qtest cannot count a pulse. With no kernel loaded, the GIC also keeps its interrupts secure, out of qtest's reach. The probe arms OSTM2 the way Linux arms a one-shot event. It then checks that the interrupt arrives as INTID 80, no earlier than CMP + 1 counts, and only once. Twelve mutations each turn one check red ([tasks](../units/M3b-ostm/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 
-## 3. Pitfalls
+## 3. The pin controller and the interrupt control unit (unit M3b-pfc-irqc)
+
+### 3.1 What the kernel needs
+
+The pin controller (PFC) chooses each pin's function. Linux's serial driver applies the SCIF0 pins before it takes over the console, so without a PFC the real console never starts. The pin controller binds only after the interrupt control unit (IRQC) has registered, because GPIO interrupts route through it. The IRQC probe itself touches no register.
+
+### 3.2 How the models are shaped
+
+`qemu/hw/gpio/renesas_rzg2l_pfc.c` is a table of 592 registers, one row per port and register family, with the manual's reset values and implemented bits. Every access is split into bytes. A byte with no register reads 0, because the EVK does the same at an undefined offset. `qemu/hw/intc/renesas_rzg2l_irqc.c` keeps the IRQC's selection registers. Its status registers read 0, because no interrupt input is modelled.
+
+**Worked example: setting SCIF0's pin function (P38, port index `0x36`).** Linux does this per pin (`pinctrl-rzg2l.c:451-482`); the table merges the two pins and starts from the reset values. `test_pfc_pwpr` checks the same rules on port P48.
+
+| Write | Register reads after it | Why |
+|---|---|---|
+| PFC36 (`0x4D8`) ← `0x11` | `0x00` | PWPR is `0x80`: PFCWE = 0, so PFC writes are dropped |
+| PWPR (`0x3014`) ← `0x00`, then `0x40` | PWPR `0x40` | B0WI was 0 before the second write, so PFCWE may change |
+| PMC36 (`0x236`) ← bit 0 cleared | `0x00` | pin to GPIO mode while its function changes; PMC is never locked |
+| PFC36 ← `0x01`, then `0x11` | `0x11` | function 1 for pins 0 and 1 |
+| PMC36 ← `0x03` | `0x03` | both pins back to their peripheral function |
+| PWPR ← `0x00`, then `0x80` | PWPR `0x80` | locked again |
+
+### 3.3 The proof
+
+`rzv2l-pfc-irqc-test.c` checks reset and post-firmware values, the PWPR gate, port masks, PIN and the IRQC registers. The hello probe checks that an unlisted IRQC offset faults. Nine mutations each turn one check red ([tasks](../units/M3b-pfc-irqc/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+
+With the console working, Linux probes Ethernet, I2C, USB and SD next. Each is a logged stub for now and fails within a bound. The boot then ends at "No working init found", because there is no root file system: that is the next unit.
+
+## 4. Pitfalls
 
 - **A Renesas write-enable bit covers a field, not one bit.** In PL2_DDIV, bit 16 enables the 3-bit field at bits 2:0. Linux writes a mask of all field bits into the upper half, so it also sets bits 17 and 18. They have no function. A model that applies each upper bit to the bit 16 below gets the divider wrong (manual §7.2.4.17 p.275; tasks proof 3).
 - **RSTMON is the inverse of RST.** In RST, 1 means released; in RSTMON, 1 means in reset. A model that copies RST makes every Linux reset release time out after 200 µs (manual §7.2.4.135 p.409, §7.2.4.173 p.450; `rzg2l-cpg.c:1480`).
@@ -111,4 +138,9 @@ The interrupt follows the same split. Free-running mode requests one when the co
 - **"Interrupt when the counter reaches 0" and "every CMP + 1 clocks" describe the same event.** The manual gives both (§20.3.3, §20.3.5.1). The model uses the cycle count of Table 20.5, and a mutation that drops the + 1 changes when the reload happens, which the interval test sees.
 - **CMP = 0 in interval mode is not a 10 ns periodic timer.** The manual holds the request high while the counter runs (§20.3.5.2), so the model raises the line and arms no timer. Whether MD0 = 0 suppresses it is unclear in the manual; the model holds it either way (an inference).
 - **In QEMU, qtest cannot see an edge.** An interrupt that is a pulse leaves no trace in qtest's interrupt intercept, and the GIC's pending state is out of reach with no kernel loaded. Test pulses from a guest probe on a real CPU.
+- **The manual's access width and real drivers can disagree.** The manual gives PWPR as an 8-bit register, but Linux and TF-A write it with 32-bit stores, and silicon accepts them. A model that faults on the 32-bit store breaks every pin change (§41.2.10 p.3379; `pinctrl-rzg2l.c:3014-3027`).
+- **Undefined offsets behave differently per block.** The PFC reads an undefined offset as 0 (EVK R71); the SYSC faults on its secure-only registers (R04, R05). Decide per block from evidence, not from one rule.
+- **A register map extracted from 3000 pages needs spot checks.** The PFC map came from a research pass over chapter 41. Its IEN list and IOLH resets were checked against the manual before the model used it, and the IOLH reset depends on a pin group column in another table (§41.3.7 Note 1).
+- **Read the driver variants.** The IRQC driver defines IMSK and TMSK at `0x10010` and `0x10020`, but only the RZ/Five paths use them; RZ/V2L never does (`irq-renesas-rzg2l.c:146-176`).
+- **A driver that never binds can look like a missing console.** `sh-sci` defers until the pin controller binds, which waits for the IRQC. Without either model the serial console never takes over, with no error (`pinctrl.md` §6).
 
