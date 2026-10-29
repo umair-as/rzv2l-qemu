@@ -1,0 +1,29 @@
+# M2-first-character — tasks
+
+Fork tasks go on `unit/M2-first-character` in `qemu/`, branched from `rzv2l-dev` `51378195d3`; project tasks go on the same-named branch (AGENTS.md "Branches and PRs"). One task per commit where practical; the commit names the task ID. A test counts only after it has been seen red on its mutation (§7 of `design.md`), in the eval harness's fresh worktree.
+
+Part 1 (Ticket 1) is T01-T06. Part 2 (Ticket 2) is T07-T12.
+
+| ID | Task | REQ / AC | Files | Test | Mutation that must turn it red | Status |
+|---|---|---|---|---|---|---|
+| M2-T01 | SCIFA register file: Table 22.4 resets, BRR/MDDR banking, MDDR write rule, SPTR pin bits, undefined offsets read 0 + log, 8/16-bit only, `direct-boot` start state | SCIF-001 / AC01-AC03, AC09, AC11 | fork `hw/char/renesas_rz_scifa.c`, `include/hw/char/renesas_rz_scifa.h`, `hw/char/Kconfig`, `hw/char/meson.build`, `hw/char/trace-events` | qtest S01, S02, S03, S10, S12 | S01, S02, S03, S10, S12 patches | TODO |
+| M2-T02 | Flags and TX: read-armed clears, TDFE level rule and TX triggers, FTDR push/discard, TEND clear on FTDR, frame-time TX timer and deferred TEND, chardev write with watch, LOOP, TFRST, CM = 1 honest fault | SCIF-001 / AC04-AC06, AC10 | as T01 | qtest S04, S05, S06, S07, S11, S13 | S04, S05, S06, S07, S11, S13 patches | TODO |
+| M2-T03 | RX: FIFO from the chardev, FDR.R, RDF and RX triggers, FRDR pop, DR 15-ETU timer, RFRST, RE = 0 discard | SCIF-001 / AC07 | as T01 | qtest S08 | S08 patch | TODO |
+| M2-T04 | Five IRQ outputs with the Table 22.19 equations, re-evaluated after every access and timer event | SCIF-001 / AC08 | as T01 | qtest S09 (`qtest_irq_intercept_out`) | S09 patch | TODO |
+| M2-T05 | qtest file and meson wiring; `scripts/checkpatch.pl --no-signoff` clean | SCIF-001 / AC01-AC11 | fork `tests/qtest/rzv2l-scifa-test.c`, `tests/qtest/meson.build` | all S checks green | — (each S check has its own) | TODO |
+| M2-T06 | Eval harness: `checks.yaml`, the 13 S mutation patches, `scripts/eval.py m2`, `build/eval/m2/report.md`; `tests/eval/` in the AGENTS.md layout block | TEST-002 / AC18 | project `tests/eval/m2/`, `scripts/eval.py`, `AGENTS.md` | `scripts/eval.py m2` reports S01-S13 green and each mutation red on its line | a broken patch that does not relink must fail the harness (relink assert) | TODO |
+| M2-T07 | SoC wiring: five SCIFs at the device-map bases, SPIs 380-404, `serial_hd(i)` → SCIF*i*, Kconfig select; board sets `scif[0].direct-boot` when `-kernel` is given; M1 expected mtree/qtree updated from the device-map rows | SCIF-001, MAP-001 / AC11, AC14 | fork `hw/arm/r9a07g054.c`, `include/hw/arm/r9a07g054.h`, `hw/arm/rzv2l-smarc.c`, `hw/arm/Kconfig`; project `tests/acceptance/m1/expected/` | A04; M1 acceptance passes | SCIF2 base + `0x400` | TODO |
+| M2-T08 | Hello image: no UART set-up; TF-A putc/flush sequence (`scifa.S:188-222, 237-256` @ `f59ed5a31`); flush timeout → exit 2; GIC bring-up and TXI as INTID 415; the `+0x18` read | TEST-001, SCIF-001 / AC12, AC13 | project `tests/probes/hello-rzv2l/` (decision (a)) | A01, A02, A03 | drop one FTDR byte; S06's patch (A02 → exit 2); TXI wired to SPI 382 | TODO |
+| M2-T09 | Acceptance run M2: hello on the serial chardev (stderr never counts), mtree/qtree against expected files, the log gate | TEST-001, MAP-001 / AC12, AC14, AC15 | project `tests/acceptance/m2/` | `run.sh` ends `M2 ACCEPTANCE: PASS`; A05 | one extra `GUEST_ERROR` line | TODO |
+| M2-T10 | Device-map and spec updates: SCIF1-4 milestone M3b → M2; the §4 row DR-0005 requires (windows left unmapped until the M3b review); errata per decision (a); `requests.md`/scif.md cross-references | MAP-001, TEST-001 | project `docs/device-map.md`, `docs/spec/requirements.md`, `docs/spec/project.md` | `scripts/lint.py` 0 errors (the `tests/hello-rzv2l` warnings go away) | — | TODO |
+| M2-T11 | G0 kernel: v6.12.59 arm64 `defconfig` `Image` + static BusyBox initramfs; read the effective `.config` (claim 6); boot with the unmodified DTB-U and the argument from decision (b) until earlycon prints; record the first blocker (layer verified, coverage list) in this unit folder | SCIF-001, GUEST-001, GUEST-004 / AC16, AC17 | project `tests/guests/g0/build-kernel.sh`, `tests/acceptance/m2/`, `docs/units/M2-first-character/first-blocker.md` | L01 (`.config` fact check), L02, L03 (review item) | L02: S01's patch | TODO |
+| M2-T12 | Bench profile `rzv2l-smarc-m2-hello` (`expect`, `expect_exit = 0`), driven once with `bench-drive`; learning doc; traceability and requirement statuses; README "Where it stands"; DR-0004's stale Consequences line | TEST-001 | project `bench/profiles/`, `docs/learning/m2-first-character.md`, `docs/spec/traceability.md`, `docs/spec/requirements.md`, `README.md`, `docs/decisions/DR-0004-agent-workflow-tooling.md` | bench verdict `pass`; lint 0 errors | — | TODO |
+
+## Closure checklist (before closing the unit)
+- [ ] every REQ in spec.md appears in at least one task
+- [ ] every task names a test; each test's result **and** its mutation check (the test seen to fail on a broken model) are recorded
+- [ ] `../../spec/traceability.md` updated; `scripts/lint.py` reports 0 errors
+- [ ] independent review done on the final revision: project commit `…`, fork commit `…`
+- [ ] every review finding has a disposition (fixed / gap / rejected with evidence); **no unresolved BLOCKER**, since a recorded blocker is still a blocker
+- [ ] material fixes rechecked by the reviewer on that final revision
+- [ ] fidelity gaps accepted by the operator are listed (spec decision (b); design §6)

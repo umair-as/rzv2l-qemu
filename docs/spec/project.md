@@ -123,6 +123,7 @@ Every device has two independent classifications.
 | Real device model | modelled behaviour | FULL / FUNCTIONAL |
 | `create_unimplemented_device()` | reads 0, ignores writes, logs under `-d unimp` | STUB only where the guest only writes, or where reading 0 is a faithful reset-like value; must be listed |
 | Unmapped region | synchronous external abort | UNSUPPORTED regions the board also faults on (to be measured) |
+| Unmapped region over working silicon | synchronous external abort | a recorded fidelity gap, only while the coverage list shows no guest at the current milestone touches the window and the window is listed in `../device-map.md` §4 for the M3b per-window review (DR-0005). The abort is honest-fault |
 
 What a powered-down or clock-stopped module does on silicon (hang, zero, abort) is an open question for the oracle (§14).
 
@@ -359,6 +360,10 @@ M0 is incomplete until both answers can be defended from evidence.
 RZ/V2L, with hardware available, calibrates the method: build the model, measure it against silicon, and refine the evidence, retrieval and validation process. A later SoC without hardware is where the method itself becomes the experiment.
 
 ## 22. Changes
+
+### v0.3 errata (2026-10-29)
+
+- §7 mechanism table: an unmapped window over working silicon is allowed as a recorded fidelity gap under two conditions (DR-0005, open question R23).
 
 ### v0.3 errata (2026-10-27)
 
