@@ -20,7 +20,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-SYSC-001 | M1 | M1 | M1-machine-skeleton | M1-T02, T05 | qtest `rzv2l-smarc-test` `/sysc/id`; probe (abort on a non-ID offset) | `../research/sysc.md`; EVK BL2 print `0x18447447` | V |
 | REQ-SYSC-002 | M1 (board property) | M7 (BL2/U-Boot boot-device selection) | M1-machine-skeleton | M1-T02 | qtest `rzv2l-smarc-test` `/sysc/boot-pins`, `/sysc/boot-mode-reserved` | `../research/sysc.md`; EVK BL2 LSI_MODE values | D |
 | REQ-SYC-001 | M7 | M7 | — | — | — | `../research/sysc.md` §5 (inference); EVK-R50 pending | P |
-| REQ-SCIF-001 | M2 | M2 (qtest + hello); M3 | M2-first-character | M2-T01–T07 | qtest `rzv2l-scifa-test` (21 paths); eval `tests/eval/m2/checks.yaml` S01–S13, X01–X04 with their mutations; hello probe (A03, A06) | `../research/scif.md`; `../evidence/EVK-2026-10-29-post-firmware.md` | D |
+| REQ-SCIF-001 | M2 | M2 (qtest + hello); M3 | M2-first-character | M2-T01–T07, M2-T13 | qtest `rzv2l-scifa-test` (24 paths); eval `tests/eval/m2/checks.yaml` S01–S15, X01–X05 with their mutations; hello probe (A03, A06) | `../research/scif.md`; `../evidence/EVK-2026-10-29-post-firmware.md` | D |
 | REQ-CPG-001 | M3b | M3b | — | — | — | `../research/cpg-reset.md`; HW manual p.327/368/409/450 | P |
 | REQ-PFC-001 | M3b | M3b | — | — | — | `../research/pinctrl.md` | P |
 | REQ-OSTM-001 | M3b | M3b | — | — | — | `../research/boot-dependency-graph.md`; EVK boot log | P |
