@@ -9,6 +9,24 @@ dev: renesas-rzg2l-sysc
   lsi-devid = 407139399 (0x18447447)
   lsi-prr = 0 (0x0)
   mmio 0000000011020000/0000000000010000
+# SCIF0-4: device-map rows SCIF0, SCIF2, SCIF1/SCIF3/SCIF4. This run loads
+# the probe with -kernel, so the board sets direct-boot on SCIF0 only
+# (M2 unit spec AC11).
+dev: renesas-rz-scifa @000000001004b800
+  direct-boot = true
+  mmio 000000001004b800/0000000000000400
+dev: renesas-rz-scifa @000000001004bc00
+  direct-boot = false
+  mmio 000000001004bc00/0000000000000400
+dev: renesas-rz-scifa @000000001004c000
+  direct-boot = false
+  mmio 000000001004c000/0000000000000400
+dev: renesas-rz-scifa @000000001004c400
+  direct-boot = false
+  mmio 000000001004c400/0000000000000400
+dev: renesas-rz-scifa @000000001004c800
+  direct-boot = false
+  mmio 000000001004c800/0000000000000400
 dev: arm-gicv3
   num-cpu = 2 (0x2)
   num-irq = 512 (0x200)

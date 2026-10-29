@@ -78,7 +78,7 @@ Offsets are from each channel's base. "Post-firmware" is the direct-mode start s
 | 0x16 | FTCR | 16 | `0x1F1F` | `0x1F1F` (O) | config | RTRGS b15, RFTC b12:8, TTRGS b7, TFTC b4:0. With TTRGS/RTRGS = 1, TFTC/RFTC override FCR's triggers (§22.2.15 p.1299) |
 | other | — | — | — | — | undefined | reads 0, writes ignored, `guest_errors` log. Only one 16-bit read at `+0x18` was measured (EVK-R70: 0, no bus error, O). Reads at other undefined offsets and all writes are unmeasured (A). This overrides the `device-model` default (reference §7: `LOG_UNIMP` + decode error), because the silicon measurement says zero |
 
-**Access widths (A).** The 8-bit registers accept 8-bit accesses and the 16-bit registers 16-bit ones; an 8-bit access to a 16-bit register uses QEMU's partial-access path. A 32-bit access is refused (`.valid.max_access_size = 2`), so the guest takes a bus error. All three consumers (Linux, TF-A, U-Boot) use the documented widths (`scif.md` §4, §7).
+**Access widths (A).** Each register accepts only its documented width: 8-bit accesses to the 8-bit registers, 16-bit accesses to the 16-bit ones. Any other access that touches a register's bytes (a wrong width, or a byte inside a 16-bit register) gets a decode error plus a `guest_errors` log line, so the guest takes a bus error. What silicon does is not known, and failing visibly is the honest choice. A 32-bit access is refused by QEMU itself (`.valid.max_access_size = 2`). All three consumers (Linux, TF-A, U-Boot) use the documented widths (`scif.md` §4, §7).
 
 ## 4. TX, RX and flags
 

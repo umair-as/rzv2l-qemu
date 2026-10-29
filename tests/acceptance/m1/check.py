@@ -44,18 +44,32 @@ def check_mtree(captured, expected):
 
 
 def check_qtree(captured, expected):
-    """Exact device set; listed lines present in each device's block."""
-    blocks = {}
-    cur = None
+    """Exact device set; listed lines present in each device's block.
+
+    A device type that appears more than once (for example the five SCIF
+    channels) is keyed as "<type> @<base>", with the base of its first
+    mmio window, so each instance is checked on its own.
+    """
+    found = []
     for l in open(captured):
         m = re.match(r"\s*dev: ([^,]+), id", l)
         if m:
-            cur = m.group(1)
-            if cur in blocks:
-                return fail("qtree: device %s appears twice" % cur)
-            blocks[cur] = []
-        elif cur:
-            blocks[cur].append(l.strip())
+            found.append((m.group(1), []))
+        elif found:
+            found[-1][1].append(l.strip())
+    count = {}
+    for dev, _ in found:
+        count[dev] = count.get(dev, 0) + 1
+    blocks = {}
+    for dev, lines in found:
+        key = dev
+        if count[dev] > 1:
+            mmio = next((x.split()[1].split("/")[0] for x in lines
+                         if x.startswith("mmio ")), None)
+            key = "%s @%s" % (dev, mmio)
+        if key in blocks:
+            return fail("qtree: device %s appears twice" % key)
+        blocks[key] = lines
     want = {}
     cur = None
     for l in expected_lines(expected):

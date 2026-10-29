@@ -1,10 +1,17 @@
 # Flat "memory" view of `info mtree -f` on rzv2l-smarc: exactly these lines.
 # Addresses and sizes from docs/device-map.md (rows SYSC, GIC-600 distributor,
 # GIC-600 redistributors, DDR); region names are QEMU's.
+#   SCIF0-4 0x1004B800, 0x1004BC00, 0x1004C000, 0x1004C400, 0x1004C800, 0x400 each
+#   (rows SCIF0, SCIF2, SCIF1/SCIF3/SCIF4)
 #   SYSC 0x11020000, 64 KiB
 #   GIC distributor 0x11900000; QEMU backs 0x10000 of the 0x20000 window
 #   GIC redistributors 0x11940000, 0x40000 (2 frames of 0x20000)
 #   DDR 0x40000000, 2 GiB
+000000001004b800-000000001004bbff (prio 0, i/o): renesas-rz-scifa
+000000001004bc00-000000001004bfff (prio 0, i/o): renesas-rz-scifa
+000000001004c000-000000001004c3ff (prio 0, i/o): renesas-rz-scifa
+000000001004c400-000000001004c7ff (prio 0, i/o): renesas-rz-scifa
+000000001004c800-000000001004cbff (prio 0, i/o): renesas-rz-scifa
 0000000011020000-000000001102ffff (prio 0, i/o): renesas-rzg2l-sysc
 0000000011900000-000000001190ffff (prio 0, i/o): gicv3_dist
 0000000011940000-000000001197ffff (prio 0, i/o): gicv3_redist_region[0]
