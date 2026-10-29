@@ -269,7 +269,7 @@ A successful boot is evidence that a software path works. It is **not** evidence
 | `design.md` | the model design derived from `../research/`, `../device-map.md` and the decision records; QEMU structure, register behaviour, start states |
 | `tasks.md` | tasks with stable IDs (`<unit>-T01`…), each naming the REQ(s) it serves, the files it touches, and the test that proves it |
 
-A unit starts only after its spec is reviewed by the operator. `traceability.md` links every REQ to its unit, tasks, tests and evidence, and is updated as tasks close. A consistency check (every REQ in a unit spec appears in a task; every task names a test) runs before a unit is marked done.
+A unit starts only after its spec is reviewed by the operator. `traceability.md` links every REQ to its unit, tasks, tests and evidence, and is updated as tasks close. *Erratum 2026-10-29 (§22): from M3b on, a unit is `spec.md` (one page) and `tasks.md`; no `design.md`; traceability and statuses are updated at v1.0.* A consistency check (every REQ in a unit spec appears in a task; every task names a test) runs before a unit is marked done.
 
 **Fidelity bugs** use `../units/templates/fidelity-bug.md`: observed behaviour, expected behaviour (with evidence), unchanged behaviour (what must not regress), and the layer verified.
 
@@ -363,6 +363,7 @@ RZ/V2L, with hardware available, calibrates the method: build the model, measure
 
 ### v0.3 errata (2026-10-29)
 
+- §15 work units, from M3b on: one-page `spec.md` (scope, what the guest needs, exit criterion, evidence); `design.md` dropped; `tasks.md` a short table with one mutation line per test; `traceability.md` and requirement statuses updated once at v1.0, not per unit (DR-0004 amendment 2026-10-29).
 - §17 M2 and REQ-TEST-001: the hello program lives in `tests/probes/hello-rzv2l/`, next to the other guest probes, and is an arm64 Image (M2 unit decision (a)).
 - §7 mechanism table: an unmapped window over working silicon is allowed as a recorded fidelity gap under two conditions (DR-0005, open question R23).
 

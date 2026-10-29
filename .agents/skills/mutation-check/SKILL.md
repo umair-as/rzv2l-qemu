@@ -5,7 +5,7 @@ description: Prove a qtest, guest probe or acceptance check can fail — break t
 
 # Mutation check
 
-A test that was never seen to fail proves nothing. Examples with real output: the mutation tables in `docs/learning/testing.md`.
+A test that was never seen to fail proves nothing. Examples with real output: the M1 and M2 mutation tables in `docs/learning/testing.md` and `docs/learning/m2-first-character.md` (historical; new units record one line per mutation in `tasks.md`).
 
 ## Steps
 
@@ -16,7 +16,7 @@ A test that was never seen to fail proves nothing. Examples with real output: th
 5. Make sure no QEMU from an earlier run is still alive (stop it by PID; a `pkill -f` pattern can match your own shell).
 6. Run only the targeted test. The red **line** must be the assertion from step 2. A different red (startup abort, timeout, another case) does not count: choose a better mutation.
 7. **Reverse only the mutation.** Never `git checkout -- <file>`: it also throws away your uncommitted work in that file. Confirm the file's diff is your own work again, rebuild, and see the test green.
-8. Record it: the task's Mutation column and status in the unit's `tasks.md`, the red line in the task's mutation table in `docs/learning/testing.md`.
+8. Record it as one line in the unit's `tasks.md`: the exact code change → the red line. No patch file, no eval entry, no learning-doc table (AGENTS.md "Record each proof once").
 
 ## Choosing mutations by test type
 

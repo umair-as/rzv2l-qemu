@@ -21,7 +21,7 @@ The machine qtest is `qemu/tests/qtest/rzv2l-smarc-test.c` (under `CONFIG_RZV2L_
    - properties: each board property value changes the register as documented; invalid values refuse to start (as `boot-mode-reserved` does)
 3. **Sweep the axis the register exposes:** at least two values per field that changes timing or thresholds. One value is one shape, and a hardwired model passes it.
 4. Run `mutation-check` on every new case before calling it verified.
-5. Record the test and its mutation in the unit's `tasks.md` (Test and Mutation columns), and the red line in the task's mutation table in `docs/learning/testing.md`.
+5. Record the test and its mutation as one line in the unit's `tasks.md`: the exact code change that was mutated → the red line. Nowhere else (AGENTS.md "Record each proof once").
 
 ## Limits of qtest (use `guest-probe` instead)
 
