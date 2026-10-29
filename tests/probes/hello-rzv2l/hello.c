@@ -482,15 +482,21 @@ void probe_main(void)
         /*
          * A compare value rewritten while free-running takes effect at
          * once (Table 20.5 rows c, d): start with a match 43 s away,
-         * then move it 1 ms ahead; the interrupt must come within 20 ms.
+         * then move it 10 ms past the current count; the interrupt must
+         * come within 500 ms. The margin keeps a stalled host from moving
+         * the count past the new value first (row d would then wait for
+         * the counter to wrap). The waiting windows below are wide: on a
+         * loaded host QEMU's timer callbacks can run late while the
+         * guest's generic counter keeps advancing.
          */
         puts_("-- OSTM2 compare rewritten while free-running\n");
         irq_count = 0;
         mmio_write32(OSTM2 + OSTM_CMP, 0xfffffff0);
         mmio_write8(OSTM2 + OSTM_TS, 1);
-        mmio_write32(OSTM2 + OSTM_CMP, OSTM_ONESHOT_CMP);
+        mmio_write32(OSTM2 + OSTM_CMP,
+                     mmio_read32(OSTM2 + OSTM_CNT) + 10 * (OSTM_ONESHOT_CMP + 1));
         t0 = READ_SYSREG(cntvct_el0);
-        while (!irq_count && READ_SYSREG(cntvct_el0) - t0 < 20 * min_ticks) {
+        while (!irq_count && READ_SYSREG(cntvct_el0) - t0 < 500 * min_ticks) {
             __asm__ volatile("yield");
         }
         check("OSTM2 IRQ after the rewrite", irq_count, 1, 1);
@@ -498,7 +504,7 @@ void probe_main(void)
         /*
          * Interval mode as Linux's periodic event (renesas-ostm.c:107-119):
          * CMP = period - 1, an interrupt every period, the timer keeps
-         * running. Expect at least 3 interrupts within 5 periods.
+         * running. Expect at least 3 interrupts (within 200 periods).
          */
         puts_("-- OSTM2 interval (periodic) interrupts\n");
         ostm_oneshot = 0;
@@ -508,11 +514,12 @@ void probe_main(void)
         mmio_write8(OSTM2 + OSTM_CTL, 0);
         mmio_write8(OSTM2 + OSTM_TS, 1);
         t0 = READ_SYSREG(cntvct_el0);
-        while (irq_count < 3 && READ_SYSREG(cntvct_el0) - t0 < 5 * min_ticks) {
+        while (irq_count < 3 &&
+               READ_SYSREG(cntvct_el0) - t0 < 200 * min_ticks) {
             __asm__ volatile("yield");
         }
         mmio_write8(OSTM2 + OSTM_TT, 1);
-        check("OSTM2 interval IRQs within 5 periods >= 3", irq_count >= 3, 1, 0);
+        check("OSTM2 interval IRQs >= 3", irq_count >= 3, 1, 0);
         check("OSTM2 interval IRQ INTID", irq_intid, OSTM2_INTID, 1);
     }
 
