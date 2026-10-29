@@ -15,16 +15,22 @@
   <div class="controls">
     <button id="start" data-testid="btn-start" class="primary">Start</button>
     <button id="start-paused" data-testid="btn-start-paused">Start paused</button>
+    <label class="check" title="Adds -gdb on a free loopback port and starts paused; connect gdb, then continue from gdb">
+      <input type="checkbox" id="gdb" data-testid="gdb-option"> Start with gdbstub
+    </label>
     <button id="pause" data-testid="btn-pause" disabled>Pause</button>
     <button id="reset" data-testid="btn-reset" disabled>Reset</button>
     <button id="stop" data-testid="btn-stop" class="danger" disabled>Stop</button>
   </div>
   <div class="status">
     <span id="state" class="pill" data-testid="status" data-state="none" role="status" aria-label="Session status">no session</span>
+    <span id="verdict" class="pill" data-testid="verdict" data-verdict="" role="status" aria-label="Verdict" hidden></span>
     <span id="exit" data-testid="exit-code" role="status" aria-label="Exit status" hidden></span>
   </div>
 </header>
 <p id="profile-desc" class="desc"></p>
+<p id="gdb-info" class="desc" data-testid="gdb-info" hidden></p>
+<p id="verdict-why" class="desc" data-testid="verdict-reasons" hidden></p>
 
 <main>
   <section class="panel console-panel">
@@ -42,6 +48,7 @@
       <button role="tab" data-tab="coverage" data-testid="tab-coverage">Coverage <b id="cov-count">0</b></button>
       <button role="tab" data-tab="monitor" data-testid="tab-monitor">Monitor</button>
       <button role="tab" data-tab="events" data-testid="tab-events">Events</button>
+      <button role="tab" data-tab="runs" data-testid="tab-runs">Runs</button>
     </nav>
 
     <div class="tab-body" data-panel="log">
@@ -50,7 +57,8 @@
     </div>
 
     <div class="tab-body" data-panel="coverage" hidden>
-      <p class="hint">What the guest touched that the model does not provide. Each row is either fixed or listed as a gap.</p>
+      <p class="hint">What the guest touched that the model does not provide. Each row is either fixed or listed as a gap.
+        <a id="cov-csv" data-testid="coverage-csv" href="#" hidden download>Download CSV</a></p>
       <table data-testid="coverage-table" aria-label="Coverage">
         <thead><tr><th>Kind</th><th>Access</th><th>Where</th><th>Size</th><th>Count</th></tr></thead>
         <tbody id="coverage"></tbody>
@@ -75,6 +83,27 @@
     <div class="tab-body" data-panel="events" hidden>
       <p class="hint">QMP events.</p>
       <pre id="events" data-testid="events" class="scroll" role="log" aria-label="QMP events"></pre>
+    </div>
+
+    <div class="tab-body" data-panel="runs" hidden>
+      <p class="hint">Runs kept in <code>build/bench/</code>, newest first. Pick one to view its files.</p>
+      <div class="table-scroll">
+        <table data-testid="runs-table" aria-label="Runs">
+          <thead><tr><th>Profile</th><th>Started</th><th>Exit</th><th>Verdict</th></tr></thead>
+          <tbody id="runs"></tbody>
+        </table>
+      </div>
+      <div id="run-view" data-testid="run-view" hidden>
+        <div class="chips">
+          <b id="run-name" data-testid="run-name"></b>
+          <button data-file="console" data-testid="run-console">console</button>
+          <button data-file="log" data-testid="run-log">log</button>
+          <button data-file="stderr" data-testid="run-stderr">stderr</button>
+          <button data-file="cmdline" data-testid="run-cmdline">cmdline</button>
+          <a id="run-csv" data-testid="run-coverage-csv" href="#" download>coverage CSV</a>
+        </div>
+        <pre id="run-out" data-testid="run-output" class="scroll" role="log" aria-label="Run file"></pre>
+      </div>
     </div>
   </section>
 </main>

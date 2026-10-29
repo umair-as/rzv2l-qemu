@@ -65,6 +65,26 @@ function resetViews() {
   $("cov-count").textContent = "0";
 }
 
+function showVerdict(s) {
+  const v = $("verdict");
+  v.hidden = !s.verdict;
+  v.dataset.verdict = s.verdict || "";
+  v.textContent = (s.verdict || "").toUpperCase();
+  const why = $("verdict-why");
+  const reasons = s.verdict_reasons || [];
+  why.hidden = !reasons.length;
+  why.textContent = reasons.join("; ");
+  const gdb = $("gdb-info");
+  gdb.hidden = !(s.gdb_port && s.state !== "exited");
+  gdb.dataset.port = s.gdb_port || "";
+  gdb.textContent = s.gdb_port
+    ? `gdbstub on 127.0.0.1:${s.gdb_port}: gdb-multiarch -ex "target remote 127.0.0.1:${s.gdb_port}"`
+    : "";
+  const csv = $("cov-csv");
+  csv.hidden = !s.run;
+  if (s.run) csv.href = `/api/runs/${encodeURIComponent(s.run)}/coverage.csv`;
+}
+
 function appendPre(id, line) {
   const pre = $(id);
   const atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
@@ -85,12 +105,15 @@ function setStatus(s) {
   $("reset").disabled = !live;
   $("pause").disabled = !(state === "running" || state === "paused");
   $("pause").textContent = state === "paused" ? "Resume" : "Pause";
+  $("gdb").disabled = live;
+  showVerdict(s);
   const exit = $("exit");
   if (state === "exited") {
     exit.hidden = false;
     exit.textContent = s.error ? `error: ${s.error}` : `exit ${s.exit_code}`;
     exit.dataset.code = s.exit_code ?? "";
     refreshCoverage();
+    if (runsShown()) refreshRuns();
   } else {
     exit.hidden = true;
   }
@@ -119,6 +142,66 @@ async function refreshCoverage() {
   }
   $("cov-count").textContent = String(coverage.length);
 }
+
+// ---- runs ------------------------------------------------------------------
+
+let currentRun = null;
+
+function runsShown() {
+  return !document.querySelector('[data-panel="runs"]').hidden;
+}
+
+function fmtTime(t) {
+  return t ? new Date(t * 1000).toLocaleString() : "";
+}
+
+async function refreshRuns() {
+  const runs = await api("GET", "/api/runs");
+  const body = $("runs");
+  body.innerHTML = "";
+  for (const r of runs) {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-testid", "run-row");
+    tr.dataset.run = r.run;
+    tr.setAttribute("aria-selected", String(r.run === currentRun));
+    const cells = [r.profile, fmtTime(r.started) || r.run.slice(0, 15),
+                   r.exit_code ?? (r.state === "exited" ? "" : r.state),
+                   r.verdict ? r.verdict.toUpperCase() : ""];
+    cells.forEach((v, i) => {
+      const td = document.createElement("td");
+      td.textContent = v;
+      if (i === 3) { td.className = "verdict"; td.dataset.verdict = r.verdict || ""; }
+      tr.append(td);
+    });
+    tr.onclick = () => openRun(r.run);
+    body.append(tr);
+  }
+}
+
+async function openRun(id) {
+  currentRun = id;
+  document.querySelectorAll("#runs tr").forEach((tr) =>
+    tr.setAttribute("aria-selected", String(tr.dataset.run === id)));
+  $("run-view").hidden = false;
+  $("run-name").textContent = id;
+  $("run-csv").href = `/api/runs/${encodeURIComponent(id)}/coverage.csv`;
+  await showRunFile("console");
+}
+
+let runFileSeq = 0;
+async function showRunFile(file) {
+  const seq = ++runFileSeq;           // a slower earlier fetch must not win
+  const res = await fetch(`/api/runs/${encodeURIComponent(currentRun)}/${file}`);
+  const text = res.ok ? await res.text()
+    : `(${file}: ${(await res.json().catch(() => ({}))).error || res.statusText})`;
+  if (seq !== runFileSeq) return;
+  $("run-out").textContent = text;
+  $("run-out").dataset.file = file;
+}
+
+document.querySelectorAll("#run-view button[data-file]").forEach((b) => {
+  b.onclick = () => showRunFile(b.dataset.file);
+});
 
 // ---- websocket ---------------------------------------------------------------
 
@@ -156,7 +239,8 @@ async function start(paused) {
   resetViews();
   setStatus({ state: "starting" });
   try {
-    await api("POST", "/api/session", { profile: $("profile").value, paused });
+    await api("POST", "/api/session",
+              { profile: $("profile").value, paused, gdb: $("gdb").checked });
     term.focus();
   } catch (e) {
     appendPre("log", `bench: ${e.message}`);
@@ -184,7 +268,7 @@ $("pause").onclick = () => action(state === "paused" ? "/api/session/resume" : "
 $("reset").onclick = () => action("/api/session/reset");
 $("stop").onclick = () => action("/api/session/stop");
 
-document.querySelectorAll(".chips button").forEach((b) => {
+document.querySelectorAll("[data-panel=monitor] .chips button").forEach((b) => {
   b.onclick = () => monitor(b.dataset.cmd);
 });
 $("monitor-form").onsubmit = (e) => {
@@ -201,6 +285,7 @@ document.querySelectorAll(".tabs button").forEach((b) => {
       p.hidden = p.dataset.panel !== b.dataset.tab;
     });
     if (b.dataset.tab === "coverage" && state !== "none") refreshCoverage();
+    if (b.dataset.tab === "runs") refreshRuns();
   };
 });
 

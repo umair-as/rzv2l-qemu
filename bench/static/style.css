@@ -52,6 +52,18 @@ button.danger:not(:disabled) { color: var(--danger); }
 .pill[data-state="paused"]  { color: var(--warn); border-color: var(--warn); }
 .pill[data-state="starting"] { color: var(--accent); border-color: var(--accent); }
 #exit { font: 12px var(--mono); color: var(--muted); }
+.pill[data-verdict="pass"], .verdict[data-verdict="pass"] { color: var(--ok); border-color: var(--ok); }
+.pill[data-verdict="fail"], .verdict[data-verdict="fail"] { color: var(--danger); border-color: var(--danger); }
+.pill[data-verdict="running"] { color: var(--accent); border-color: var(--accent); }
+.verdict { font: 600 12px var(--mono); text-transform: uppercase; }
+.check { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13px; }
+.check input { margin: 0; }
+#runs tr { cursor: pointer; }
+#runs tr:hover, #runs tr[aria-selected="true"] { background: var(--bg); }
+.table-scroll { max-height: 22vh; overflow: auto; margin-bottom: 8px; }
+#run-view .scroll { height: 34vh; }
+#run-view .chips { align-items: center; margin-bottom: 8px; }
+#run-name { font: 600 12px var(--mono); word-break: break-all; }
 
 .desc { margin: 8px 16px 0; color: var(--muted); }
 
