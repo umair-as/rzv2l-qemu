@@ -48,6 +48,6 @@ The skills are split in two layers. The procedure in each lives in one place.
 ## Consequences
 
 - One copy of each procedure serves both agents, versioned and reviewed.
-- The branch and sign-off rules are enforced by code for every committer, and the build and push rules for Claude Code.
+- The branch and sign-off rules are enforced by code for every committer, and the build rule (no builds inside `qemu/`) for Claude Code. Pushes are not gated (2026-10-28).
 - The tree shows the agent tooling; private paths and the working area stay out of it.
 - Skills point to the rules in AGENTS.md instead of restating them, so the two do not drift.

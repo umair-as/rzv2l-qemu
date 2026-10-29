@@ -1,0 +1,18 @@
+# The M2 hello probe on the project's QEMU build, in direct mode.
+# The greeting goes out on SCIF0 (the serial console); the probe's check
+# lines go through semihosting. QEMU exits with the probe's status
+# (0 = pass, 1 = a check failed, 2 = the console flush timed out).
+name = "rzv2l-smarc · M2 hello"
+description = "M2 hello probe: prints Hello from RZ/V2L on SCIF0 like TF-A, checks TXI as INTID 415 and the SCIF aborts."
+qemu = "build/qemu/qemu-system-aarch64"
+prepare = ["make", "-s", "-C", "tests/probes/hello-rzv2l"]
+args = ["-M", "rzv2l-smarc", "-kernel", "tests/probes/hello-rzv2l/out/probe.Image"]
+semihosting = true
+log = "unimp,guest_errors,invalid_mem"
+# Verdict: the greeting from the UART, the probe's summary, its exit status
+expect = ["Hello from RZ/V2L", "RESULT: PASS"]
+expect_exit = 0
+
+# Semihosting text ends lines with a bare LF: draw it as CRLF (display only)
+[console]
+lf_to_crlf = true

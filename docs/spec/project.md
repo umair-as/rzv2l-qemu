@@ -298,7 +298,7 @@ Findings are classed BLOCKER / FIDELITY GAP / LATER SCOPE / DOCUMENTATION.
 |---|---|---|
 | **M0** | Research baseline | sources pinned; `device-map.md`; boot dependency graph; §20 question answered; EXP-001 done; uncertainties recorded |
 | **M1** | Machine skeleton | `-M rzv2l-smarc` with 2× A55 (REQ-MACH-002), GIC-600, timer, DDR, SYSC ID registers. `info mtree`/`info qtree` match `device-map.md`; a qtest reads GIC and SYSC ID registers equal to EVK values |
-| **M2** | First character | `tests/hello-rzv2l` (ELF) prints `Hello from RZ/V2L` through SCIF0 @ `0x1004B800` in direct mode; SCIF qtest passes against manual reset values |
+| **M2** | First character | `tests/probes/hello-rzv2l/` (an arm64 Image built from an ELF) prints `Hello from RZ/V2L` through SCIF0 @ `0x1004B800` in direct mode; SCIF qtest passes against manual reset values |
 | **M3** | G0 Linux | mainline `Image` + DTB-U + BusyBox initramfs → shell. **M3a:** earlycon output. **M3b:** console via `sh-sci`, with CPG, pinctrl and PM domains probed. Both CPUs up via PSCI. All boot arguments and gaps listed |
 | **M4** | G1 Linux | vendor kernel + DTB-V + initramfs userspace → shell; probe failures understood and listed; WDT0 behaviour defined |
 | **M5** | Storage | SDHI + SD/eMMC with the real `renesas_sdhi` driver; ext4 read/write/sync verified against the image |
@@ -363,6 +363,7 @@ RZ/V2L, with hardware available, calibrates the method: build the model, measure
 
 ### v0.3 errata (2026-10-29)
 
+- §17 M2 and REQ-TEST-001: the hello program lives in `tests/probes/hello-rzv2l/`, next to the other guest probes, and is an arm64 Image (M2 unit decision (a)).
 - §7 mechanism table: an unmapped window over working silicon is allowed as a recorded fidelity gap under two conditions (DR-0005, open question R23).
 
 ### v0.3 errata (2026-10-27)

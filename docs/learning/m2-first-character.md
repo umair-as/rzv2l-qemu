@@ -75,3 +75,71 @@ The qtest file `qemu/tests/qtest/rzv2l-scifa-test.c` checks the SCIFA registers 
 
 The `sync-mode-refused` test sees only half of the behaviour. The model refuses the write with a decode error, and qtest cannot see a bus error (`testing.md` §1). The test therefore checks that SMR keeps its old value. The guest probe in M2-T08 checks that the CPU takes the abort.
 
+## 3. Transmit and TEND (M2-T02)
+
+The model sends each byte through a shift register. A byte leaves the 16-byte FIFO, goes to the chardev, and the next byte follows one frame time later on the virtual clock. TEND becomes 1 only when the last frame is out and the FIFO is empty. The frame time comes from the manual's bit-rate formulas (p.1282, p.1287) and the frame format in SMR. With the direct-boot settings, a 10-bit frame takes 87.08 µs.
+
+The qtest steps the virtual clock to 200 ns before the end of the frame and checks that TEND is still 0. It then steps 400 ns more and checks that TEND is 1. The 200 ns margin is smaller than the MDDR correction (680 ns), so a model that ignores MDDR fails the test.
+
+| Mutation (M2-T02) | Test result |
+|---|---|
+| a 0-write clears an FSR flag without the prior read | `not ok …/scif/fsr-read-armed`: `(0x00000020 == 0x00000060)` |
+| TDFE stored, not computed from the FIFO count | `not ok …/scif/tdfe-level`: `(0x00000040 == 0x00000060)` |
+| TEND set in the FTDR write handler | `not ok …/scif/tend-deferred`: `(0x00000040 == 0x00000000)`, before the frame ends |
+| TTRG hard-wired to 8 | `not ok …/scif/tx-trigger`: `(0x00000020 == 0x00000000)`, 5 bytes with trigger 4 |
+| an FTDR write leaves TEND | `not ok …/scif/ftdr-clears-tend`: `(0x00000040 == 0x00000000)` |
+| the MDDR correction (SEMR.BRME) ignored | `not ok …/scif/tend-deferred`: TEND already 1 at 86.88 µs |
+| the second stop bit ignored | `not ok …/scif/tend-deferred`: the 7E2 frame ends 8.7 µs early |
+
+## 4. Receive, DR and overrun (M2-T03)
+
+The receive side has its own 16-byte FIFO. Most tests use loopback (FCR.LOOP): the transmitter feeds the receiver, and a looped byte arrives when its frame is done. The receive timing is then exact on the virtual clock. One test sends bytes through a real socket chardev.
+
+Two manual rules are easy to get wrong:
+- RDF is set when the FIFO *reaches* the trigger, but after a clear it is set again only while the FIFO holds *more* than the trigger (§22.8.2, p.1327).
+- DR is set 15 bit times after the last byte (§22.2.7, p.1279). This is 1.5 frames only for 8-bit data with one stop bit. The test checks the 7E2 format too, where 1.5 frames is 13 µs longer.
+
+| Mutation (M2-T03) | Test result |
+|---|---|
+| an FRDR read does not pop | `not ok …/scif/rx-fifo`: `(0x00000061 == 0x00000062)` |
+| DR after 1.5 frames | `not ok …/scif/rx-dr-timeout`: DR still 0 in 7E2 |
+| RDF set again at "equal to the trigger" | `not ok …/scif/rx-fifo`: `(0x00000002 == 0x00000000)` at 4 bytes |
+| an FRDR read leaves RDF set | `not ok …/scif/rx-fifo`: the same line |
+| no ORER on overrun | `not ok …/scif/rx-overrun`: `(0x00000000 == 0x00000001)` |
+| ORER clears without the prior read | `not ok …/scif/rx-overrun`: the same line |
+| RE ignored | `not ok …/scif/rx-disabled`: `(0x00000001 == 0x00000000)` |
+
+## 5. The interrupt lines (M2-T04)
+
+Each SCIF channel has five level outputs: ERI, BRI, RXI, TXI and the shared TEI/DRI line. The model computes each line from the enable bits in SCR and the flags, as in Table 22.19 (p.1323). It recomputes them after every register access and every timer event. The SoC wires SCIF*n*'s lines to GIC SPIs 380 + 5*n* to 384 + 5*n*.
+
+The qtest watches the device's own outputs. qtest cannot watch GIC inputs at SPI 256 or above (`testing.md` §1), so the GIC routing is checked by the hello probe instead (§6).
+
+A trap in the test: qtest learns a line's level only when the device drives the line *after* the intercept starts. A line that went high during reset reads as low in the test. The first version of the TXI test therefore missed a mutation, "TXI ignores TIE". The fix makes the device report all five lines once, by writing SCR with its current value right after the intercept.
+
+| Mutation (M2-T04) | Test result |
+|---|---|
+| TXI ignores TIE | `not ok …/scif/irq-txi`: TXI = 1 while TIE = 0 |
+| RXI ignores RIE | `not ok …/scif/irq-rxi`: `(1 == 0)` |
+| the DR term dropped from TEI/DRI | `not ok …/scif/irq-tei-dri`: `(0 == 1)` |
+| BRI ignores REIE | `not ok …/scif/irq-bri`: `(0 == 1)` |
+| RXI and TXI swapped | `not ok …/scif/irq-txi`: RXI rises with TIE |
+
+## 6. Hello, and the M2 acceptance run (M2-T08, T09)
+
+The hello probe is a bare-metal guest program in `tests/probes/hello-rzv2l/`. It does not set the UART up. It writes `Hello from RZ/V2L` the way TF-A's console does (`scifa.S:188-222` @ `f59ed5a31`):
+1. Wait until FDR.T is below 16.
+2. Store the byte to FTDR.
+3. Read FSR and write it back with TEND cleared.
+
+At the end it waits for TEND, as TF-A's flush does. Each wait has a limit, so a model bug makes the probe fail instead of hang. The probe works because direct mode starts SCIF0 as the firmware leaves it (§1.4 and the evidence file).
+
+The probe then checks what only a CPU can see:
+- SCIF0's TXI reaches the CPU as INTID 415 (32 + SPI 383), through the real GIC.
+- An SMR write with CM = 1 takes a synchronous external abort (spec decision (c)).
+- The undefined offset `+0x18` reads 0 without an abort.
+
+`tests/acceptance/m2/run.sh` runs M1 acceptance first, then the probe. It compares the serial output with `expected/serial.txt` byte for byte: `Hello from RZ/V2L`, CR, LF. The semihosting output on stderr never counts as the greeting. Last comes the log gate: only the probe's two deliberate accesses may appear in the `-d` log.
+
+One acceptance mutation needed thought. The ticket proposed "TEND set in the FTDR write" for A02, but this model also sets TEND again when the frame timer fires, so TF-A's flush still finishes. The failure that matters on real firmware is a model that completes the whole transmission inside the write: TEND rises at once, TF-A clears it, and nothing sets it again. That mutation makes the probe's flush time out with exit 2, which is the red line A02 expects.
+

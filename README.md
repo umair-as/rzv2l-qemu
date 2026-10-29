@@ -65,7 +65,7 @@ flowchart LR
     class M7,M8,M9 fw
 ```
 
-🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** M0 is complete; M1 is next. Exit criteria for each milestone are in the [specification](docs/spec/project.md).
+🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** M0 and M1 are complete. M2 (first character) is in review: the board prints `Hello from RZ/V2L` on SCIF0, and the mainline kernel's early console is the next check. The v1.0 target is M2 + M3: mainline Linux to a shell on both CPUs. Exit criteria for each milestone are in the [specification](docs/spec/project.md).
 
 ## 🚀 Building
 
