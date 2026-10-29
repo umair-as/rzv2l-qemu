@@ -1,7 +1,7 @@
 # M2-first-character — spec
 
 **Milestone:** M2, plus M3a (earlycon output)
-**Status:** DRAFT (2026-10-29), for operator review
+**Status:** DRAFT (2026-10-29): decisions (a)-(d) taken by the operator, design revised after the Codex design review; waiting for the operator's spec review
 **Requirements:** REQ-SCIF-001, REQ-TEST-001, REQ-GUEST-001 (stock DTB for the M3a run), REQ-GUEST-004 (the earlycon boot argument), REQ-TEST-002 (mutation-checked tests), REQ-MAP-001 (new windows, unmapped-window gaps)
 
 ## Goal
@@ -64,7 +64,9 @@ Check IDs (S, A, L) are the eval-harness IDs from `design.md` §8.
 - Earlycon path and DTB-U `/chosen`: `../../research/scif.md` §5; DTB-U built by `tests/guests/g0/build-dtb.sh` (SHA-256 `4c339906…`).
 - Unmapped windows: DR-0005.
 
-## Decisions for the operator
+## Decisions (operator, 2026-10-29)
+
+The operator chose the recommended option in each case, in agreement with the Codex design review: **(a) A**, **(b)** as proposed, **(c) B**, **(d) A**. The options stay below for the record.
 
 **(a) Where the hello image lives.** REQ-TEST-001 and spec §17 say `tests/hello-rzv2l`, but that directory is not in the AGENTS.md layout block, which lint checks (lint already warns about the missing path).
 
