@@ -66,7 +66,7 @@ qemu-system-aarch64 -M rzv2l-smarc -kernel Image -dtb r9a07g054l2-smarc.dtb \
 - **Guest code:** linux v6.12.59 `drivers/clocksource/renesas-ostm.c`. `ostm_timer_stop` reads the 8-bit OSTM_TE register (`+0x010`, :34) of OSTM1 at `0x12801400`, the first OSTM register access after `ostm_init` takes the clock and releases the reset through the CPG.
 - **Model:** the OSTM window is unmapped. The read takes a synchronous external abort: an honest fault.
 - **Layer verified:** the `-d` log's only unmapped access is `Invalid read at addr 0x12801410, size 1`, which matches the PC and DFSC `0x10`. The CPG part of the probe (RST_GTM `0x834` write, RSTMON_GTM `0x9B4` = `0x4`; CLKON_GTM `0x534` write, CLKMON_GTM `0x6B4` = `0x2`) completed first, as the trace shows. The cause is the missing OSTM model, the next M3b unit.
-- **Seen with every window read-as-zero (diagnostic build, not committed):** OSTM1 becomes `sched_clock` at 100 MHz and time stops at 2.133 s, because the counter reads 0. The kernel then reaches PFC, ravb, USB host and SDHI, and ends at "No working init found". OSTM must be FUNCTIONAL, as the device map says.
+- **Seen with every window read-as-zero ([EXP-002](../../experiments/EXP-002-read-as-zero-survey.md), diagnostic build, not committed):** OSTM1 becomes `sched_clock` at 100 MHz and time stops at 2.133 s, because the counter reads 0. The kernel then reaches PFC, ravb, USB host and SDHI, and ends at "No working init found". OSTM must be FUNCTIONAL, as the device map says.
 
 ### Coverage list (`-d unimp,guest_errors,invalid_mem`, acceptance and diagnostic runs)
 
