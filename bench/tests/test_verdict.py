@@ -1,0 +1,100 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+"""Verdict rules: markers come from the console stream only, may straddle
+reads, and combine with expect_exit as documented in bench/README.md."""
+
+import asyncio
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import server  # noqa: E402
+
+
+class FakeBench:
+    async def broadcast(self, msg):
+        pass
+
+
+@pytest.fixture
+def session(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "ROOT", tmp_path)
+    monkeypatch.setattr(server, "RUNS", tmp_path / "build" / "bench")
+
+    made = []
+
+    def make(expect, expect_exit=None):
+        made.append(None)                       # run dirs need unique names
+        profile = {"name": "t", "qemu": "q", "args": [], "prepare": [],
+                   "semihosting": False, "log": "", "expect": expect,
+                   "expect_exit": expect_exit, "description": ""}
+        return server.Session(FakeBench(), f"t{len(made)}", profile)
+    return make
+
+
+def feed(*chunks):
+    r = asyncio.StreamReader()
+    for c in chunks:
+        r.feed_data(c)
+    r.feed_eof()
+    return r
+
+
+async def trickle(reader, chunks):
+    """Feed one chunk per read, as a socket would deliver them."""
+    for c in chunks:
+        await asyncio.sleep(0.01)
+        reader.feed_data(c)
+    reader.feed_eof()
+
+
+def test_marker_split_across_reads(session):
+    s = session(["RESULT: PASS"])
+
+    async def run():
+        r = asyncio.StreamReader()
+        t = asyncio.create_task(trickle(r, [b"xx RESULT", b": PA", b"SS\n"]))
+        await s._pump_console_inner(r)
+        await t
+    asyncio.run(run())
+    assert s.found == {"RESULT: PASS"}
+
+
+def test_stderr_is_not_the_console(session):
+    s = session(["RESULT: PASS"])
+
+    class Proc:
+        stdout = None
+    s.proc = Proc()
+
+    async def run():
+        s.proc.stdout = feed(b"RESULT: PASS\n")
+        await s._pump_stderr_inner()
+    asyncio.run(run())
+    assert s.found == set()
+
+
+def test_verdict_rules(session):
+    s = session(["hello"])                      # no expect_exit
+    s.state = "running"
+    assert s.verdict() == ("running", [])
+    s.found.add("hello")
+    assert s.verdict() == ("pass", [])          # pass while still running
+
+    s = session(["hello"], 0)
+    s.state = "running"
+    s.found.add("hello")
+    assert s.verdict() == ("running", [])       # exit still pending
+    s.state, s.exit_code = "exited", 0
+    assert s.verdict() == ("pass", [])
+    s.exit_code = 1
+    assert s.verdict() == ("fail", ["exit 1, expected 0"])
+    s.exit_code, s.stopped = 0, True
+    assert s.verdict()[0] == "fail"             # QMP quit exits 0 too
+
+    s = session(["hello"])
+    s.state = "exited"
+    assert s.verdict() == ("fail", ["missing on the console: 'hello'"])
+
+    assert session([]).verdict() == (None, [])  # no expectations, no verdict

@@ -8,3 +8,6 @@ prepare = ["make", "-s", "-C", "tests/probes/m1-skeleton"]
 args = ["-M", "rzv2l-smarc", "-kernel", "tests/probes/m1-skeleton/out/probe.Image"]
 semihosting = true
 log = "unimp,guest_errors,invalid_mem"
+# Verdict: the probe's own summary line on the console, and its exit status
+expect = ["RESULT: PASS"]
+expect_exit = 0

@@ -14,12 +14,15 @@ import argparse
 import asyncio
 import codecs
 import collections
+import csv
 import ctypes
+import io
 import json
 import os
 import re
 import shutil
 import signal
+import socket
 import tempfile
 import time
 import tomllib
@@ -32,6 +35,8 @@ ROOT = HERE.parent
 PROFILES = HERE / "profiles"
 STATIC = HERE / "static"
 RUNS = ROOT / "build" / "bench"
+DEVICE_MAP = ROOT / "docs" / "device-map.md"
+RUN_ID = re.compile(r"^(?P<stamp>\d{8}-\d{6}-\d{3})-(?P<profile>[\w.-]+)$")
 
 # Read-only HMP commands the monitor panel may run (no writes to host files,
 # no state changes; those have their own buttons).
@@ -76,6 +81,162 @@ def classify(line):
     return ("other", "", line.strip(), "", "")
 
 
+def count_log(path):
+    """Coverage counter of a -d log file on disk (a finished or past run)."""
+    cov = collections.Counter()
+    if path.exists():
+        with path.open("r", errors="replace") as f:
+            for line in f.read().split("\n"):
+                cov[classify(line)] += 1
+    return cov
+
+
+def coverage_rows(cov):
+    return [{"kind": k, "access": a, "where": w, "size": s, "detail": d,
+             "count": n}
+            for (k, a, w, s, d), n in cov.most_common()]
+
+
+# -- device-map windows ------------------------------------------------------
+#
+# The coverage export groups addresses by the windows of docs/device-map.md
+# section 1. The tables are prose, so the parser reads a bounded set of forms
+# and reports every row it cannot pair cleanly instead of guessing silently.
+
+_HEX = r"0x[0-9A-Fa-f]+"
+_SIZE = re.compile(rf"`({_HEX})`|(\d+) ([KMG])iB")
+_UNIT = {"K": 1 << 10, "M": 1 << 20, "G": 1 << 30}
+_BASE = re.compile(rf"`(?P<a>{_HEX})(?:(?P<op>[-+])(?P<b>{_HEX}))?`"
+                   rf"(?:\s+to\s+`(?P<to>{_HEX})`)?(?:\s*\{{(?P<sz>[^}}]+)\}})?")
+
+
+def _strip_parens(text):
+    while True:
+        out = re.sub(r"\([^()]*\)", "", text)
+        if out == text:
+            return out
+        text = out
+
+
+def _sizes(text):
+    return [int(h, 16) if h else int(n) * _UNIT[u]
+            for h, n, u in _SIZE.findall(text)]
+
+
+def parse_device_map(text):
+    """(windows, warnings) from the section 1 tables of docs/device-map.md.
+
+    A window is {"name", "base", "size"}. Forms read in the Base cell:
+    `0xA`, `0xA-0xB` (inclusive range), `0xA+0xB` (offset), `0xA` to `0xB`,
+    a per-base "(N MiB)", and "`0xA` + n×`0xS`" with n taken from the block
+    name. Other parenthesised text is ignored. Sizes: hex or "N KiB/MiB/GiB",
+    paired by position, or one size for every base.
+    """
+    start = text.find("\n## 1.")
+    end = text.find("\n## 2.", start)
+    windows, warnings = [], []
+    for line in text[start:end].splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if not line.startswith("| ") or len(cells) < 3 or cells[0] == "Block":
+            continue
+        raw_name, base_cell, size_cell = cells[:3]
+        if "`0x" not in base_cell:
+            continue                                 # "—", "per Table 5.1"
+        name = " ".join(_strip_parens(raw_name).replace("`", "").split())
+        name = name.replace(" ,", ",")
+        cell = re.sub(r"\((\d+ [KMG]iB)\)", r"{\1}", base_cell)
+        stride = re.search(rf"\+\s*n×`({_HEX})`", cell)
+        cell = _strip_parens(cell[:stride.start()] if stride else cell)
+        bases = []                                   # [base, size or None]
+        for m in _BASE.finditer(cell):
+            a = int(m["a"], 16)
+            b = int(m["b"], 16) if m["b"] else None
+            if m["op"] == "+":
+                a, b = a + b, None
+            size = (b - a + 1) if b is not None else None
+            if m["to"]:
+                size = int(m["to"], 16) - a + 1
+            if m["sz"]:
+                size = _sizes(m["sz"])[0]
+            bases.append([a, size])
+        if stride and bases:
+            step = int(stride[1], 16)
+            first = bases[0][0]
+            idx = [int(n) for n in re.findall(r"[A-Za-z]+(\d+)", name)]
+            bases = [[first + i * step, None] for i in idx] or bases
+        sizes = _sizes(_strip_parens(size_cell))
+        open_ = [b for b in bases if b[1] is None]
+        if len(sizes) == len(open_):
+            for b, size in zip(open_, sizes):
+                b[1] = size
+        elif sizes and open_:
+            if len(sizes) > 1:
+                warnings.append(f"{name}: {len(open_)} bases, {len(sizes)} "
+                                f"sizes; using {sizes[0]:#x} for each")
+            for b in open_:
+                b[1] = sizes[0]
+        elif open_:
+            warnings.append(f"{name}: no size; base(s) skipped")
+        names = [n.strip() for n in name.split(",")]
+        for i, (base, size) in enumerate(bases):
+            if size:
+                windows.append({"name": names[i] if len(names) == len(bases)
+                                else name, "base": base, "size": size})
+    return windows, warnings
+
+
+def load_device_map(path=DEVICE_MAP):
+    try:
+        return parse_device_map(path.read_text())
+    except OSError as e:
+        return [], [f"{path.name}: {e.strerror}"]
+
+
+def find_window(windows, addr):
+    """The smallest device-map window that contains addr, or None."""
+    hits = [w for w in windows if w["base"] <= addr < w["base"] + w["size"]]
+    return min(hits, key=lambda w: w["size"]) if hits else None
+
+
+CSV_FIELDS = ["name", "base", "size", "kind", "access", "count"]
+
+
+def coverage_csv(cov, windows):
+    """CSV of a coverage counter, addresses grouped by device-map window.
+
+    One row per (window, kind, access) with the window's base and size; an
+    address in no window is its own "unmapped" row (base = the address,
+    size = the access size). unimp rows carry a device offset, not an
+    address: name = the device, base and size blank. Free-text lines are
+    summed into one "other" row.
+    """
+    rows = collections.Counter()
+    for (kind, access, where, size, _detail), n in cov.items():
+        if kind == "other":
+            key = ("other", "", "", kind, "")
+        elif where.startswith("0x"):
+            addr = int(where, 16)
+            w = find_window(windows, addr)
+            key = ((w["name"], f"0x{w['base']:08x}", f"0x{w['size']:x}",
+                    kind, access) if w else
+                   ("unmapped", where, size, kind, access))
+        else:
+            key = (where.split("+")[0], "", "", kind, access)
+        rows[key] += n
+    out = io.StringIO()
+    wr = csv.writer(out, lineterminator="\n")
+    wr.writerow(CSV_FIELDS)
+    for key, n in sorted(rows.items(), key=lambda kv: (-kv[1], kv[0])):
+        wr.writerow([*key, n])
+    return out.getvalue()
+
+
+def free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def _die_with_parent():
     """Child side of fork: QEMU gets SIGKILL if the bench process dies."""
     libc = ctypes.CDLL(None, use_errno=True)
@@ -94,16 +255,22 @@ def load_profiles():
         p.setdefault("prepare", [])
         p.setdefault("semihosting", False)
         p.setdefault("log", "unimp,guest_errors,invalid_mem")
+        p.setdefault("expect", [])
+        p.setdefault("expect_exit", None)
+        if not (isinstance(p["expect"], list)
+                and all(isinstance(m, str) and m for m in p["expect"])):
+            raise SystemExit(f"{path}: 'expect' must be a list of non-empty strings")
+        if p["expect_exit"] is not None and type(p["expect_exit"]) is not int:
+            raise SystemExit(f"{path}: 'expect_exit' must be an integer")
         profiles[path.stem] = p
     return profiles
 
 
 def resolve_qemu(spec):
-    env = os.environ.get("BENCH_QEMU")
-    if env:
-        return env
+    """A profile's QEMU. BENCH_QEMU replaces the project build (a path in the
+    profile); a bare name (stock QEMU, the self-test) is looked up on PATH."""
     if "/" in spec:
-        return str(ROOT / spec)
+        return os.environ.get("BENCH_QEMU") or str(ROOT / spec)
     return shutil.which(spec) or spec
 
 
@@ -180,7 +347,7 @@ class QMP:
 class Session:
     """One QEMU process with its QMP, console and log."""
 
-    def __init__(self, bench, profile_id, profile):
+    def __init__(self, bench, profile_id, profile, gdb=False):
         self.bench = bench
         self.profile_id = profile_id
         self.profile = profile
@@ -205,6 +372,11 @@ class Session:
         self.cov = collections.Counter()   # all lines, not just the kept ones
         self.tail_task = None
         self.tasks = []
+        self.con_tasks = []
+        self.found = set()          # expect markers seen on the console
+        self.stopped = False        # ended by the bench (Stop, failed start)
+        self.ended = None
+        self.gdb_port = free_port() if gdb else None
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -225,6 +397,9 @@ class Session:
                      "-semihosting-config", "enable=on,target=native,chardev=semi"]
         if p["log"]:
             argv += ["-d", p["log"], "-D", str(self.log_path)]
+        if self.gdb_port:
+            # -s would listen on every interface at a fixed port; -S is above
+            argv += ["-gdb", f"tcp:127.0.0.1:{self.gdb_port}"]
         return argv
 
     async def start(self, paused):
@@ -232,6 +407,7 @@ class Session:
             await self._prepare()
             self.argv = self.build_argv()
             (self.run_dir / "cmdline.txt").write_text(" ".join(self.argv) + "\n")
+            self.write_meta()
             await self._emit("stderr", "$ " + " ".join(self.argv) + "\n")
             self.proc = await asyncio.create_subprocess_exec(
                 *self.argv, cwd=ROOT, stdin=asyncio.subprocess.DEVNULL,
@@ -243,14 +419,15 @@ class Session:
                                    lambda: self.proc.returncode is None)
             reader, self.con_writer = await asyncio.open_unix_connection(
                 str(self.sock_dir / "con.sock"))
-            self.tasks.append(asyncio.create_task(self._pump_console(reader)))
+            self.con_tasks.append(asyncio.create_task(self._pump_console(reader)))
             if self.profile["semihosting"]:
                 semi, self.semi_writer = await asyncio.open_unix_connection(
                     str(self.sock_dir / "semi.sock"))
-                self.tasks.append(asyncio.create_task(self._pump_console(semi)))
+                self.con_tasks.append(asyncio.create_task(self._pump_console(semi)))
+            self.tasks += self.con_tasks
             self.tail_task = asyncio.create_task(self._tail_log())
             self.tasks.append(self.tail_task)
-            if paused:
+            if paused or self.gdb_port:     # with gdb, the debugger resumes
                 await self._set_state("paused")
             else:
                 await self.qmp.cmd("cont")
@@ -258,8 +435,11 @@ class Session:
         except Exception as e:  # noqa: BLE001 - reported to the UI
             self.error = str(e) or type(e).__name__
             await self._emit("stderr", f"bench: start failed: {self.error}\n")
+            self.stopped = True
             await self.kill()
+            self.ended = time.time()
             await self._set_state("exited")
+            self.write_meta()
             if not self.proc:       # no exit watcher will clean up
                 shutil.rmtree(self.sock_dir, ignore_errors=True)
 
@@ -280,6 +460,7 @@ class Session:
     async def stop(self):
         if self.state == "exited":
             return
+        self.stopped = True
         try:
             await self.qmp.cmd("quit", timeout=3)
         except Exception:  # noqa: BLE001 - fall back to a kill
@@ -300,17 +481,24 @@ class Session:
     async def _watch_exit(self):
         rc = await self.proc.wait()
         self.exit_code = rc
-        await asyncio.sleep(0.2)            # let the last console bytes arrive
+        # The verdict needs every console byte: let the pumps reach EOF
+        if self.con_tasks:
+            await asyncio.wait(self.con_tasks, timeout=2)
+        else:
+            await asyncio.sleep(0.2)
         self.qmp.close()
-        await self._set_state("exited")
-        if self.tail_task:                  # one last read of the -d log
+        # ... and the -d log its last read, so "exited" means complete
+        if self.tail_task:
             try:
                 await asyncio.wait_for(asyncio.shield(self.tail_task), 5)
             except asyncio.TimeoutError:
                 pass
+        self.ended = time.time()
+        await self._set_state("exited")
         for t in self.tasks:
             if t is not asyncio.current_task() and not t.done():
                 t.cancel()
+        self.write_meta()
         shutil.rmtree(self.sock_dir, ignore_errors=True)
 
     # -- streams -----------------------------------------------------------
@@ -340,10 +528,21 @@ class Session:
 
     async def _pump_console_inner(self, reader):
         dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        markers = [m.encode() for m in self.profile["expect"]]
+        keep = max((len(m) for m in markers), default=1) - 1
+        tail = b""                  # a marker may straddle two reads
         with (self.run_dir / "console.log").open("ab") as f:
             while data := await reader.read(4096):
                 f.write(data)
                 f.flush()
+                if markers and len(self.found) < len(markers):
+                    window = tail + data
+                    before = len(self.found)
+                    self.found.update(m.decode() for m in markers if m in window)
+                    tail = window[-keep:] if keep else b""
+                    if len(self.found) != before:
+                        await self.bench.broadcast(
+                            {"t": "status", "d": self.status()})
                 self.console += data
                 if len(self.console) > CONSOLE_KEEP:
                     del self.console[:len(self.console) - CONSOLE_KEEP]
@@ -356,7 +555,8 @@ class Session:
         pos = 0
         partial = ""
         while True:
-            exited = self.state == "exited"     # read once more after exit
+            # QEMU gone: read once more, then stop
+            exited = self.exit_code is not None or self.state == "exited"
             if self.log_path.exists():
                 with self.log_path.open("r", errors="replace") as f:
                     f.seek(pos)
@@ -399,18 +599,55 @@ class Session:
 
     def coverage(self):
         """Every -d log line of the run, grouped (see LOG_FORMS)."""
-        return [{"kind": k, "access": a, "where": w, "size": s, "detail": d,
-                 "count": n}
-                for (k, a, w, s, d), n in self.cov.most_common()]
+        return coverage_rows(self.cov)
+
+    def verdict(self):
+        """(verdict, reasons) from the profile's expect / expect_exit.
+
+        None without expectations. "running" until decided; with no
+        expect_exit, "pass" as soon as every marker has appeared.
+        """
+        expect, want = self.profile["expect"], self.profile["expect_exit"]
+        if not expect and want is None:
+            return None, []
+        missing = [m for m in expect if m not in self.found]
+        if self.error:
+            return "fail", [f"start failed: {self.error}"]
+        if self.state != "exited":
+            if want is None and not missing:
+                return "pass", []
+            return "running", []
+        reasons = [f"missing on the console: {m!r}" for m in missing]
+        if want is not None:
+            if self.stopped:
+                reasons.append("stopped by the bench before the guest exited")
+            elif self.exit_code != want:
+                reasons.append(f"exit {self.exit_code}, expected {want}")
+        return ("fail" if reasons else "pass"), reasons
 
     def status(self):
+        verdict, reasons = self.verdict()
         return {"state": self.state, "profile": self.profile_id,
                 "name": self.profile["name"],
                 "pid": self.proc.pid if self.proc else None,
                 "exit_code": self.exit_code, "error": self.error,
+                "verdict": verdict, "verdict_reasons": reasons,
+                "expect": self.profile["expect"],
+                "expect_exit": self.profile["expect_exit"],
+                "expect_missing": [m for m in self.profile["expect"]
+                                   if m not in self.found],
+                "gdb_port": self.gdb_port,
                 "uptime": round(time.time() - self.started, 1),
+                "run": self.run_dir.name,
                 "run_dir": str(self.run_dir.relative_to(ROOT)),
                 "cmdline": " ".join(self.argv)}
+
+    def write_meta(self):
+        """run.json: what the Runs tab lists once the bench forgets the run."""
+        meta = {k: v for k, v in self.status().items()
+                if k not in ("pid", "uptime")}
+        meta.update(started=self.started, ended=self.ended)
+        (self.run_dir / "run.json").write_text(json.dumps(meta, indent=1) + "\n")
 
     async def _set_state(self, state):
         if self.state != state:
@@ -424,6 +661,7 @@ class Session:
 class Bench:
     def __init__(self):
         self.profiles = load_profiles()
+        self.windows, self.map_warnings = load_device_map()
         self.session = None
         self.clients = set()
 
@@ -437,6 +675,42 @@ class Bench:
 
     def live(self):
         return self.session and self.session.state != "exited"
+
+    def run_dir(self, run_id):
+        """A run directory by its name; None unless it is one, under RUNS."""
+        if not RUN_ID.match(run_id or ""):
+            return None
+        path = RUNS / run_id
+        return path if path.is_dir() and path.parent == RUNS else None
+
+    def run_info(self, path):
+        s = self.session
+        if s and s.run_dir == path:
+            meta = s.status()
+            meta.update(started=s.started, ended=s.ended)
+        else:
+            try:
+                meta = json.loads((path / "run.json").read_text())
+            except (OSError, ValueError):
+                meta = {}           # a run from before run.json: name only
+        m = RUN_ID.match(path.name)
+        meta.setdefault("profile", m["profile"])
+        meta.setdefault("state", "exited")
+        for key in ("exit_code", "verdict", "started", "ended", "name"):
+            meta.setdefault(key, None)
+        meta["run"] = path.name
+        meta["files"] = [f for f in RUN_FILES
+                         if (path / RUN_FILES[f]).exists()]
+        return meta
+
+    def runs(self):
+        dirs = [p for p in RUNS.glob("*") if p.is_dir() and RUN_ID.match(p.name)]
+        return [self.run_info(p) for p in sorted(dirs, key=lambda p: p.name,
+                                                  reverse=True)]
+
+
+RUN_FILES = {"console": "console.log", "log": "qemu.log",
+             "stderr": "stderr.log", "cmdline": "cmdline.txt"}
 
 
 def json_error(status, msg):
@@ -488,7 +762,8 @@ def make_app(port=8090):
             return json_error(400, f"unknown profile {pid!r}")
         if bench.live():
             return json_error(409, "a session is running; stop it first")
-        bench.session = Session(bench, pid, bench.profiles[pid])
+        bench.session = Session(bench, pid, bench.profiles[pid],
+                                gdb=bool(body.get("gdb")))
         await bench.session.start(bool(body.get("paused")))
         status = bench.session.status()
         return web.json_response(status, status=500 if status["error"] else 200)
@@ -547,6 +822,50 @@ def make_app(port=8090):
         return web.json_response({"lines": list(s.log_lines),
                                   "lines_total": s.log_total,
                                   "coverage": s.coverage()})
+
+    @routes.get("/api/runs")
+    async def runs_list(_):
+        return web.json_response(bench.runs())
+
+    def need_run(handler):
+        async def wrapped(req):
+            path = bench.run_dir(req.match_info["run"])
+            if not path:
+                return json_error(404, "no such run")
+            return await handler(req, path)
+        return wrapped
+
+    @routes.get("/api/runs/{run}")
+    @need_run
+    async def run_get(_, path):
+        return web.json_response(bench.run_info(path))
+
+    @routes.get("/api/runs/{run}/coverage.csv")
+    @need_run
+    async def run_coverage_csv(_, path):
+        s = bench.session
+        cov = s.cov if s and s.run_dir == path else count_log(path / "qemu.log")
+        return web.Response(
+            text=coverage_csv(cov, bench.windows), content_type="text/csv",
+            headers={"Content-Disposition":
+                     f'attachment; filename="{path.name}-coverage.csv"'})
+
+    @routes.get("/api/runs/{run}/coverage")
+    @need_run
+    async def run_coverage(_, path):
+        s = bench.session
+        cov = s.cov if s and s.run_dir == path else count_log(path / "qemu.log")
+        return web.json_response({"coverage": coverage_rows(cov),
+                                  "map_warnings": bench.map_warnings})
+
+    @routes.get("/api/runs/{run}/{file:console|log|stderr|cmdline}")
+    @need_run
+    async def run_file(req, path):
+        f = path / RUN_FILES[req.match_info["file"]]
+        if not f.exists():
+            return json_error(404, f"this run has no {f.name}")
+        return web.Response(text=f.read_text(errors="replace"),
+                            content_type="text/plain")
 
     @routes.get("/ws")
     async def ws_handler(req):
