@@ -49,6 +49,11 @@ read16:
     ldrh    w0, [x0]
     ret
 
+    .globl read32
+read32:
+    ldr     w0, [x0]
+    ret
+
     .globl write16
 write16:
     strh    w1, [x0]

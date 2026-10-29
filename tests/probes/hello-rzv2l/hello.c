@@ -15,6 +15,7 @@
 /* start.S */
 uint64_t semihost(uint64_t op, const void *param);
 uint16_t read16(uint64_t addr);
+uint32_t read32(uint64_t addr);
 void write16(uint64_t addr, uint16_t value);
 
 /* SCIF0 (device map; manual Table 22.3) */
@@ -34,6 +35,15 @@ void write16(uint64_t addr, uint16_t value);
 #define FIFO_SIZE           16          /* Table 22.1 */
 
 /* GIC-600 (device map), register offsets from the Arm GICv3 architecture */
+/*
+ * CPG (manual section 7): 0x510 is an offset Table 7.5 does not list;
+ * 0xb30 is CPG_CLUSTER_PCHMON, listed but not modelled. Both must fail
+ * with a bus error rather than read as zero.
+ */
+#define CPG                 0x11010000UL
+#define CPG_UNLISTED        0x510
+#define CPG_CLUSTER_PCHMON  0xb30
+
 #define GICD                0x11900000UL
 #define GICD_CTLR           0x0000
 #define GICD_ISENABLER(n)   (0x0100 + 4 * ((n) / 32))
@@ -308,6 +318,24 @@ static void check_write_aborts(const char *name, uint64_t addr, uint16_t v)
     check("  ESR.DFSC", abort_esr & 0x3f, DFSC_SEA, 0);
 }
 
+/* A 32-bit load that must take a synchronous external abort */
+static void check_read_aborts(const char *name, uint64_t addr)
+{
+    expect_abort = 1;
+    abort_esr = 0;
+    (void)read32(addr);
+    if (expect_abort) {
+        expect_abort = 0;
+        puts_("FAIL ");
+        puts_(name);
+        puts_(": read completed without an abort\n");
+        failures++;
+        return;
+    }
+    check("  ESR.EC", abort_esr >> 26, ESR_EC_DABT_CUR, 0);
+    check("  ESR.DFSC", abort_esr & 0x3f, DFSC_SEA, 0);
+}
+
 /* Bring the GIC up as a kernel does, for one SPI routed to this CPU */
 static void gic_enable_spi(unsigned intid)
 {
@@ -364,6 +392,11 @@ void probe_main(void)
     puts_("-- SMR write with CM = 1\n");
     check_write_aborts("SMR CM = 1", SCIF0 + SMR, SMR_CM);
     check("SMR after the refused write", mmio_read16(SCIF0 + SMR), 0, 0);
+
+    /* CPG registers the model does not implement fail visibly */
+    puts_("-- CPG reads outside the model\n");
+    check_read_aborts("CPG +0x510 (unlisted)", CPG + CPG_UNLISTED);
+    check_read_aborts("CPG +0xb30 (PCHMON)", CPG + CPG_CLUSTER_PCHMON);
 
     /* AC13: SCIF0 TXI reaches the CPU as INTID 415 */
     puts_("-- SCIF0 TXI through the GIC\n");

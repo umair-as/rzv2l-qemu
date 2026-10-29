@@ -1,4 +1,9 @@
 # Lines allowed in the -d unimp,guest_errors,invalid_mem log of the hello
-# probe run: exactly its two deliberate accesses (M2 spec AC09, AC10).
+# probe run: exactly its deliberate accesses. The first two are the SCIFA
+# ones (M2 spec AC09, AC10).
 rz_scifa_read: read at undefined offset 0x18
 rz_scifa_write: clock synchronous mode not supported
+# The two CPG reads outside the model (clock controller unit): an offset
+# Table 7.5 does not list, and CPG_CLUSTER_PCHMON, listed but not modelled.
+rzv2l_cpg_read: unimplemented read at offset 0x510
+rzv2l_cpg_read: unimplemented read at offset 0xb30
