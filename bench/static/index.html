@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>rzv2l bench</title>
 <link rel="icon" href="data:,">
+<script>
+  // Before first paint: the remembered theme, so the page never flashes
+  try {
+    const t = localStorage.getItem("bench.theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  } catch (e) { /* no storage: System */ }
+</script>
 <link rel="stylesheet" href="/static/vendor/xterm.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -12,25 +19,39 @@
 <header class="bar">
   <div class="brand">rzv2l <span>bench</span></div>
   <select id="profile" data-testid="profile-select" aria-label="Profile"></select>
-  <div class="controls">
+  <div class="controls" role="group" aria-label="Session">
     <button id="start" data-testid="btn-start" class="primary">Start</button>
     <button id="start-paused" data-testid="btn-start-paused">Start paused</button>
-    <label class="check" title="Adds -gdb on a free loopback port and starts paused; connect gdb, then continue from gdb">
-      <input type="checkbox" id="gdb" data-testid="gdb-option"> Start with gdbstub
+    <label class="toggle" title="Start with gdbstub: adds -gdb on a free loopback port and starts paused. Connect gdb, then continue from gdb.">
+      <input type="checkbox" id="gdb" data-testid="gdb-option"> gdbstub
     </label>
+    <span class="sep" aria-hidden="true"></span>
     <button id="pause" data-testid="btn-pause" disabled>Pause</button>
     <button id="reset" data-testid="btn-reset" disabled>Reset</button>
     <button id="stop" data-testid="btn-stop" class="danger" disabled>Stop</button>
   </div>
-  <div class="status">
-    <span id="state" class="pill" data-testid="status" data-state="none" role="status" aria-label="Session status">no session</span>
-    <span id="verdict" class="pill" data-testid="verdict" data-verdict="" role="status" aria-label="Verdict" hidden></span>
-    <span id="exit" data-testid="exit-code" role="status" aria-label="Exit status" hidden></span>
+
+  <div class="readout" id="readout" data-testid="readout" data-state="none" data-verdict="" aria-live="polite">
+    <span class="led" aria-hidden="true"></span>
+    <span id="state" data-testid="status" data-state="none" role="status" aria-label="Session status">no session</span>
+    <span id="verdict" class="verdict" data-testid="verdict" data-verdict="" role="status" aria-label="Verdict" hidden></span>
+    <span id="markers" class="meta" data-testid="markers" hidden></span>
+    <span id="exit" class="meta" data-testid="exit-code" role="status" aria-label="Exit status" hidden></span>
+    <span id="duration" class="meta" data-testid="duration" hidden></span>
+  </div>
+
+  <div class="theme" role="radiogroup" aria-label="Theme">
+    <button role="radio" data-theme-choice="system" data-testid="theme-system" aria-checked="true">System</button>
+    <button role="radio" data-theme-choice="light" data-testid="theme-light" aria-checked="false">Light</button>
+    <button role="radio" data-theme-choice="dark" data-testid="theme-dark" aria-checked="false">Dark</button>
   </div>
 </header>
-<p id="profile-desc" class="desc"></p>
-<p id="gdb-info" class="desc" data-testid="gdb-info" hidden></p>
-<p id="verdict-why" class="desc" data-testid="verdict-reasons" hidden></p>
+
+<div class="notes">
+  <p id="profile-desc" class="desc"></p>
+  <p id="verdict-why" class="why" data-testid="verdict-reasons" hidden></p>
+  <p id="gdb-info" class="gdb" data-testid="gdb-info" hidden></p>
+</div>
 
 <main>
   <section class="panel console-panel">
@@ -52,17 +73,27 @@
     </nav>
 
     <div class="tab-body" data-panel="log">
-      <p class="hint">QEMU <code>-d</code> log and QEMU's own messages.</p>
-      <pre id="log" data-testid="log-lines" class="scroll" role="log" aria-label="QEMU log"></pre>
+      <details id="cmdline" class="cmdline" data-testid="cmdline" hidden>
+        <summary>Command line <span id="cmdline-bin" class="hint"></span></summary>
+        <div class="cmdline-body">
+          <pre id="cmdline-text" data-testid="cmdline-text"></pre>
+          <button id="cmdline-copy" data-testid="cmdline-copy" type="button">Copy</button>
+        </div>
+      </details>
+      <pre id="log" data-testid="log-lines" class="scroll" role="log" aria-label="QEMU log"
+           data-empty="QEMU's -d log and its own messages appear here once a session starts."></pre>
     </div>
 
     <div class="tab-body" data-panel="coverage" hidden>
       <p class="hint">What the guest touched that the model does not provide. Each row is either fixed or listed as a gap.
         <a id="cov-csv" data-testid="coverage-csv" href="#" hidden download>Download CSV</a></p>
-      <table data-testid="coverage-table" aria-label="Coverage">
-        <thead><tr><th>Kind</th><th>Access</th><th>Where</th><th>Size</th><th>Count</th></tr></thead>
-        <tbody id="coverage"></tbody>
-      </table>
+      <p id="cov-empty" class="empty" data-testid="coverage-empty">Start a session to see what the guest touches outside the model.</p>
+      <div class="table-wrap">
+        <table data-testid="coverage-table" aria-label="Coverage">
+          <thead><tr><th>Kind</th><th>Access</th><th>Where</th><th>Size</th><th>Count</th></tr></thead>
+          <tbody id="coverage"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="tab-body" data-panel="monitor" hidden>
@@ -77,30 +108,37 @@
         <input id="monitor-input" data-testid="monitor-input" aria-label="Monitor command" placeholder="info …" autocomplete="off" spellcheck="false">
         <button data-testid="monitor-run">Run</button>
       </form>
-      <pre id="monitor-out" data-testid="monitor-output" class="scroll" role="log" aria-label="Monitor output"></pre>
+      <pre id="monitor-out" data-testid="monitor-output" class="scroll" role="log" aria-label="Monitor output"
+           data-empty="Read-only info commands. Pick one above or type one; state changes use the header buttons."></pre>
     </div>
 
     <div class="tab-body" data-panel="events" hidden>
-      <p class="hint">QMP events.</p>
-      <pre id="events" data-testid="events" class="scroll" role="log" aria-label="QMP events"></pre>
+      <pre id="events" data-testid="events" class="scroll" role="log" aria-label="QMP events"
+           data-empty="QMP events (STOP, RESUME, RESET, SHUTDOWN) appear here as they happen."></pre>
     </div>
 
     <div class="tab-body" data-panel="runs" hidden>
-      <p class="hint">Runs kept in <code>build/bench/</code>, newest first. Pick one to view its files.</p>
-      <div class="table-scroll">
+      <div class="runs-head">
+        <p class="hint">Runs kept in <code>build/bench/</code>, newest first. Pick one to view its files.</p>
+        <label class="toggle"><input type="checkbox" id="hide-tests" data-testid="runs-hide-tests"> Hide test runs</label>
+      </div>
+      <p id="runs-empty" class="empty" data-testid="runs-empty" hidden>No runs yet. Start a session and it is kept here.</p>
+      <div class="table-wrap runs-wrap">
         <table data-testid="runs-table" aria-label="Runs">
-          <thead><tr><th>Profile</th><th>Started</th><th>Exit</th><th>Verdict</th></tr></thead>
+          <thead><tr><th>Profile</th><th>Started</th><th>Exit</th><th>Verdict</th><th>Duration</th></tr></thead>
           <tbody id="runs"></tbody>
         </table>
       </div>
       <div id="run-view" data-testid="run-view" hidden>
-        <div class="chips">
+        <div class="run-bar">
           <b id="run-name" data-testid="run-name"></b>
-          <button data-file="console" data-testid="run-console">console</button>
-          <button data-file="log" data-testid="run-log">log</button>
-          <button data-file="stderr" data-testid="run-stderr">stderr</button>
-          <button data-file="cmdline" data-testid="run-cmdline">cmdline</button>
-          <a id="run-csv" data-testid="run-coverage-csv" href="#" download>coverage CSV</a>
+          <div class="chips">
+            <button data-file="console" data-testid="run-console">console</button>
+            <button data-file="log" data-testid="run-log">log</button>
+            <button data-file="stderr" data-testid="run-stderr">stderr</button>
+            <button data-file="cmdline" data-testid="run-cmdline">cmdline</button>
+            <a id="run-csv" data-testid="run-coverage-csv" href="#" download>coverage CSV</a>
+          </div>
         </div>
         <pre id="run-out" data-testid="run-output" class="scroll" role="log" aria-label="Run file"></pre>
       </div>

@@ -36,6 +36,8 @@ PROFILES = HERE / "profiles"
 STATIC = HERE / "static"
 RUNS = ROOT / "build" / "bench"
 DEVICE_MAP = ROOT / "docs" / "device-map.md"
+# Who starts runs: "test" when the bench's own tests run it (BENCH_RUN_ORIGIN)
+ORIGIN = os.environ.get("BENCH_RUN_ORIGIN") or "manual"
 RUN_ID = re.compile(r"^(?P<stamp>\d{8}-\d{6}-\d{3})-(?P<profile>[\w.-]+)$")
 
 # Read-only HMP commands the monitor panel may run (no writes to host files,
@@ -79,6 +81,17 @@ def classify(line):
             return (kind, g.get("access") or "access", where,
                     g.get("size") or "", g.get("reason") or "")
     return ("other", "", line.strip(), "", "")
+
+
+def crlf(data, after_cr=False):
+    """(data with each lone \n as \r\n, whether data ends in \r).
+
+    after_cr: the previous chunk ended in \r, so a leading \n is not lone.
+    """
+    out = re.sub(rb"(?<!\r)\n", b"\r\n", data)
+    if after_cr and data.startswith(b"\n"):
+        out = out[1:]                       # undo the \r added at the start
+    return out, data.endswith(b"\r")
 
 
 def count_log(path):
@@ -372,6 +385,7 @@ class Session:
         self.cov = collections.Counter()   # all lines, not just the kept ones
         self.tail_task = None
         self.tasks = []
+        self.watch_task = None
         self.con_tasks = []
         self.found = set()          # expect markers seen since Start/Reset
         self.resets = 0             # QMP RESET events: the pumps drop their tails
@@ -415,7 +429,8 @@ class Session:
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
                 start_new_session=True, preexec_fn=_die_with_parent)
             self.tasks.append(asyncio.create_task(self._pump_stderr()))
-            self.tasks.append(asyncio.create_task(self._watch_exit()))
+            self.watch_task = asyncio.create_task(self._watch_exit())
+            self.tasks.append(self.watch_task)
             await self.qmp.connect(str(self.sock_dir / "qmp.sock"),
                                    lambda: self.proc.returncode is None)
             reader, self.con_writer = await asyncio.open_unix_connection(
@@ -424,7 +439,8 @@ class Session:
             if self.profile["semihosting"]:
                 semi, self.semi_writer = await asyncio.open_unix_connection(
                     str(self.sock_dir / "semi.sock"))
-                self.con_tasks.append(asyncio.create_task(self._pump_console(semi)))
+                self.con_tasks.append(asyncio.create_task(
+                    self._pump_console(semi, semihosting=True)))
             self.tasks += self.con_tasks
             self.tail_task = asyncio.create_task(self._tail_log())
             self.tasks.append(self.tail_task)
@@ -525,17 +541,23 @@ class Session:
                 f.flush()
                 await self._emit("stderr", dec.decode(line))
 
-    async def _pump_console(self, reader):
-        await self._reported("console pump", self._pump_console_inner(reader))
+    async def _pump_console(self, reader, semihosting=False):
+        await self._reported("console pump",
+                             self._pump_console_inner(reader, semihosting))
 
-    async def _pump_console_inner(self, reader):
+    async def _pump_console_inner(self, reader, semihosting=False):
         dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        after_cr = False            # semihosting: a \r ending the last read
         markers = [m.encode() for m in self.profile["expect"]]
         keep = max((len(m) for m in markers), default=1) - 1
         tail = b""                  # a marker may straddle two reads
         resets = self.resets
         with (self.run_dir / "console.log").open("ab") as f:
             while data := await reader.read(4096):
+                if semihosting:
+                    # SYS_WRITE0 text ends lines with a bare \n; a terminal
+                    # needs \r\n. Serial output is passed on byte-exact.
+                    data, after_cr = crlf(data, after_cr)
                 f.write(data)
                 f.flush()
                 if resets != self.resets:   # nothing before a reset counts
@@ -647,7 +669,9 @@ class Session:
                 "expect_missing": [m for m in self.profile["expect"]
                                    if m not in self.found],
                 "gdb_port": self.gdb_port,
+                "origin": ORIGIN,
                 "uptime": round(time.time() - self.started, 1),
+                "started": self.started, "ended": self.ended,
                 "run": self.run_dir.name,
                 "run_dir": str(self.run_dir.relative_to(ROOT)),
                 "cmdline": " ".join(self.argv)}
@@ -903,8 +927,14 @@ def make_app(port=8090):
         return ws
 
     async def on_shutdown(_):
-        if bench.session:
-            await bench.session.stop()
+        s = bench.session
+        if s:
+            await s.stop()
+            if s.watch_task:        # let it write run.json before the loop ends
+                try:
+                    await asyncio.wait_for(asyncio.shield(s.watch_task), 10)
+                except asyncio.TimeoutError:
+                    pass
         for ws in list(bench.clients):
             await ws.close()
 

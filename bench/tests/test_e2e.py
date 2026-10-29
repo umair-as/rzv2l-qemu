@@ -45,7 +45,7 @@ def free_port():
 def server():
     port = free_port()
     proc = subprocess.Popen([sys.executable, "bench/server.py", "--port", str(port)],
-                            cwd=ROOT)
+                            cwd=ROOT, env={**os.environ, "BENCH_RUN_ORIGIN": "test"})
     url = f"http://127.0.0.1:{port}"
     for _ in range(50):
         try:
@@ -333,3 +333,124 @@ def test_m1_probe_through_the_bench(server):
     assert st["verdict"] == "pass", st["verdict_reasons"]
     meta = json.loads((ROOT / st["run_dir"] / "run.json").read_text())
     assert meta["verdict"] == "pass" and meta["exit_code"] == 0
+
+
+# ---- UX: theme toggle and the semihosting staircase --------------------------
+
+LIGHT_BG, DARK_BG = "rgb(238, 241, 245)", "rgb(13, 17, 23)"          # --bg
+LIGHT_TERM, DARK_TERM = "rgb(246, 248, 250)", "rgb(10, 14, 19)"      # --term-bg
+
+
+def colours(page):
+    return page.evaluate("""() => [
+        getComputedStyle(document.body).backgroundColor,
+        getComputedStyle(document.querySelector('#term .xterm-viewport')).backgroundColor]""")
+
+
+def test_theme_toggle(server):
+    """System / Light / Dark: remembered per browser; the terminal follows."""
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        ctx = browser.new_context(color_scheme="light")
+        page = ctx.new_page()
+        page.goto(server)
+        expect(page.get_by_test_id("theme-system")).to_have_attribute("aria-checked", "true")
+        assert colours(page) == [LIGHT_BG, LIGHT_TERM]
+
+        page.get_by_test_id("theme-dark").click()
+        expect(page.locator("html")).to_have_attribute("data-theme", "dark")
+        assert colours(page) == [DARK_BG, DARK_TERM]
+        page.reload()                                   # remembered
+        expect(page.get_by_test_id("theme-dark")).to_have_attribute("aria-checked", "true")
+        assert colours(page) == [DARK_BG, DARK_TERM]
+
+        # System follows the OS scheme, live, terminal included
+        page.get_by_test_id("theme-system").click()
+        assert colours(page) == [LIGHT_BG, LIGHT_TERM]
+        page.emulate_media(color_scheme="dark")
+        page.wait_for_function(
+            "getComputedStyle(document.querySelector('#term .xterm-viewport'))"
+            f".backgroundColor === '{DARK_TERM}'")
+        assert colours(page) == [DARK_BG, DARK_TERM]
+        page.reload()
+        expect(page.get_by_test_id("theme-system")).to_have_attribute("aria-checked", "true")
+        ctx.close()
+
+        # Without usable storage the page still works and the toggle applies
+        ctx = browser.new_context(color_scheme="light")
+        ctx.add_init_script("""Object.defineProperty(window, 'localStorage',
+            { get() { throw new DOMException('denied', 'SecurityError'); } });""")
+        page = ctx.new_page()
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(server)
+        expect(page.get_by_test_id("profile-select")).to_contain_text("virt")
+        page.get_by_test_id("theme-dark").click()
+        assert colours(page) == [DARK_BG, DARK_TERM]
+        assert errors == []
+        browser.close()
+
+
+@pytest.mark.skipif(not PROJECT_QEMU.exists(),
+                    reason="needs the project QEMU (BENCH_QEMU or build/qemu)")
+def test_semihosting_lines_start_at_column_0(server):
+    """The M1 probe prints through semihosting with bare \\n; each line must
+    start at column 0 in the terminal, and the transcript carries \\r\\n."""
+    post(server, "/api/session/stop", b"{}", JSON_H)
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 860})
+        page.goto(server)
+        page.get_by_test_id("profile-select").select_option("rzv2l-smarc-m1-probe")
+        page.get_by_test_id("btn-start").click()
+        expect(page.get_by_test_id("status")).to_have_attribute(
+            "data-state", "exited", timeout=60_000)
+        expect(page.get_by_test_id("console-text")).to_contain_text("RESULT: PASS")
+        rows = page.evaluate("""() => [...document.querySelectorAll(
+            '#term .xterm-rows > div')].map((r) => r.textContent)""")
+        browser.close()
+    printed = [r.rstrip() for r in rows if r.strip()]
+    assert any(r.startswith("RESULT: PASS") for r in printed), printed
+    assert all(r == r.lstrip() for r in printed), printed     # no staircase
+    text = get_json(server, "/api/session/console")["text"]
+    assert "RESULT: PASS" in text and re.search(r"(?<!\r)\n", text) is None
+
+
+def test_serial_output_stays_byte_exact(server):
+    """virt-echo answers Enter with a bare \\n on the PL011: it must arrive as is."""
+    post(server, "/api/session/stop", b"{}", JSON_H)
+    assert post(server, "/api/session", b'{"profile": "virt-echo"}', JSON_H) == 200
+    for _ in range(100):
+        if "echo ready" in get_json(server, "/api/session/console")["text"]:
+            break
+        time.sleep(0.1)
+    post(server, "/api/session/console", b'{"data": "a\\rb"}', JSON_H)
+    for _ in range(50):
+        text = get_json(server, "/api/session/console")["text"]
+        if text.endswith("b"):
+            break
+        time.sleep(0.1)
+    post(server, "/api/session/stop", b"{}", JSON_H)
+    assert text.endswith("echo ready\r\na\nb"), repr(text[-40:])
+
+
+def test_shutdown_records_the_running_session():
+    """Stopping the bench while a session runs still finishes its run.json."""
+    port = free_port()
+    proc = subprocess.Popen([sys.executable, "bench/server.py", "--port", str(port)],
+                            cwd=ROOT, env={**os.environ, "BENCH_RUN_ORIGIN": "test"})
+    url = f"http://127.0.0.1:{port}"
+    try:
+        for _ in range(50):
+            try:
+                urllib.request.urlopen(url + "/api/profiles", timeout=1)
+                break
+            except OSError:
+                time.sleep(0.1)
+        assert post(url, "/api/session", b'{"profile": "virt-echo"}', JSON_H) == 200
+        run_dir = ROOT / get_json(url, "/api/session")["run_dir"]
+    finally:
+        proc.terminate()                    # SIGTERM: aiohttp's graceful shutdown
+        proc.wait(20)
+    meta = json.loads((run_dir / "run.json").read_text())
+    assert meta["state"] == "exited", meta["state"]
