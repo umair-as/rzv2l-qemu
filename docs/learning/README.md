@@ -9,6 +9,7 @@ How this project's QEMU model works, explained from real monitor output, code an
 | [`qemu-basics.md`](qemu-basics.md) | what QEMU is; the memory map; devices, objects and properties; how a register gets from the manual into the model |
 | [`m1-machine-tour.md`](m1-machine-tour.md) | how the M1 board, SoC and devices fit together; a hands-on monitor tour |
 | [`m2-first-character.md`](m2-first-character.md) | M2: reading the EVK registers at the U-Boot prompt; the SCIFA model, its tests, the hello probe, the first Linux lines; what the review found; the SCIFA pitfalls |
+| [`m3-linux-shell.md`](m3-linux-shell.md) | M3: the CPG model (write enables, computed monitors, two start states), the stubbed windows, the next blocker; the CPG pitfalls |
 | [`testing.md`](testing.md) | qtests, the guest probe, the acceptance run, the device-tree check |
 | [`building-and-testing.md`](building-and-testing.md) | the commands: building, running tests, style check, tracing, editor setup |
 | [`glossary.md`](glossary.md) | the terms |
