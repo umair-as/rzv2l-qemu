@@ -12,6 +12,7 @@ Contents:
 5. [Watching a device at work: trace points and logs](#5-watching-a-device-at-work-trace-points-and-logs)
 6. [Editor setup: VS Code with clangd](#6-editor-setup-vs-code-with-clangd)
 7. [Gotchas](#7-gotchas)
+8. [Booting the G0 Linux kernel](#8-booting-the-g0-linux-kernel)
 
 ---
 
@@ -49,7 +50,7 @@ ninja qemu-system-aarch64
 
 Ninja compiles again only what changed. Ninja also sees changes to `Kconfig`, `meson.build` or `trace-events`: it runs meson again first.
 
-A new `.c` file compiles only when a machine selects its Kconfig switch. For this project the chain is `RZV2L_SMARC` (board, on by default) → `R9A07G054` (SoC) → `RENESAS_RZG2L_SYSC` and `ARM_GIC`.
+A new `.c` file compiles only when a machine selects its Kconfig switch. For this project the chain is `RZV2L_SMARC` (board, on by default) → `R9A07G054` (SoC) → `ARM_GIC`, `RENESAS_RZG2L_SYSC`, `RENESAS_RZV2L_CPG` and `RENESAS_RZ_SCIFA`.
 
 If no machine selects the switch of a file yet (as for SYSC during M1-T02), compile-check the file by hand:
 1. Copy the command of a file in the same directory from `compile_commands.json`.
@@ -277,3 +278,33 @@ Reading QEMU code in the editor:
 | a new device file never compiles | its Kconfig switch is not selected by any machine yet | expected until the SoC selects it; compile-check by hand ([§2](#2-rebuilding-after-an-edit)) |
 | clangd: every QEMU type "unknown" | clangd cannot find `compile_commands.json` | [§6](#6-editor-setup-vs-code-with-clangd) |
 | checkpatch: "does MAINTAINERS need updating?" | new file not listed in `MAINTAINERS` | added once with the board (M1-T04) |
+| `-d unimp,guest_errors,invalid_mem` prints the list of log items and QEMU exits; or `-M rzv2l-smarc` is unknown | the shell ran the distribution QEMU (`/usr/bin/qemu-system-aarch64`, 8.2.2 on Ubuntu 24.04), which has no `invalid_mem` mask and no RZ/V2L machine | run `build/qemu/qemu-system-aarch64` ([§8](#8-booting-the-g0-linux-kernel)) |
+
+## 8. Booting the G0 Linux kernel
+
+G0 is a mainline Linux kernel (v6.12.59, arm64 `defconfig`) with the upstream device tree of the board, both unmodified. Build them once:
+
+```bash
+tests/guests/g0/build-kernel.sh     # tests/guests/out/g0/linux/arch/arm64/boot/Image
+tests/guests/g0/build-dtb.sh        # tests/guests/out/g0/r9a07g054l2-smarc.dtb
+```
+
+Boot it from the repository root with the project's QEMU. Do not use `qemu-system-aarch64` from your `PATH`: that is the distribution QEMU ([§7](#7-gotchas)).
+
+```bash
+build/qemu/qemu-system-aarch64 -M rzv2l-smarc \
+    -kernel tests/guests/out/g0/linux/arch/arm64/boot/Image \
+    -dtb tests/guests/out/g0/r9a07g054l2-smarc.dtb \
+    -append "ignore_loglevel rw root=/dev/nfs ip=on earlycon" \
+    -display none -nodefaults -chardev file,id=scif0,path=build/serial.log -serial chardev:scif0 \
+    -d unimp,guest_errors,invalid_mem -D build/qemu.log
+```
+
+- The terminal stays empty: the output goes to files under `build/` (ignored by git). `build/serial.log` gets the guest console (SCIF0). `build/qemu.log` gets one line for each access the model does not implement, and for each access to an unmapped address.
+- To watch the console in the terminal instead, replace the `-chardev … -serial chardev:scif0` pair with `-serial mon:stdio`. Then Ctrl-A X stops QEMU, and Ctrl-A C switches to the QEMU monitor.
+- `-append` is the device tree's own boot arguments plus `earlycon`, a recorded gap (device map §4 row 6).
+- The kernel output stops at `printk: legacy bootconsole [scif0] disabled`, because the real serial driver cannot start yet. To see the rest of the boot, add `keep_bootcon` to `-append`. It is for diagnosis only.
+- When the kernel panics, QEMU keeps running: the run has ended when `build/serial.log` ends with `end Kernel panic`. Stop QEMU with Ctrl-C.
+- Add `-trace "renesas_rzv2l_cpg_*"` to see each CPG register access in `qemu.log` ([§5](#5-watching-a-device-at-work-trace-points-and-logs)).
+
+Where the boot stops today, and why, is in the latest unit page: [`../units/M3b-cpg/spec.md`](../units/M3b-cpg/spec.md) ("Next blocker").

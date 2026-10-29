@@ -42,14 +42,18 @@ The direct-mode overlay is the 23 words where the EVK differs from Table 7.5. It
 
 The G0 kernel with DTB-U no longer aborts in the CPG. The `-d` log has no access to `0x1101xxxx`. The boot then stops at a block that needs a model of its own (OSTM, PFC, IRQC or sh-sci). Windows touched before that point are mapped with their device-map class. The qtests assert the manual and EVK values above, and each one is seen red on a plausible mutation (`tasks.md`).
 
+From the repository root, with the project's QEMU (a distribution `qemu-system-aarch64` has no `rzv2l-smarc` machine; QEMU 8.x also lacks the `invalid_mem` mask and prints the `-d` help instead):
+
 ```
-qemu-system-aarch64 -M rzv2l-smarc -kernel Image -dtb r9a07g054l2-smarc.dtb \
+build/qemu/qemu-system-aarch64 -M rzv2l-smarc \
+    -kernel tests/guests/out/g0/linux/arch/arm64/boot/Image \
+    -dtb tests/guests/out/g0/r9a07g054l2-smarc.dtb \
     -append "ignore_loglevel rw root=/dev/nfs ip=on earlycon" \
-    -display none -nodefaults -chardev file,id=scif0,path=serial.log -serial chardev:scif0 \
-    -d unimp,guest_errors,invalid_mem -D qemu.log
+    -display none -nodefaults -chardev file,id=scif0,path=build/serial.log -serial chardev:scif0 \
+    -d unimp,guest_errors,invalid_mem -D build/qemu.log
 ```
 
-`Image` and the DTB come from `tests/guests/g0/build-kernel.sh` and `build-dtb.sh`. Add `keep_bootcon` to see past the console handover; it is for diagnosis only, as in M2.
+The terminal stays empty; see `../../learning/building-and-testing.md` §8 for the output files and a live-console variant. `Image` and the DTB come from `tests/guests/g0/build-kernel.sh` and `build-dtb.sh`. Add `keep_bootcon` to see past the console handover; it is for diagnosis only, as in M2. After the panic QEMU keeps running: stop it with Ctrl-C.
 
 ## Evidence
 
