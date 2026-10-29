@@ -11,3 +11,7 @@ log = "unimp,guest_errors,invalid_mem"
 # Verdict: the probe's own summary line on the console, and its exit status
 expect = ["RESULT: PASS"]
 expect_exit = 0
+
+# Semihosting text ends lines with a bare LF: draw it as CRLF (display only)
+[console]
+lf_to_crlf = true

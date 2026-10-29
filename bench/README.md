@@ -25,7 +25,16 @@ A profile is a small TOML file in [`profiles/`](profiles/): QEMU binary, argumen
 
 Each run keeps its command line, console, stderr, QEMU log and `run.json` (profile, times, exit code, verdict, origin) in `build/bench/<time>-<profile>/`. The **Runs** tab lists them, newest first, with their duration, and opens each one's files. Runs started by the bench's own tests (`BENCH_RUN_ORIGIN=test`, set by `bench/tests`) carry a *test* tag and can be hidden.
 
-The console shows serial output byte for byte. Semihosting text ends lines with a bare `\n`, so the bench turns each lone `\n` on the semihosting stream into `\r\n`; the transcript and `console.log` hold it that way.
+## Console settings
+
+Like a serial terminal's map options, per profile, and in the console's **Settings** menu for the current session:
+
+| Profile key | Menu | Default | Effect |
+|---|---|---|---|
+| `[console] lf_to_crlf` | Show lone LF as CRLF | `false` | the terminal draws a bare `\n` as a new line at column 0 |
+| `[console] enter` | Enter sends | `"cr"` | what the Enter key sends: `"cr"`, `"lf"` or `"crlf"` |
+
+The defaults are raw, so a Linux shell is untouched. The M1 probe sets `lf_to_crlf = true`: semihosting text ends lines with a bare `\n`. The map is display only: the transcript, `console.log`, the API and the verdict always hold the guest's bytes. A menu change lasts until another profile is picked.
 
 ## Verdict
 
@@ -78,6 +87,8 @@ uv run pytest bench/tests
 The test drives the UI on stock QEMU `virt` with a small bare-metal echo program (`tests/virt-echo/`): console in and out, coverage, monitor allow-list, pause, reset, exit status, verdict, the Runs tab, the CSV download and the gdbstub. `test_verdict.py` and `test_device_map.py` check the verdict rules and the window grouping without QEMU. With `BENCH_QEMU` set (or `build/qemu` built), the M1 probe also runs through the bench and must reach PASS.
 
 ## Limits
+
+- No local echo or local line editing in the console: every guest so far echoes its own input (or reads none). Added when a guest needs it.
 
 - One session, no authentication: it binds to `127.0.0.1` and refuses requests whose `Host` is not a loopback name or whose `Origin` is another site (a web page in your browser cannot drive it). Don't expose it.
 - The coverage list counts every `-d` log line of the run: known forms are grouped by address, anything else is listed verbatim as `other`.

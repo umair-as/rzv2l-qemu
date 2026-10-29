@@ -58,6 +58,22 @@ let profiles = [];
 let state = "none";
 let ws;
 
+// ---- console settings (display and keyboard only; bytes stay raw) ------------
+
+const ENTER = { cr: "\r", lf: "\n", crlf: "\r\n" };
+
+function applyConsoleSettings() {
+  term.options.convertEol = $("lf-crlf").checked;   // draws \n as \r\n
+}
+
+function consoleDefaults() {
+  const p = profiles.find((x) => x.id === $("profile").value);
+  const c = (p && p.console) || { lf_to_crlf: false, enter: "cr" };
+  $("lf-crlf").checked = c.lf_to_crlf;
+  $("enter-sends").value = c.enter;
+  applyConsoleSettings();
+}
+
 // ---- REST ------------------------------------------------------------------
 
 async function api(method, path, body) {
@@ -79,6 +95,7 @@ async function loadProfiles() {
     $("profile").append(o);
   }
   showDesc();
+  consoleDefaults();
 }
 
 function showDesc() {
@@ -201,7 +218,11 @@ function setStatus(s) {
   } else {
     exit.hidden = true;
   }
-  if (s.profile && live) { $("profile").value = s.profile; showDesc(); }
+  if (s.profile && live && $("profile").value !== s.profile) {
+    $("profile").value = s.profile;
+    showDesc();
+    consoleDefaults();
+  }
 }
 
 let covTimer;
@@ -362,7 +383,8 @@ function connect() {
 
 term.onData((d) => {
   if (ws && ws.readyState === WebSocket.OPEN && (state === "running" || state === "paused")) {
-    ws.send(JSON.stringify({ t: "key", d }));
+    // Enter arrives as \r: send what the profile or the menu asks for
+    ws.send(JSON.stringify({ t: "key", d: d.replace(/\r/g, ENTER[$("enter-sends").value]) }));
   }
 });
 
@@ -394,7 +416,8 @@ async function monitor(cmd) {
   }
 }
 
-$("profile").addEventListener("change", showDesc);
+$("profile").addEventListener("change", () => { showDesc(); consoleDefaults(); });
+$("lf-crlf").onchange = applyConsoleSettings;
 $("start").onclick = () => start(false);
 $("start-paused").onclick = () => start(true);
 $("pause").onclick = () => action(state === "paused" ? "/api/session/resume" : "/api/session/pause");
