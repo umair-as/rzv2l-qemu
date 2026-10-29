@@ -109,6 +109,20 @@ U-Boot echoes each command on SCIF0, so a read straight after the echo sees the 
 | EVK-R70 | no abort. SCIF0 `+0x18` reads `0x0000` | `0x0000` or abort | answered: zero, no bus error (scif.md Q4) |
 | EVK-R71 | no abort. PFC `+0x3100` reads `0x00000000` | `0` or abort | answered: zero (pinctrl.md Q4) |
 
+**X01/X02 values the rows above do not list** (added 2026-10-29 for the CPG model's direct-boot start state; copied from the raw transcript, SHA-256 `07d97c90…15fb2` as above). Each word differs from its Table 7.5 reset value; its monitor follows the rules above.
+
+| Offset | Register | Measured | Reset (Table 7.5) | Monitor measured |
+|---|---|---|---|---|
+| `0x54C` | CPG_CLKON_DDR | `0x3` | `0x0` | CLK_MON `0x6CC` = `0x3` |
+| `0x550` | CPG_CLKON_SPI_MULTI | `0x3` | `0x0` | CLK_MON `0x6D0` = `0x3` |
+| `0x578` | CPG_CLKON_USB | `0xF` | `0x0` | CLK_MON `0x6F8` = `0xF` |
+| `0x84C` | CPG_RST_DDR | `0x7F` | `0x0` | RSTMON `0x9CC` = `0x0` |
+| `0x850` | CPG_RST_SPI | `0x1` | `0x0` | RSTMON `0x9D0` = `0x0` |
+| `0x878` | CPG_RST_USB | `0xF` | `0x0` | RSTMON `0x9F8` = `0x0` |
+| `0x87C` | CPG_RST_ETH | `0x3` | `0x0` | RSTMON `0x9FC` = `0x0` |
+| `0x880` | CPG_RST_I2C | `0xF` | `0x0` | RSTMON `0xA00` = `0x0` |
+
+
 ## Cause of each DIFFERS row
 
 "Firmware" means the value depends on what TF-A or U-Boot did before the prompt, so it is a direct-mode start value for this firmware, not a reset value. "Silicon" means no firmware write can explain it.
