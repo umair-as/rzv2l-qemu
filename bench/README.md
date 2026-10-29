@@ -36,6 +36,23 @@ Like a serial terminal's map options, per profile, and in the console's **Settin
 
 The defaults are raw, so a Linux shell is untouched. The M1 probe sets `lf_to_crlf = true`: semihosting text ends lines with a bare `\n`. The map is display only: the transcript, `console.log`, the API and the verdict always hold the guest's bytes. A menu change lasts until another profile is picked.
 
+## What emulation shows that silicon can't
+
+Read-only views, from stock QEMU monitor commands the bench runs itself at start (before the guest runs), kept with the run as `mtree.txt` and `qtree.txt`:
+
+- **Map:** `info mtree -f` (the `memory` address space) against the windows of `docs/device-map.md` §1. Each window is *modelled*, *RAM*, *UNIMP* (an `unimplemented-device`, known by its `name` property in `info qtree`) or *missing*, marked *part* when the live regions cover only part of it. Each window also shows the live region names, the coverage hits from the `-d` log (absolute addresses, and `unimp` offsets placed through the device's base), and the milestone that needs it, with the full plan on hover. Live regions in no window are listed below the table. Filters: in this build, missing, hit. `GET /api/runs/<run>/map`.
+- **Devices:** `info qtree` as a tree you can filter by type, name or property. `GET /api/runs/<run>/devices`.
+- **Readiness:** next to the profile picker, before Start. *ready*; *builds on Start* (guest files missing, but the prepare step makes them); *missing* (no executable QEMU, or files nothing builds). The tooltip lists each file. `GET /api/profiles` returns it as `assets`.
+
+Not built yet, because nothing in the model needs them:
+
+| View | Needs |
+|---|---|
+| LCD panel (QMP `screendump`) | a display model (DU/DSI, M4) |
+| Board LEDs | the GPIO model (PFC, M3b) |
+| Snapshots (`savevm`/`loadvm`) | a writable block device; direct mode has none |
+| Swap a kernel or DTB without editing the profile | M3 Linux bring-up, if it needs it |
+
 ## Verdict
 
 | Field | Meaning |
@@ -73,7 +90,8 @@ The map's tables are prose. Rows whose bases and sizes do not pair are listed in
 | `POST /api/session/monitor` `{"cmd"}` | read-only `info …` commands only |
 | `GET /api/runs` | every run in `build/bench/`, newest first |
 | `GET /api/runs/<run>` | one run's `run.json`, or the live status |
-| `GET /api/runs/<run>/{console,log,stderr,cmdline}` | that file as text |
+| `GET /api/runs/<run>/{console,log,stderr,cmdline,mtree,qtree}` | that file as text |
+| `GET /api/runs/<run>/map`, `…/devices` | the Map and Devices views (JSON) |
 | `GET /api/runs/<run>/coverage`, `…/coverage.csv` | its coverage list (JSON, or CSV as above) |
 | `WS /ws` | live stream: console, log, status, QMP events |
 

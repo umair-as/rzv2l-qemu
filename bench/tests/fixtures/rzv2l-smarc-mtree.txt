@@ -1,0 +1,22 @@
+FlatView #0
+ AS "memory", root: system
+ AS "cpu-memory-0", root: system
+ AS "cpu-secure-memory-0", root: system
+ AS "cpu-memory-1", root: system
+ AS "cpu-secure-memory-1", root: system
+ Root memory region: system
+  000000001004b800-000000001004bbff (prio 0, i/o): renesas-rz-scifa
+  000000001004bc00-000000001004bfff (prio 0, i/o): renesas-rz-scifa
+  000000001004c000-000000001004c3ff (prio 0, i/o): renesas-rz-scifa
+  000000001004c400-000000001004c7ff (prio 0, i/o): renesas-rz-scifa
+  000000001004c800-000000001004cbff (prio 0, i/o): renesas-rz-scifa
+  0000000011020000-000000001102ffff (prio 0, i/o): renesas-rzg2l-sysc
+  0000000011900000-000000001190ffff (prio 0, i/o): gicv3_dist
+  0000000011940000-000000001197ffff (prio 0, i/o): gicv3_redist_region[0]
+  0000000040000000-00000000bfffffff (prio 0, ram): rzv2l-smarc.ram
+
+FlatView #1
+ AS "I/O", root: io
+ Root memory region: io
+  0000000000000000-000000000000ffff (prio 0, container): io
+

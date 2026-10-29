@@ -548,3 +548,62 @@ def test_echo_terminal_keys(server):
         browser.close()
     printed = [r for r in rows if r]
     assert printed[-3:] == ["ab", "de", "f"], printed
+
+
+# ---- introspection: Map, Devices, readiness ------------------------------------
+
+def test_map_lists_unlisted_regions_and_assets(server):
+    """virt is not the RZ/V2L, and the Map says so: its PCIe window lies over
+    the RZ/V2L peripheral addresses, its 128 MiB of RAM covers part of the
+    DDR window, and its own devices (pl011...) are in no device-map window."""
+    with sync_playwright() as pw:
+        browser, page = echo_page(pw, server)
+        expect(page.get_by_test_id("assets")).to_have_attribute("data-status", "ready")
+        expect(page.get_by_test_id("machine")).to_have_text("virt")
+        page.get_by_test_id("tab-map").click()
+        scif0 = page.locator('[data-testid=map-row][data-base="0x1004b800"]')
+        expect(scif0).to_contain_text("gpex_mmio_window")
+        ddr = page.locator('[data-testid=map-row][data-base="0x40000000"]')
+        expect(ddr).to_have_attribute("data-status", "ram")
+        expect(ddr.locator(".st")).to_have_attribute("data-partial", "true")
+        expect(page.get_by_test_id("map-extra-row").filter(has_text="pl011")).to_have_count(1)
+        page.get_by_test_id("map-filter-live").click()
+        expect(page.get_by_test_id("map-extra")).to_be_hidden()   # filters hide extras
+        page.get_by_test_id("btn-stop").click()
+        browser.close()
+
+
+@pytest.mark.skipif(not PROJECT_QEMU.exists(),
+                    reason="needs the project QEMU (BENCH_QEMU or build/qemu)")
+def test_map_and_devices_on_rzv2l(server):
+    """The M1 probe: SYSC modelled; its deliberate read of 0x10000000 is the
+    one hit, on a missing window; the device tree shows SYSC's DEVID."""
+    post(server, "/api/session/stop", b"{}", JSON_H)
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 1366, "height": 860})
+        page.goto(server)
+        page.get_by_test_id("profile-select").select_option("rzv2l-smarc-m1-probe")
+        page.get_by_test_id("btn-start").click()
+        expect(page.get_by_test_id("status")).to_have_attribute(
+            "data-state", "exited", timeout=60_000)
+        page.get_by_test_id("tab-map").click()
+        sysc = page.locator('[data-testid=map-row][data-base="0x11020000"]')
+        expect(sysc).to_have_attribute("data-status", "modelled")
+        expect(sysc).to_contain_text("renesas-rzg2l-sysc")
+        page.get_by_test_id("map-filter-hits").click()
+        hit = page.get_by_test_id("map-row")
+        expect(hit).to_have_count(1)
+        expect(hit).to_have_attribute("data-base", "0x10000000")
+        expect(hit).to_have_attribute("data-status", "missing")
+        expect(hit).to_have_attribute("data-hits", "1")
+
+        page.get_by_test_id("tab-devices").click()
+        page.get_by_test_id("devices-filter").fill("lsi-devid")
+        nodes = page.get_by_test_id("device-node")
+        expect(nodes).to_have_count(1)
+        expect(nodes).to_contain_text("renesas-rzg2l-sysc")
+        expect(nodes).to_contain_text("0x18447447")
+        page.get_by_test_id("devices-filter").fill("no-such-thing")
+        expect(page.get_by_test_id("devices-empty")).to_contain_text("Nothing matches")
+        browser.close()

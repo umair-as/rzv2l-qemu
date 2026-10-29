@@ -19,6 +19,7 @@
 <header class="bar">
   <div class="brand">rzv2l <span>bench</span></div>
   <select id="profile" data-testid="profile-select" aria-label="Profile"></select>
+  <span id="assets" class="assets" data-testid="assets" data-status="" hidden></span>
   <div class="controls" role="group" aria-label="Session">
     <button id="start" data-testid="btn-start" class="primary">Start</button>
     <button id="start-paused" data-testid="btn-start-paused">Start paused</button>
@@ -27,7 +28,7 @@
     </label>
     <span class="sep" aria-hidden="true"></span>
     <button id="pause" data-testid="btn-pause" disabled>Pause</button>
-    <button id="reset" data-testid="btn-reset" disabled>Reset</button>
+    <button id="reset" data-testid="btn-reset" class="warn" disabled>Reset</button>
     <button id="stop" data-testid="btn-stop" class="danger" disabled>Stop</button>
   </div>
 
@@ -35,9 +36,11 @@
     <span class="led" aria-hidden="true"></span>
     <span id="state" data-testid="status" data-state="none" role="status" aria-label="Session status">no session</span>
     <span id="verdict" class="verdict" data-testid="verdict" data-verdict="" role="status" aria-label="Verdict" hidden></span>
+    <span id="machine" class="meta" data-testid="machine" hidden></span>
     <span id="markers" class="meta" data-testid="markers" hidden></span>
     <span id="exit" class="meta" data-testid="exit-code" role="status" aria-label="Exit status" hidden></span>
     <span id="duration" class="meta" data-testid="duration" hidden></span>
+    <span id="pid" class="meta" data-testid="pid" hidden></span>
   </div>
 
   <div class="theme" role="radiogroup" aria-label="Theme">
@@ -81,6 +84,8 @@
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="log" data-testid="tab-log" aria-selected="true">Log</button>
       <button role="tab" data-tab="coverage" data-testid="tab-coverage">Coverage <b id="cov-count">0</b></button>
+      <button role="tab" data-tab="map" data-testid="tab-map">Map</button>
+      <button role="tab" data-tab="devices" data-testid="tab-devices">Devices</button>
       <button role="tab" data-tab="monitor" data-testid="tab-monitor">Monitor</button>
       <button role="tab" data-tab="events" data-testid="tab-events">Events</button>
       <button role="tab" data-tab="runs" data-testid="tab-runs">Runs</button>
@@ -108,6 +113,36 @@
           <tbody id="coverage"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="tab-body" data-panel="map" hidden>
+      <p class="hint">The run's memory map at start, against <code>docs/device-map.md</code>: what each window is in this build, and how often the guest hit it outside the model.</p>
+      <div class="chips filter" role="group" aria-label="Show">
+        <button data-map-filter="all" data-testid="map-filter-all" aria-pressed="true">All</button>
+        <button data-map-filter="live" data-testid="map-filter-live" aria-pressed="false">In this build</button>
+        <button data-map-filter="missing" data-testid="map-filter-missing" aria-pressed="false">Missing</button>
+        <button data-map-filter="hits" data-testid="map-filter-hits" aria-pressed="false">Hit</button>
+        <span id="map-summary" class="hint" data-testid="map-summary"></span>
+      </div>
+      <p id="map-empty" class="empty" data-testid="map-empty">Start a session: its memory map is read before the guest runs.</p>
+      <div class="table-wrap">
+        <table data-testid="map-table" aria-label="Memory map" hidden>
+          <thead><tr><th>Window</th><th>Base +size</th><th>This build</th><th title="Accesses outside the model, from the -d log">Hits</th><th title="First milestone that needs it (hover a cell for the plan)">Due</th></tr></thead>
+          <tbody id="map"></tbody>
+        </table>
+        <div id="map-extra" data-testid="map-extra" hidden>
+          <h3>Live regions in no window of the device map</h3>
+          <table aria-label="Unlisted regions"><tbody id="map-extra-rows"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-body" data-panel="devices" hidden>
+      <form class="row" onsubmit="return false">
+        <input id="dev-filter" data-testid="devices-filter" aria-label="Filter devices" placeholder="Filter: type, name or property" autocomplete="off" spellcheck="false">
+      </form>
+      <p id="dev-empty" class="empty" data-testid="devices-empty">Start a session: its device tree is read before the guest runs.</p>
+      <div id="dev-tree" class="tree scroll" data-testid="devices-tree" hidden></div>
     </div>
 
     <div class="tab-body" data-panel="monitor" hidden>

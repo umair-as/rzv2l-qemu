@@ -142,6 +142,8 @@ def parse_device_map(text):
         if not line.startswith("| ") or len(cells) < 3 or cells[0] == "Block":
             continue
         raw_name, base_cell, size_cell = cells[:3]
+        milestone = cells[6].replace("`", "").replace("**", "") if len(cells) > 6 else ""
+        plan = cells[7].replace("`", "").replace("**", "") if len(cells) > 7 else ""
         if "`0x" not in base_cell:
             continue                                 # "—", "per Table 5.1"
         name = " ".join(_strip_parens(raw_name).replace("`", "").split())
@@ -183,7 +185,8 @@ def parse_device_map(text):
         for i, (base, size) in enumerate(bases):
             if size:
                 windows.append({"name": names[i] if len(names) == len(bases)
-                                else name, "base": base, "size": size})
+                                else name, "base": base, "size": size,
+                                "milestone": milestone, "plan": plan})
     return windows, warnings
 
 
@@ -198,6 +201,129 @@ def find_window(windows, addr):
     """The smallest device-map window that contains addr, or None."""
     hits = [w for w in windows if w["base"] <= addr < w["base"] + w["size"]]
     return min(hits, key=lambda w: w["size"]) if hits else None
+
+
+# -- live memory map and device tree (info mtree -f / info qtree) -------------
+
+_FLAT = re.compile(r"^\s+([0-9a-f]+)-([0-9a-f]+) \(prio -?\d+, ([^)]+)\): (.+?)"
+                   r"(?: @[0-9a-f]+)?$")
+_MMIO = re.compile(r"^\s+mmio ([0-9a-f]+)/([0-9a-f]+)$")
+UNIMP_TYPE = "unimplemented-device"       # hw/misc/unimp.c
+
+
+def parse_flat_mtree(text):
+    """Regions of the "memory" address space from `info mtree -f`:
+    [{"base", "end", "kind", "name"}], end inclusive."""
+    regions, in_memory = [], False
+    for line in text.splitlines():
+        if line.startswith("FlatView"):
+            in_memory = False
+        elif line.strip() == 'AS "memory", root: system':
+            in_memory = True
+        elif in_memory and (m := _FLAT.match(line)):
+            regions.append({"base": int(m[1], 16), "end": int(m[2], 16),
+                            "kind": m[3], "name": m[4]})
+    return regions
+
+
+def parse_qtree(text):
+    """`info qtree` as a tree: [{"kind": "bus"|"dev", "label", "props",
+    "children"}], nesting from the two-space indent."""
+    root = {"children": [], "props": []}
+    stack = [(-1, root)]
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        depth = (len(line) - len(line.lstrip(" "))) // 2
+        body = line.strip()
+        kind = body.split(":", 1)[0] if body.startswith(("bus:", "dev:")) else None
+        while stack[-1][0] >= depth:
+            stack.pop()
+        parent = stack[-1][1]
+        if kind:
+            node = {"kind": kind, "label": body.split(":", 1)[1].strip(),
+                    "props": [], "children": []}
+            parent["children"].append(node)
+            stack.append((depth, node))
+        else:
+            parent["props"].append(body)
+    return root["children"]
+
+
+def qtree_devices(nodes):
+    """Every device with its type, name property and mmio ranges."""
+    out = []
+    for n in nodes:
+        if n["kind"] == "dev":
+            props = {}
+            mmio = []
+            for line in n["props"]:
+                if m := _MMIO.match("  " + line):
+                    mmio.append((int(m[1], 16), int(m[2], 16)))
+                elif " = " in line:
+                    k, v = line.split(" = ", 1)
+                    props[k] = v.strip('"')
+            out.append({"type": n["label"].split(",")[0], "name": props.get("name"),
+                        "mmio": mmio})
+        out += qtree_devices(n["children"])
+    return out
+
+
+def _covered(base, end, ranges):
+    """Bytes of [base, end] covered by the (possibly overlapping) ranges."""
+    total, at = 0, base
+    for b, e in sorted((max(b, base), min(e, end)) for b, e in ranges
+                       if b <= end and e >= base):
+        if e >= at:
+            total += e - max(b, at) + 1
+            at = e + 1
+    return total
+
+
+def memory_map(windows, mtree_text, qtree_text, cov):
+    """Device-map windows against the live map: status per window, the live
+    regions in it, coverage hits; and live regions in no window."""
+    regions = parse_flat_mtree(mtree_text)
+    devices = qtree_devices(parse_qtree(qtree_text))
+    unimp_names = {d["name"] for d in devices if d["type"] == UNIMP_TYPE}
+    unimp_base = {d["name"]: d["mmio"][0][0] for d in devices
+                  if d["type"] == UNIMP_TYPE and d["mmio"] and d["name"]}
+
+    hits = collections.Counter()
+    for (kind, _access, where, _size, _detail), n in cov.items():
+        addr = None
+        if where.startswith("0x"):
+            addr = int(where, 16)
+        elif "+0x" in where and where.split("+")[0] in unimp_base:
+            dev, off = where.split("+0x")
+            addr = unimp_base[dev] + int(off, 16)
+        if addr is not None and (w := find_window(windows, addr)):
+            hits[(w["name"], w["base"])] += n
+
+    rows, used = [], set()
+    for w in sorted(windows, key=lambda w: w["base"]):
+        end = w["base"] + w["size"] - 1
+        inside = [r for r in regions if r["base"] <= end and r["end"] >= w["base"]]
+        used.update(id(r) for r in inside)
+        covered = _covered(w["base"], end, [(r["base"], r["end"]) for r in inside])
+        if not inside:
+            status = "missing"
+        elif all(r["name"] in unimp_names for r in inside):
+            status = "unimp"
+        elif all(r["kind"] == "ram" for r in inside):
+            status = "ram"
+        else:
+            status = "modelled"
+        rows.append({"name": w["name"], "base": f"0x{w['base']:08x}",
+                     "size": f"0x{w['size']:x}", "status": status,
+                     "partial": bool(inside) and covered < w["size"],
+                     "regions": sorted({r["name"] for r in inside}),
+                     "hits": hits[(w["name"], w["base"])],
+                     "milestone": w.get("milestone", ""), "plan": w.get("plan", "")})
+    extra = [{"name": r["name"], "base": f"0x{r['base']:08x}",
+              "size": f"0x{r['end'] - r['base'] + 1:x}", "kind": r["kind"]}
+             for r in regions if id(r) not in used]
+    return rows, extra
 
 
 CSV_FIELDS = ["name", "base", "size", "kind", "access", "count"]
@@ -231,6 +357,15 @@ def coverage_csv(cov, windows):
     for key, n in sorted(rows.items(), key=lambda kv: (-kv[1], kv[0])):
         wr.writerow([*key, n])
     return out.getvalue()
+
+
+def machine_of(profile):
+    """The -M value of a profile, without its options."""
+    args = profile["args"]
+    for i, a in enumerate(args[:-1]):
+        if a in ("-M", "-machine"):
+            return args[i + 1].split(",")[0]
+    return ""
 
 
 def free_port():
@@ -273,6 +408,34 @@ def load_profiles():
         p["console"] = con
         profiles[path.stem] = p
     return profiles
+
+
+GUEST_FILE_OPTS = ("-kernel", "-initrd", "-dtb", "-bios")
+
+
+def profile_assets(p):
+    """What a profile needs before Start: the QEMU binary and its guest files.
+
+    status: "ready", "builds" (missing files, but a prepare step may make
+    them) or "missing" (no QEMU, or files nothing will build)."""
+    qemu = resolve_qemu(p["qemu"])
+    qemu_ok = os.path.isfile(qemu) and os.access(qemu, os.X_OK)
+    files = []
+    args = p["args"]
+    for i, a in enumerate(args[:-1]):
+        if a in GUEST_FILE_OPTS:
+            path = args[i + 1]
+            files.append({"option": a, "path": path,
+                          "exists": (ROOT / path).is_file()})
+    absent = [f["path"] for f in files if not f["exists"]]
+    if not qemu_ok:
+        status = "missing"
+    elif absent:
+        status = "builds" if p["prepare"] else "missing"
+    else:
+        status = "ready"
+    return {"status": status, "qemu": qemu, "qemu_ok": qemu_ok, "files": files,
+            "prepare": bool(p["prepare"])}
 
 
 def resolve_qemu(spec):
@@ -439,6 +602,7 @@ class Session:
             self.tasks += self.con_tasks
             self.tail_task = asyncio.create_task(self._tail_log())
             self.tasks.append(self.tail_task)
+            await self._capture_views()
             if paused or self.gdb_port:     # with gdb, the debugger resumes
                 await self._set_state("paused")
             else:
@@ -454,6 +618,15 @@ class Session:
             self.write_meta()
             if not self.proc:       # no exit watcher will clean up
                 shutil.rmtree(self.sock_dir, ignore_errors=True)
+
+    async def _capture_views(self):
+        """The memory map and device tree before the guest runs: the run keeps
+        them, so the Map and Devices tabs work after it ends too."""
+        for cmd, name in (("info mtree -f", "mtree.txt"), ("info qtree", "qtree.txt")):
+            try:
+                (self.run_dir / name).write_text(await self.monitor(cmd))
+            except (RuntimeError, ConnectionError, asyncio.TimeoutError) as e:
+                await self._emit("stderr", f"bench: {cmd} failed: {e}\n")
 
     async def _prepare(self):
         cmd = self.profile["prepare"]
@@ -666,6 +839,7 @@ class Session:
                                    if m not in self.found],
                 "gdb_port": self.gdb_port,
                 "origin": ORIGIN,
+                "machine": machine_of(self.profile),
                 "uptime": round(time.time() - self.started, 1),
                 "started": self.started, "ended": self.ended,
                 "run": self.run_dir.name,
@@ -744,7 +918,8 @@ class Bench:
 
 
 RUN_FILES = {"console": "console.log", "log": "qemu.log",
-             "stderr": "stderr.log", "cmdline": "cmdline.txt"}
+             "stderr": "stderr.log", "cmdline": "cmdline.txt",
+             "mtree": "mtree.txt", "qtree": "qtree.txt"}
 
 
 def json_error(status, msg):
@@ -780,7 +955,8 @@ def make_app(port=8090):
     async def profiles(_):
         return web.json_response([
             {"id": k, "name": p["name"], "description": p["description"],
-             "console": p["console"]}
+             "console": p["console"], "assets": profile_assets(p),
+             "machine": machine_of(p)}
             for k, p in bench.profiles.items()])
 
     @routes.get("/api/session")
@@ -893,7 +1069,30 @@ def make_app(port=8090):
         return web.json_response({"coverage": coverage_rows(cov),
                                   "map_warnings": bench.map_warnings})
 
-    @routes.get("/api/runs/{run}/{file:console|log|stderr|cmdline}")
+    @routes.get("/api/runs/{run}/map")
+    @need_run
+    async def run_map(_, path):
+        try:
+            mtree = (path / "mtree.txt").read_text()
+            qtree = (path / "qtree.txt").read_text()
+        except OSError:
+            return json_error(404, "this run has no memory map (captured at start)")
+        s = bench.session
+        cov = s.cov if s and s.run_dir == path else count_log(path / "qemu.log")
+        rows, extra = memory_map(bench.windows, mtree, qtree, cov)
+        return web.json_response({"windows": rows, "extra": extra,
+                                  "map_warnings": bench.map_warnings})
+
+    @routes.get("/api/runs/{run}/devices")
+    @need_run
+    async def run_devices(_, path):
+        try:
+            qtree = (path / "qtree.txt").read_text()
+        except OSError:
+            return json_error(404, "this run has no device tree (captured at start)")
+        return web.json_response({"tree": parse_qtree(qtree)})
+
+    @routes.get("/api/runs/{run}/{file:console|log|stderr|cmdline|mtree|qtree}")
     @need_run
     async def run_file(req, path):
         f = path / RUN_FILES[req.match_info["file"]]
