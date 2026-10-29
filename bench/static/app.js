@@ -101,6 +101,29 @@ async function loadProfiles() {
 function showDesc() {
   const p = profiles.find((x) => x.id === $("profile").value);
   $("profile-desc").textContent = p ? p.description : "";
+  showAssets(p);
+}
+
+// Before Start: is the QEMU binary there, and the guest files (or a step that builds them)?
+function showAssets(p) {
+  const chip = $("assets");
+  const a = p && p.assets;
+  chip.hidden = !a;
+  if (!a) return;
+  chip.dataset.status = a.status;
+  const missing = a.files.filter((f) => !f.exists).map((f) => f.path);
+  chip.textContent = { ready: "ready", builds: "builds on Start", missing: "missing" }[a.status];
+  const lines = [`QEMU: ${a.qemu} ${a.qemu_ok ? "(found)" : "(not found or not executable)"}`];
+  a.files.forEach((f) => lines.push(`${f.option} ${f.path} ${f.exists ? "(found)" : "(missing)"}`));
+  if (missing.length && a.prepare) lines.push("The prepare step runs on Start and should build the missing files.");
+  chip.title = lines.join("\n");
+}
+
+async function refreshAssets() {
+  try {
+    profiles = await api("GET", "/api/profiles");
+    showDesc();
+  } catch (e) { /* keep the last view */ }
 }
 
 // ---- view ------------------------------------------------------------------
@@ -154,6 +177,13 @@ function showReadout(s) {
   why.hidden = !reasons.length;
   why.textContent = reasons.join("; ");
 
+  const mach = $("machine");
+  mach.hidden = !s.machine;
+  mach.textContent = s.machine || "";
+  const pid = $("pid");
+  pid.hidden = !(s.pid && s.state !== "exited");
+  pid.textContent = s.pid ? `pid ${s.pid}` : "";
+
   const dur = $("duration");
   dur.hidden = !(s.state === "exited" && s.started && s.ended);
   dur.textContent = dur.hidden ? "" : fmtDuration(s.ended - s.started);
@@ -168,6 +198,8 @@ function showReadout(s) {
   const csv = $("cov-csv");
   csv.hidden = !s.run;
   if (s.run) csv.href = `/api/runs/${encodeURIComponent(s.run)}/coverage.csv`;
+
+  if (s.run && s.run !== viewRun && s.state !== "starting") loadViews(s.run);
 
   if (s.cmdline) {
     $("cmdline").hidden = false;
@@ -214,6 +246,7 @@ function setStatus(s) {
     exit.textContent = s.error ? `error: ${s.error}` : `exit ${s.exit_code}`;
     exit.dataset.code = s.exit_code ?? "";
     refreshCoverage();
+    refreshAssets();
     if (runsShown()) refreshRuns();
   } else {
     exit.hidden = true;
@@ -258,13 +291,156 @@ async function refreshCoverage() {
   }
   $("cov-count").textContent = String(coverage.length);
   showCoverageEmpty(coverage.length);
+  if (viewRun && mapShown()) loadViews(viewRun);
 }
+
+// ---- map and devices (captured at start, kept with the run) ----------------
+
+let viewRun = null;
+let mapRows = [];
+let mapFilter = "all";
+let mapExtra = [];
+let devTree = [];
+
+async function loadViews(run) {
+  viewRun = run;
+  const enc = encodeURIComponent(run);
+  try {
+    const m = await api("GET", `/api/runs/${enc}/map`);
+    mapRows = m.windows;
+    mapExtra = m.extra;
+    renderMap();
+  } catch (e) { mapRows = []; mapExtra = []; renderMap(e.message); }
+  try {
+    devTree = (await api("GET", `/api/runs/${enc}/devices`)).tree;
+  } catch (e) { devTree = []; }
+  renderDevices();
+}
+
+function renderMap(error) {
+  const extra = mapFilter === "all" ? mapExtra : [];
+  const shown = mapRows.filter((r) => mapFilter === "all"
+    || (mapFilter === "live" && r.status !== "missing")
+    || (mapFilter === "missing" && r.status === "missing")
+    || (mapFilter === "hits" && r.hits > 0));
+  const body = $("map");
+  body.innerHTML = "";
+  for (const r of shown) {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-testid", "map-row");
+    tr.dataset.status = r.status;
+    tr.dataset.hits = r.hits;
+    tr.dataset.base = r.base;
+    const nm = cell(tr, "", "wname");
+    const nspan = document.createElement("span");
+    nspan.textContent = r.name; nspan.title = r.name;
+    nm.append(nspan);
+    const at = cell(tr, r.base, "at");
+    const sz = document.createElement("span");
+    sz.className = "rname"; sz.textContent = ` +${r.size}`;
+    at.append(sz);
+    const live = cell(tr, "", "regions");
+    const st = document.createElement("span");
+    st.className = "st"; st.dataset.status = r.status; st.dataset.partial = String(r.partial);
+    st.textContent = r.status;
+    st.title = r.partial ? "The live regions cover only part of this window" : "";
+    live.append(st);
+    if (r.regions.length) {
+      const rn = document.createElement("div");
+      rn.className = "rname"; rn.textContent = r.regions.join(", ");
+      live.append(rn);
+    }
+    cell(tr, r.hits, "hits");
+    // The milestone's first word (M2, M3b, later); the full plan on hover
+    const plan = cell(tr, (r.milestone.match(/^[\w-]+/) || [""])[0], "plan");
+    plan.title = [r.milestone, r.plan].filter(Boolean).join(" · ");
+    body.append(tr);
+  }
+  const counts = { modelled: 0, ram: 0, unimp: 0, missing: 0 };
+  mapRows.forEach((r) => { counts[r.status] += 1; });
+  $("map-summary").textContent = mapRows.length
+    ? `${counts.modelled} modelled · ${counts.ram} RAM · ${counts.unimp} UNIMP · ${counts.missing} missing`
+    : "";
+  const empty = $("map-empty");
+  empty.hidden = mapRows.length > 0;
+  if (error) empty.textContent = error.charAt(0).toUpperCase() + error.slice(1) + ".";
+  document.querySelector('[data-testid="map-table"]').hidden = mapRows.length === 0;
+
+  const ex = $("map-extra-rows");
+  ex.innerHTML = "";
+  (extra || []).forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.setAttribute("data-testid", "map-extra-row");
+    cell(tr, r.name); cell(tr, r.base); cell(tr, r.size); cell(tr, r.kind);
+    ex.append(tr);
+  });
+  $("map-extra").hidden = !(extra && extra.length);
+}
+
+document.querySelectorAll("[data-map-filter]").forEach((b) => {
+  b.onclick = () => {
+    mapFilter = b.dataset.mapFilter;
+    document.querySelectorAll("[data-map-filter]").forEach((x) =>
+      x.setAttribute("aria-pressed", String(x === b)));
+    renderMap();
+  };
+});
+
+function nodeText(n) {
+  return [n.label, ...n.props].join("\n").toLowerCase();
+}
+
+// A node is shown when it, or anything below it, matches the filter
+function renderNode(n, q, depth) {
+  const kids = n.children.map((c) => renderNode(c, q, depth + 1)).filter(Boolean);
+  const hit = q && nodeText(n).includes(q);
+  if (q && !hit && !kids.length) return null;
+  const d = document.createElement("details");
+  d.setAttribute("data-testid", n.kind === "dev" ? "device-node" : "bus-node");
+  d.open = q ? true : depth < 1;
+  const sum = document.createElement("summary");
+  const k = document.createElement("span");
+  k.className = "k"; k.textContent = n.kind + " ";
+  const t = document.createElement(hit ? "mark" : "span");
+  t.className = "t"; t.textContent = n.label;
+  sum.append(k, t);
+  d.append(sum);
+  if (n.props.length) {
+    const props = document.createElement("div");
+    props.className = "props";
+    n.props.forEach((line) => {
+      const row = document.createElement("div");
+      row.textContent = line;
+      props.append(row);
+    });
+    d.append(props);
+  }
+  kids.forEach((c) => d.append(c));
+  return d;
+}
+
+function renderDevices() {
+  const q = $("dev-filter").value.trim().toLowerCase();
+  const tree = $("dev-tree");
+  tree.innerHTML = "";
+  devTree.map((n) => renderNode(n, q, 0)).filter(Boolean).forEach((d) => tree.append(d));
+  tree.hidden = devTree.length === 0;
+  const empty = $("dev-empty");
+  empty.hidden = devTree.length > 0 && tree.children.length > 0;
+  if (devTree.length && !tree.children.length) empty.textContent = `Nothing matches “${q}”.`;
+  else empty.textContent = "Start a session: its device tree is read before the guest runs.";
+}
+$("dev-filter").addEventListener("input", renderDevices);
 
 // ---- runs ------------------------------------------------------------------
 
 let currentRun = null;
 const LOST_WHY = "The bench stopped (killed or restarted) before this run ended, "
   + "so it has no exit code or verdict. Its console and log are kept.";
+
+function mapShown() {
+  return !document.querySelector('[data-panel="map"]').hidden;
+}
 
 function runsShown() {
   return !document.querySelector('[data-panel="runs"]').hidden;
@@ -454,6 +630,7 @@ document.querySelectorAll(".tabs button").forEach((b) => {
     });
     if (b.dataset.tab === "coverage" && state !== "none") refreshCoverage();
     if (b.dataset.tab === "runs") refreshRuns();
+    if ((b.dataset.tab === "map" || b.dataset.tab === "devices") && viewRun) loadViews(viewRun);
   };
 });
 
