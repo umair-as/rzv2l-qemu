@@ -23,6 +23,21 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | MPIDR / affinity | The CPU's own ID register; its affinity fields name the CPU (`0x0` and `0x100` here) and must match the DT `cpu@0`, `cpu@100`. |
 | EL0-EL3 | Arm exception levels: EL0 applications, EL1 kernel, EL2 hypervisor, EL3 secure monitor (TF-A). |
 | CNTFRQ | The generic timer's frequency register; 24 MHz on this board. |
+| CPG | Clock Pulse Generator at `0x11010000` (manual §7): the PLLs, clock dividers, and every peripheral's clock gate, reset line and module stop. |
+| CLK_ON | CPG clock-gate registers (`0x500`-`0x5E8`), one per peripheral group; bit n = 1 supplies clock n. Written with a write-enable mask. |
+| CLK_MON | Clock monitors, CLK_ON + `0x180`, read-only: bit n = 1 once clock n is supplied. Linux polls it 10 µs after each CLK_ON write. |
+| RST | CPG reset registers (`0x800`-`0x8E8`); bit n = 1 **releases** reset n. Written with a write-enable mask. |
+| RSTMON | Reset monitors, RST + `0x180`, read-only, **inverted**: bit n = 1 while reset n is applied. Linux polls it 200 µs after each RST write. |
+| MSTOP | CPG module-stop registers (`0xB60`-`0xB88`); 1 = the module is in its stop state. The pinned kernels never write them on RZ/V2L. |
+| Write-enable mask | Renesas CPG convention: bit n + 16 of a write enables the write to the field starting at bit n; fields without it keep their value; the upper 16 bits read 0. |
+| CLKSTATUS | CPG register whose bits are 1 while a divider or selector switch is in progress; Linux polls it only for the SD clock selector. |
+| PLL1, SAMPLL1_CLK1/2 | The CPU PLL and its two setting registers; the reset values give 24 MHz × 100 / 2 = 1200 MHz. |
+| PLn_DDIV, PLn_SSEL, PL2SDHI_DSEL | CPG divider and source-selector registers behind the bus and peripheral clocks (P0 = 100 MHz feeds SCIF and OSTM). |
+| OSTM | OS Timer, three channels at `0x12801000` + n × `0x400`; the manual calls it GTM. Linux uses OSTM1 as a clock source and `sched_clock`. |
+| GTM | The manual's name for OSTM, also the name of its CPG clock and reset registers (CLK_ON_GTM, RST_GTM). |
+| SCIF / SCIFA | Serial ports, SCIF0-4 at `0x1004B800` + n × `0x400`; SCIF0 is the board console. |
+| TSU | Thermal Sensor Unit at `0x10059400`; read-as-zero stub here, so Linux's probe fails with "Failed to start TSU". |
+| EVK row ID (R10, X01 …) | A numbered register read in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md); R = planned read, X = experimental read. |
 | DIP switch / boot mode | Physical switches on the board that select the boot source; latched into `SYS_LSI_MODE` at power-on. |
 
 **Software: firmware and guests**
@@ -35,6 +50,7 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | OP-TEE | The secure-world OS running beside Linux. |
 | PSCI | Power State Coordination Interface: the firmware call Linux uses to power CPUs on and off (here via the `SMC` instruction). |
 | DT / DTB | Device tree / device tree blob: the hardware description the kernel reads at boot. |
+| DTB-U | The upstream device tree for the board (`r9a07g054l2-smarc.dtb`), built unmodified from the pinned kernel by `tests/guests/g0/build-dtb.sh`. |
 | G0 / G1 / G2 | This project's guest tiers: mainline Linux (G0), the Renesas BSP (G1), downstream products (G2, integration only). |
 
 **QEMU**
@@ -51,6 +67,8 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | Machine / board | The top-level QEMU object, selected with `-M` (here `rzv2l-smarc`). |
 | Monitor | QEMU's command console (`info mtree`, `info qtree`, `xp`). |
 | qtest | Test mode where a test program reads and writes addresses directly, with no guest CPU ([`testing.md` §1](testing.md#1-qtest-and-guest-probes)). |
+| UNIMP / `unimplemented-device` | QEMU's stub device: logs every access under `-d unimp`, reads 0, ignores writes. "UNIMP" in the device map means a window mapped this way. |
+| `retain-writes` | This project's option on `unimplemented-device`: reads return the last value written (the DMA controller stub). |
 | Semihosting | A channel letting a guest program talk to QEMU, for example to report an exit status; used by the M1 probe. |
 
 **This project's process**
@@ -65,4 +83,6 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | DR | Decision record ([`docs/decisions/`](../decisions/)), for example DR-0003 on the GIC identity. |
 | Fidelity class | How much of a device is modelled (FULL / FUNCTIONAL / STUB / UNSUPPORTED), and whether it fails honestly (honest-fault) or lies (silent-wrong, never allowed). |
 | Mutation check | Breaking the model on purpose to prove a test can fail ([`testing.md` §1](testing.md#1-qtest-and-guest-probes)). |
+| Device map / device-map row | [`docs/device-map.md`](../device-map.md): one row per hardware block with its address, IRQs, clocks, milestone and the class it is mapped with. |
+| `direct-boot` | The device property that selects the direct-kernel start state; the board sets it when `-kernel` is given. |
 | Direct-kernel / firmware mode | Two start states: QEMU boots Linux directly (devices start as firmware would leave them) or runs the real firmware (devices start at reset values). |

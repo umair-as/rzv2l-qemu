@@ -32,6 +32,18 @@ There are five kinds of register:
 
 The monitors are computed when they are read. A stored copy could go out of date. The model has no settle time, so the kernel's first poll read succeeds.
 
+**Worked example: SCIF clocks and resets.** CLK_ON_SCIF is at `0x584` and RST_SCIF at `0x884`. Bit n is SCIFn, and the monitors are `0x180` higher. The sequence starts from reset. `rzv2l-cpg-test.c` asserts the same writes (`/cpg/write-enable` the first row, `/cpg/monitors` the monitor values of the others):
+
+| Write | Register reads after it | Why |
+|---|---|---|
+| CLK_ON_SCIF ← `0x0000001F` | CLK_ON `0x00`, CLK_MON `0x00` | no bit in 31:16 is set, so no field is enabled and nothing changes |
+| CLK_ON_SCIF ← `0x00010001` | CLK_ON `0x01`, CLK_MON `0x01` | bit 16 enables bit 0; this is the kernel's "SCIF0 clock on" |
+| CLK_ON_SCIF ← `0x00120010` | CLK_ON `0x11`, CLK_MON `0x11` | bits 17 and 20 enable bits 1 and 4: bit 4 is set, bit 1 is written 0 |
+| CLK_ON_SCIF ← `0x00010000` | CLK_ON `0x10`, CLK_MON `0x10` | bit 16 enables bit 0, written 0: SCIF0 clock off, SCIF4 untouched |
+| RST_SCIF ← `0x00010001` | RST `0x01`, RSTMON `0x1E` | releases SCIF0; RSTMON is inverted, so SCIF1-4 still show 1 (in reset) |
+
+The kernel never does a read-modify-write on these registers. It writes the enable bits for the clocks or resets it changes, and leaves the others alone. A model that ignored the upper half would switch off SCIF4 on the fourth write.
+
 Two start states (AGENTS.md rule 9) come from the `direct-boot` property. Without it, the registers start at the manual reset values. With `-kernel`, the board sets it, and 23 registers start at the values the EVK firmware left. For example, the OSTM clocks are off (CLK_ON_GTM = 0) and SCIF0 is clocked and out of reset.
 
 ### 1.3 The boot, step by step
