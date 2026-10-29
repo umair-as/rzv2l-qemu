@@ -81,7 +81,7 @@ The clock controller unit ended at the first TE read. A diagnostic build read th
 
 `qemu/hw/timer/renesas_rz_ostm.c` is one channel; the SoC maps three. The counter is never stored while it runs. A read computes it from the virtual clock: ticks = elapsed ns × 100 MHz. A QEMU timer fires only at the next interrupt.
 
-**Worked example: the two modes from the same writes.** The count clock is 100 MHz, so one count every 10 ns. `rzv2l-ostm-test.c` asserts each cell except two, which come from the manual: the free-running CMP rewrite (§20.3.6.1) and the interval restart after TT (§20.2.2.3 Note 1).
+**Worked example: the two modes from the same writes.** The count clock is 100 MHz, so one count every 10 ns. `rzv2l-ostm-test.c` asserts each cell except two: the free-running CMP rewrite is checked by the hello probe, and the interval restart after TT comes from the manual (§20.2.2.3 Note 1).
 
 | Step | Free-running (CTL = `0x02`) | Interval (CTL = `0x00`), CMP = 999 |
 |---|---|---|
@@ -95,7 +95,7 @@ The interrupt follows the same split. Free-running mode requests one when the co
 
 ### 2.3 The proof
 
-`rzv2l-ostm-test.c` checks reset values, both modes, the CTL rules and the CMP = 0 level. The interrupt itself is checked on a real CPU, in the hello probe. qtest cannot count a pulse. With no kernel loaded, the GIC also keeps its interrupts secure, out of qtest's reach. The probe arms OSTM2 the way Linux arms a one-shot event. It then checks that the interrupt arrives as INTID 80, no earlier than CMP + 1 counts, and only once. Ten mutations each turn one check red ([tasks](../units/M3b-ostm/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+`rzv2l-ostm-test.c` checks reset values, both modes, the CTL rules and the CMP = 0 level. The interrupts are checked on a real CPU, in the hello probe: a one-shot, a compare value rewritten while free-running, and a periodic interval run. qtest cannot count a pulse. With no kernel loaded, the GIC also keeps its interrupts secure, out of qtest's reach. The probe arms OSTM2 the way Linux arms a one-shot event. It then checks that the interrupt arrives as INTID 80, no earlier than CMP + 1 counts, and only once. Twelve mutations each turn one check red ([tasks](../units/M3b-ostm/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 
 ## 3. Pitfalls
 
@@ -109,6 +109,6 @@ The interrupt follows the same split. Free-running mode requests one when the co
 - **A timer that reads as zero stops kernel time, not just the timer.** Linux's `sched_clock` moves to the fastest counter it finds (OSTM1, 100 MHz, over the 24 MHz arch timer), so a stuck OSTM freezes every timestamp (EXP-002).
 - **Compute a counter on read; never store it while it runs.** `sched_clock` reads CNT constantly. A model that updates CNT in a timer callback is wrong between callbacks, and one that arms a QEMU timer per count is far too slow (10 ns per count).
 - **"Interrupt when the counter reaches 0" and "every CMP + 1 clocks" describe the same event.** The manual gives both (§20.3.3, §20.3.5.1). The model uses the cycle count of Table 20.5, and a mutation that drops the + 1 changes when the reload happens, which the interval test sees.
-- **CMP = 0 in interval mode is not a 10 ns periodic timer.** The manual holds the request high while the counter runs (§20.3.5.2), so the model raises the line and arms no timer.
+- **CMP = 0 in interval mode is not a 10 ns periodic timer.** The manual holds the request high while the counter runs (§20.3.5.2), so the model raises the line and arms no timer. Whether MD0 = 0 suppresses it is unclear in the manual; the model holds it either way (an inference).
 - **In QEMU, qtest cannot see an edge.** An interrupt that is a pulse leaves no trace in qtest's interrupt intercept, and the GIC's pending state is out of reach with no kernel loaded. Test pulses from a guest probe on a real CPU.
 

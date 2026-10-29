@@ -6,15 +6,15 @@
 
 A new device `renesas-rz-ostm`, one instance per channel: OSTM0-2 at `0x12801000` + n × `0x400` (manual Table 20.2 p.1224), interrupts on SPI 46, 47 and 48, edge-rising (DT). The manual calls the block GTM ("General Timer"). It is FUNCTIONAL and faithful for what is modelled:
 
-- **Registers** (§20.2.1 p.1226): CMP (R/W, 32-bit), CNT (R, 32-bit), TE (R, 8-bit), TS (W, 8-bit, reads 0), TT (W, 8-bit, reads 0), CTL (R/W, 8-bit; MD1 bit 1, MD0 bit 0). Each register accepts only its own access width; another width, or an offset the manual does not list, is a bus error.
+- **Registers** (§20.2.1 p.1226): CMP (R/W, 32-bit), CNT (R, 32-bit), TE (R, 8-bit), TS (W, 8-bit, reads 0), TT (W, 8-bit, reads 0), CTL (R/W, 8-bit; MD1 bit 1, MD0 bit 0). Each register accepts only its own access width; another width, or an offset the manual does not list, is a bus error. That is a design choice (an honest fault, AGENTS.md rule 6): the manual gives only the access units (§20.2.1) and does not say what another width does.
 - **Counter on the virtual clock** at the count clock P0 (§20.3.2), a board property set to 100 MHz: CPG PL2_DDIV resets to 0 and the EVK leaves it at 0 (EVK R11), which gives P0 = 100 MHz.
 - **Free-running comparison mode** (MD1 = 1, §20.3.6): counts up from 0, wraps at `0xFFFFFFFF`; interrupt when the counter passes CMP, first after (CMP + 1) clocks (Table 20.5 (a)); a CMP rewrite takes effect at once (Table 20.5 (c), (d)); TS while running is ignored.
-- **Interval timer mode** (MD1 = 0, §20.3.5): counts down from CMP, interrupt every (CMP + 1) clocks, then reloads CMP; a CMP rewrite takes effect at the next reload; TS while running is a forced restart. With CMP = 0 the interrupt request stays asserted while the counter runs (§20.3.5.2).
+- **Interval timer mode** (MD1 = 0, §20.3.5): counts down from CMP, interrupt every (CMP + 1) clocks, then reloads CMP; a CMP rewrite takes effect at the next reload; TS while running is a forced restart. With CMP = 0 the interrupt request stays asserted while the counter runs (§20.3.5.2). **Inference:** the model holds it whatever CTL.MD0 is. The section's first bullet reads as unconditional, but its item (4) could also be read as MD0 = 0 suppressing the request; Linux never uses interval mode with CMP = 0.
 - **TE / TS / TT** (§20.2.2.3-5): TS sets TE and starts; TT clears TE and stops, the counter keeps its value. A restart begins again from CMP (interval) or from 0 (free-running) (§20.2.2.3 Note 1).
-- **CTL** is writable only while TE = 0 (§20.2.2.6); a write while running is ignored and logged. Changing MD1 sets CNT to the mode's initial value (Table 20.4 p.1228: interval `0xFFFFFFFF`, free-running 0). MD0 = 1 adds an interrupt when counting starts (§20.3.3).
+- **CTL** is writable only while TE = 0 (§20.2.2.6; the manual's text says "OSTMnTOE", which is no register of this block and is read as TE); a write while running is ignored and logged. Changing MD1 sets CNT to the mode's initial value (Table 20.4 p.1228: interval `0xFFFFFFFF`, free-running 0). MD0 = 1 adds an interrupt when counting starts (§20.3.3).
 - **Interrupt:** a pulse into the GIC per event, matching the edge-triggered SPI; the CMP = 0 interval case holds the line high instead.
 
-**Not modelled:** DMA start by compare match (§20.1); the debug-pause input (§20.2.2.3 Note 2); the count clock following CPG divider writes or CLK_ON gating (no CPG clock outputs yet, as for SCIF).
+**Not modelled:** DMA start by compare match (§20.1); the debug-pause input (§20.2.2.3 Note 2); the count clock following CPG divider writes or CLK_ON gating, and the CPG reset line RST_GTM (no CPG outputs yet, as for SCIF; Linux releases the reset before its first access, so it is not visible today); in free-running mode with CMP = 0, the request lasting two count clocks (§20.3.6.2 item 3): the model sends one pulse, which an edge-triggered interrupt cannot tell apart.
 
 ## What the guest needs
 
@@ -38,6 +38,11 @@ The G0 boot passes the OSTM probe (`timer@12801400: used for clocksource`, `time
 ## Evidence
 
 HW manual Rev 1.50 §20 p.1224-1240; EVK R11, R15 (`../../evidence/EVK-2026-10-29-post-firmware.md`); the driver lines above; [EXP-002](../../experiments/EXP-002-read-as-zero-survey.md); `../M3b-cpg/spec.md` "Next blocker".
+
+## Listed for the operator
+
+- **CMP = 0 in interval mode with MD0 = 0:** the model asserts the request (see Scope). The other reading would assert it only with MD0 = 1. No guest uses it.
+- **Bus error on a wrong-size or unlisted access:** kept as the project's honest-fault class; the manual is silent.
 
 ## Next blocker (2026-10-29, fork `afe1e5b71b`)
 

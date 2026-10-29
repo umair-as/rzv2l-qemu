@@ -9,6 +9,7 @@ Fork branch `unit/M3b-ostm` from `rzv2l-dev` `f512aba021`; project branch of the
 | T3 | qtest: reset values, free-running and interval counting, start/stop/forced restart, CTL rules, CMP = 0 level | `afe1e5b71b` | 5/5 green | done |
 | T4 | Hello probe: OSTM2 one-shot interrupt on a real CPU (INTID 80, not before CMP + 1 counts, once), wrong-size and unlisted reads fault | project | probe PASS | done |
 | T5 | Boot to the next blocker, recorded in `spec.md` | — | boot logs below | done |
+| T6 | Review response: probe checks for the interval (periodic) interrupt and the free-running compare rewrite; labels (MD0 reading, bus-error choice); not-modelled list (CPG reset line, two-clock request); manual typo note | fork comment only | probe PASS; proofs 11-12 | done |
 
 ## Proofs (each mutation: the exact change → the red line)
 
@@ -24,6 +25,8 @@ Fork branch `unit/M3b-ostm` from `rzv2l-dev` `f512aba021`; project branch of the
 | 8 | `ostm_start`: request an interrupt at every start (MD0 ignored) | hello probe: `FAIL OSTM2 CNT at IRQ >= CMP + 1` and `FAIL generic timer ticks to IRQ >= 1 ms` |
 | 9 | SoC: `R9A07G054_OSTM0_SPI` 46 → 45 (OSTM2 on SPI 47) | hello probe: `FAIL OSTM2 IRQ taken: 0`, `FAIL OSTM2 IRQ INTID: 1023` |
 | 10 | `ostm_check_access`: accept a wrong access size | hello probe: `FAIL OSTM2 TE as 32-bit: read completed without an abort` |
+| 11 | `ostm_timer_cb`, interval path: drop `ostm_request(s)` (no interval interrupt; found green by the review) | hello probe: `FAIL OSTM2 interval IRQs within 5 periods >= 3` |
+| 12 | `ostm_write_cmp`, free-running: drop the `ostm_freerun_arm()` re-arm (Table 20.5 rows c, d; found green by the review) | hello probe: `FAIL OSTM2 IRQ after the rewrite: 0` |
 
 Each mutation was built with a confirmed relink and run alone; the model was restored and the full test passed after each. The first try at proof 5 changed only the counter read and stayed green; the period lives in the reload timer too, so the stated form changes both.
 
