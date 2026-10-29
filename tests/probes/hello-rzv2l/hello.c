@@ -34,7 +34,6 @@ void write16(uint64_t addr, uint16_t value);
 #define FDR_T_MASK          0x1f
 #define FIFO_SIZE           16          /* Table 22.1 */
 
-/* GIC-600 (device map), register offsets from the Arm GICv3 architecture */
 /*
  * CPG (manual section 7): 0x510 is an offset Table 7.5 does not list;
  * 0xb30 is CPG_CLUSTER_PCHMON, listed but not modelled. Both must fail
@@ -44,6 +43,7 @@ void write16(uint64_t addr, uint16_t value);
 #define CPG_UNLISTED        0x510
 #define CPG_CLUSTER_PCHMON  0xb30
 
+/* GIC-600 (device map), register offsets from the Arm GICv3 architecture */
 #define GICD                0x11900000UL
 #define GICD_CTLR           0x0000
 #define GICD_ISENABLER(n)   (0x0100 + 4 * ((n) / 32))
