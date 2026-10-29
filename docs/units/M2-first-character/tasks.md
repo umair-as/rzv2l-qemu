@@ -1,6 +1,6 @@
 # M2-first-character — tasks
 
-Fork tasks go on `unit/M2-first-character` in `qemu/`, branched from `rzv2l-dev` `51378195d3`; project tasks go on the same-named branch (AGENTS.md "Branches and PRs"). One task per commit where practical; the commit names the task ID. A test counts only after it has been seen red on its mutation (§7 of `design.md`), in the eval harness's fresh worktree.
+Fork tasks go on `unit/M2-first-character` in `qemu/`, branched from `rzv2l-dev` `51378195d3`; project tasks go on the same-named branch (AGENTS.md "Branches and PRs"). One task per commit where practical; the commit names the task ID. A test counts only after it has been seen red on its mutation (§8 of `design.md`), in the eval harness's fresh worktree.
 
 Part 1 (Ticket 1) is T01-T06. Part 2 (Ticket 2) is T07-T12.
 
@@ -26,4 +26,4 @@ Part 1 (Ticket 1) is T01-T06. Part 2 (Ticket 2) is T07-T12.
 - [ ] independent review done on the final revision: project commit `…`, fork commit `…`
 - [ ] every review finding has a disposition (fixed / gap / rejected with evidence); **no unresolved BLOCKER**, since a recorded blocker is still a blocker
 - [ ] material fixes rechecked by the reviewer on that final revision
-- [ ] fidelity gaps accepted by the operator are listed (spec decision (b); design §6)
+- [ ] fidelity gaps accepted by the operator are listed (spec decision (b); design §7)

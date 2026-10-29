@@ -10,7 +10,7 @@ The machine gets its first console. A new SCIFA model sits at the five SCIF base
 
 ## Acceptance criteria (EARS)
 
-Check IDs (S, A, L) are the eval-harness IDs from `design.md` §7.
+Check IDs (S, A, L) are the eval-harness IDs from `design.md` §8.
 
 | ID | Criterion | REQ | Verified by |
 |---|---|---|---|
@@ -21,7 +21,7 @@ Check IDs (S, A, L) are the eval-harness IDs from `design.md` §7.
 | M2-AC05 | WHILE the TX FIFO count ≤ the TX trigger (FCR.TTRG or FTCR.TFTC) or SCR.TE = 0, FSR.TDFE SHALL be 1, including straight after a clear (§22.2.7 p.1280, §22.2.10 p.1290, §22.2.15 p.1299). | SCIF-001 | S05, S07 |
 | M2-AC06 | WHEN FTDR is written THEN TEND SHALL clear (§22.2.7 p.1281) and SHALL NOT set again until virtual time has passed the last character's frame time with the FIFO empty. | SCIF-001 | S06, S13 |
 | M2-AC07 | WHEN the chardev delivers bytes THEN they SHALL enter the 16-byte RX FIFO, FDR.R SHALL count them, RDF SHALL follow the RX trigger, an FRDR read SHALL pop, and DR SHALL set after 15 ETU with no new byte while the count is below the trigger (§22.2.7 p.1279, §22.8.2 p.1327). | SCIF-001 | S08 |
-| M2-AC08 | The five level IRQ outputs SHALL follow Table 22.19 p.1323: ERI, BRI, RXI, TXI, TEI/DRI (`design.md` §4). | SCIF-001 | S09 |
+| M2-AC08 | The five level IRQ outputs SHALL follow Table 22.19 p.1323: ERI, BRI, RXI, TXI, TEI/DRI (`design.md` §5). | SCIF-001 | S09 |
 | M2-AC09 | WHEN an offset with no register is accessed THEN reads SHALL return 0 and writes SHALL be ignored, logged under `-d guest_errors`. EVK-R70 measured `+0x18` = 0 with no bus error; the rest of the window is extrapolated (I). | SCIF-001 | S10 |
 | M2-AC10 | IF SMR.CM = 1 (clock-synchronous mode) THEN the model SHALL log `LOG_UNIMP` and transmit nothing. | SCIF-001 | S11 |
 | M2-AC11 | The device SHALL start at Table 22.4 when the property `direct-boot` is off, and at the EVK post-firmware values (EVK-R20-R26) when it is on. The board SHALL set the property on SCIF0 only when a kernel image is loaded. | SCIF-001 | S12 |
@@ -74,6 +74,13 @@ Check IDs (S, A, L) are the eval-harness IDs from `design.md` §7.
 | B. `tests/hello-rzv2l/` | A new AGENTS.md layout line; no spec change |
 
 **(b) The earlycon boot argument.** DTB-U `/chosen/bootargs` is `ignore_loglevel rw root=/dev/nfs ip=on`, with no `earlycon` (checked on the built DTB-U). In direct mode `-append` replaces the DTB bootargs entirely. Proposal: `-append "ignore_loglevel rw root=/dev/nfs ip=on earlycon"`, which keeps the stock arguments and adds a bare `earlycon` (never `earlycon=scif,…`, which selects the SH4 layout: `scif.md` §5). It is recorded as a fidelity gap; device-map §4 row 6 already lists it, and REQ-GUEST-004 requires it.
+
+**(c) Clock-synchronous mode (SMR.CM = 1).** Ticket 1's S11 asks for `LOG_UNIMP` and no transfer. The project's `device-model` skill (reference §7) says an unsupported mode should return a decode error on the register that selects it. Both are honest-fault; they differ in when the guest notices. No G0/G1/firmware consumer sets CM (`design.md` §2), so this only decides how a wrong guest fails.
+
+| Option | Guest sees | S11 and its mutation |
+|---|---|---|
+| A. `LOG_UNIMP`, store CM, send nothing | TEND never sets; the guest notices only when a TEND wait times out (TF-A's flush has no timeout, so firmware would hang) | S11 asserts nothing is sent; mutation: transmit anyway |
+| **B. Decode error on the SMR write with CM = 1 (recommended)** | an external abort on the write, at once; SMR keeps its old value | S11 asserts SMR is unchanged after the write (qtest cannot see the bus error itself: M1 AC14 note); the hello image can check the abort; mutation: accept the write |
 
 ## Open questions (resolved in design unless the operator objects)
 
