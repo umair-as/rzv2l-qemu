@@ -74,6 +74,7 @@ def test_echo_session(server):
         # Markers seen so far, but expect_exit = 0 still pending
         verdict = page.get_by_test_id("verdict")
         expect(verdict).to_have_attribute("data-verdict", "running")
+        expect(page.get_by_test_id("console-hint")).to_contain_text("waiting for 'read hole'")
 
         # Keys typed into the terminal reach the guest UART and echo back
         page.get_by_test_id("console").click()
@@ -111,6 +112,8 @@ def test_echo_session(server):
             "document.querySelector('[data-testid=console-text]')"
             ".textContent.split('echo ready').length === 3")
 
+        page.wait_for_function(ROWS_JS + ".some((r) => r.includes('reset: the verdict counts from here'))")
+        expect(console).not_to_contain_text("reset:")          # display only
         # Markers count from the last reset: print 'read hole' again
         page.get_by_test_id("console").click()
         page.keyboard.type("u")
@@ -131,6 +134,12 @@ def test_echo_session(server):
         expect(verdict).to_have_attribute("data-verdict", "pass")
         expect(verdict).to_have_text("PASS")
         run = get_json(server, "/api/session")["run"]
+        # Another profile picked: the readout says it shows the last run
+        page.get_by_test_id("profile-select").select_option("rzv2l-smarc-m1-probe")
+        expect(page.get_by_test_id("last-run")).to_be_visible()
+        expect(page.get_by_test_id("last-run")).to_have_text("last run: virt-echo")
+        page.get_by_test_id("profile-select").select_option("virt-echo")
+        expect(page.get_by_test_id("last-run")).to_be_hidden()
 
         # The run is listed in the Runs tab and its files can be opened
         page.get_by_test_id("tab-runs").click()
@@ -221,7 +230,7 @@ def test_marker_before_reset_does_not_count(server):
     st = wait_state(server, "exited")
     assert st["exit_code"] == 0 and "bye" in console()
     assert st["verdict"] == "fail"
-    assert st["verdict_reasons"] == ["missing on the console: 'read hole'"]
+    assert st["verdict_reasons"] == ["missing since the last reset: 'read hole'"]
 
 
 def test_gdbstub_option(server):
@@ -563,6 +572,9 @@ def test_map_lists_unlisted_regions_and_assets(server):
         page.get_by_test_id("tab-map").click()
         scif0 = page.locator('[data-testid=map-row][data-base="0x1004b800"]')
         expect(scif0).to_contain_text("gpex_mmio_window")
+        expect(scif0).to_have_attribute("data-status", "covered")
+        expect(page.get_by_test_id("map-extra-row").filter(
+            has_text="gpex_mmio_window").first).to_be_visible()
         ddr = page.locator('[data-testid=map-row][data-base="0x40000000"]')
         expect(ddr).to_have_attribute("data-status", "ram")
         expect(ddr.locator(".st")).to_have_attribute("data-partial", "true")
@@ -597,6 +609,7 @@ def test_map_and_devices_on_rzv2l(server):
         expect(hit).to_have_attribute("data-base", "0x10000000")
         expect(hit).to_have_attribute("data-status", "missing")
         expect(hit).to_have_attribute("data-hits", "1")
+        expect(page.get_by_test_id("map-unplaced-row")).to_contain_text("rzg2l_sysc_read+0x0")
 
         page.get_by_test_id("tab-devices").click()
         page.get_by_test_id("devices-filter").fill("lsi-devid")
@@ -638,4 +651,83 @@ def test_console_hint_says_where_keys_go(server):
         page.get_by_test_id("console").click()
         page.keyboard.type("x")                              # typed into nothing
         expect(hint).to_have_class(re.compile(r"\bnudge\b"))
+        browser.close()
+
+
+
+def test_keyboard_leaves_the_terminal_and_walks_the_tabs(server):
+    """Ctrl+] hands focus from the terminal to the tab row; arrows move along it."""
+    with sync_playwright() as pw:
+        browser, page = echo_page(pw, server)
+        page.get_by_test_id("console").click()
+        page.keyboard.press("Tab")                        # goes to the guest
+        page.keyboard.press("Control+BracketRight")
+        focused = lambda: page.evaluate(
+            "document.activeElement.getAttribute('data-testid')")
+        assert focused() == "tab-log"
+        page.keyboard.press("ArrowRight")
+        assert focused() == "tab-coverage"
+        expect(page.get_by_test_id("tab-coverage")).to_have_attribute("aria-selected", "true")
+        page.keyboard.press("End")
+        assert focused() == "tab-runs"
+        page.get_by_test_id("btn-stop").click()
+        browser.close()
+
+
+def test_console_settings_are_kept_per_profile(server):
+    with sync_playwright() as pw:
+        browser, page = echo_page(pw, server)
+        page.get_by_test_id("console-settings").locator("summary").click()
+        page.get_by_test_id("console-enter").select_option("lf")
+        page.get_by_test_id("btn-stop").click()
+        page.reload()
+        page.get_by_test_id("profile-select").select_option("virt-echo")
+        expect(page.get_by_test_id("console-enter")).to_have_value("lf")
+        page.get_by_test_id("console-settings").locator("summary").click()
+        page.get_by_test_id("console-reset").click()
+        expect(page.get_by_test_id("console-enter")).to_have_value("cr")
+        browser.close()
+
+
+def test_ended_run_shows_no_cursor(server):
+    with sync_playwright() as pw:
+        browser, page = echo_page(pw, server)
+        cursor = page.locator("#term .xterm-cursor")
+        page.get_by_test_id("console").click()
+        expect(cursor).to_have_count(1)
+        page.get_by_test_id("btn-stop").click()
+        expect(page.get_by_test_id("status")).to_have_attribute("data-state", "exited")
+        expect(cursor).to_have_count(0)
+        browser.close()
+
+
+@pytest.mark.skipif(not PROJECT_QEMU.exists(),
+                    reason="needs the project QEMU (BENCH_QEMU or build/qemu)")
+def test_map_follows_the_picked_run(server):
+    """Map and Devices name their run; picking a run in Runs shows that run's
+    map, and "current session" brings the session's back."""
+    with sync_playwright() as pw:
+        browser, page = echo_page(pw, server)
+        echo_run = get_json(server, "/api/session")["run"]
+        page.get_by_test_id("btn-stop").click()
+        expect(page.get_by_test_id("status")).to_have_attribute("data-state", "exited")
+        page.get_by_test_id("profile-select").select_option("rzv2l-smarc-m1-probe")
+        page.get_by_test_id("btn-start").click()
+        expect(page.get_by_test_id("status")).to_have_attribute(
+            "data-state", "exited", timeout=60_000)
+        m1_run = get_json(server, "/api/session")["run"]
+        scif0 = page.locator('[data-testid=map-row][data-base="0x1004b800"]')
+
+        page.get_by_test_id("tab-map").click()
+        expect(page.get_by_test_id("map-run")).to_contain_text(f"This session: {m1_run}")
+        expect(scif0).to_have_attribute("data-status", "modelled")
+
+        page.get_by_test_id("tab-runs").click()
+        page.locator(f'[data-testid=run-row][data-run="{echo_run}"]').click()
+        page.get_by_test_id("tab-map").click()
+        expect(page.get_by_test_id("map-run")).to_contain_text(f"Picked run: {echo_run}")
+        expect(scif0).to_have_attribute("data-status", "covered")
+        page.get_by_test_id("map-current").click()
+        expect(page.get_by_test_id("map-run")).to_contain_text(f"This session: {m1_run}")
+        expect(scif0).to_have_attribute("data-status", "modelled")
         browser.close()

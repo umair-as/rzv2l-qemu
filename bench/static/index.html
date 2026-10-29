@@ -36,6 +36,7 @@
     <span class="led" aria-hidden="true"></span>
     <span id="state" data-testid="status" data-state="none" role="status" aria-label="Session status">no session</span>
     <span id="verdict" class="verdict" data-testid="verdict" data-verdict="" role="status" aria-label="Verdict" hidden></span>
+    <span id="lastrun" class="meta" data-testid="last-run" hidden></span>
     <span id="machine" class="meta" data-testid="machine" hidden></span>
     <span id="markers" class="meta" data-testid="markers" hidden></span>
     <span id="exit" class="meta" data-testid="exit-code" role="status" aria-label="Exit status" hidden></span>
@@ -72,7 +73,8 @@
               <option value="cr">CR</option><option value="lf">LF</option><option value="crlf">CRLF</option>
             </select>
           </label>
-          <p class="hint">Defaults come from the profile. Changes last until another profile is picked.</p>
+          <p class="hint">Defaults come from the profile. Changes are kept per profile in this browser.</p>
+          <button id="console-reset" data-testid="console-reset" type="button">Profile defaults</button>
         </div>
       </details>
     </div>
@@ -104,8 +106,8 @@
     </div>
 
     <div class="tab-body" data-panel="coverage" hidden>
-      <p class="hint">What the guest touched that the model does not provide. Each row is either fixed or listed as a gap.
-        <a id="cov-csv" data-testid="coverage-csv" href="#" hidden download>Download CSV</a></p>
+      <p class="hint">This session: what the guest touched that the model does not provide. Each row is either fixed or listed as a gap.
+        <a id="cov-csv" class="btn-link" data-testid="coverage-csv" href="#" hidden download>Download CSV</a></p>
       <p id="cov-empty" class="empty" data-testid="coverage-empty">Start a session to see what the guest touches outside the model.</p>
       <div class="table-wrap">
         <table data-testid="coverage-table" aria-label="Coverage">
@@ -116,7 +118,8 @@
     </div>
 
     <div class="tab-body" data-panel="map" hidden>
-      <p class="hint">The run's memory map at start, against <code>docs/device-map.md</code>: what each window is in this build, and how often the guest hit it outside the model.</p>
+      <p class="view-run" data-testid="map-run"><span class="which"></span> <a href="#" class="back" data-testid="map-current" hidden>Show the current session</a></p>
+      <p class="hint">The memory map at start, against <code>docs/device-map.md</code>: what each window is in this build, and how often the guest hit it outside the model.</p>
       <div class="chips filter" role="group" aria-label="Show">
         <button data-map-filter="all" data-testid="map-filter-all" aria-pressed="true">All</button>
         <button data-map-filter="live" data-testid="map-filter-live" aria-pressed="false">In this build</button>
@@ -124,6 +127,7 @@
         <button data-map-filter="hits" data-testid="map-filter-hits" aria-pressed="false">Hit</button>
         <span id="map-summary" class="hint" data-testid="map-summary"></span>
       </div>
+      <ul id="map-unplaced" class="unplaced" data-testid="map-unplaced" hidden></ul>
       <p id="map-empty" class="empty" data-testid="map-empty">Start a session: its memory map is read before the guest runs.</p>
       <div class="table-wrap">
         <table data-testid="map-table" aria-label="Memory map" hidden>
@@ -138,6 +142,7 @@
     </div>
 
     <div class="tab-body" data-panel="devices" hidden>
+      <p class="view-run" data-testid="devices-run"><span class="which"></span> <a href="#" class="back" data-testid="devices-current" hidden>Show the current session</a></p>
       <form class="row" onsubmit="return false">
         <input id="dev-filter" data-testid="devices-filter" aria-label="Filter devices" placeholder="Filter: type, name or property" autocomplete="off" spellcheck="false">
       </form>
@@ -186,7 +191,7 @@
             <button data-file="log" data-testid="run-log">log</button>
             <button data-file="stderr" data-testid="run-stderr">stderr</button>
             <button data-file="cmdline" data-testid="run-cmdline">cmdline</button>
-            <a id="run-csv" data-testid="run-coverage-csv" href="#" download>coverage CSV</a>
+            <a id="run-csv" class="btn-link" data-testid="run-coverage-csv" href="#" download>coverage CSV</a>
           </div>
         </div>
         <pre id="run-out" data-testid="run-output" class="scroll" role="log" aria-label="Run file"></pre>

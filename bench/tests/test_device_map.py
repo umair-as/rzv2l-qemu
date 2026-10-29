@@ -55,6 +55,20 @@ def test_csv_groups_by_window():
         ["SCIF0", "0x1004b800", "0x400", "invalid_mem", "read", "5"],
         ["SCIF0", "0x1004b800", "0x400", "invalid_mem", "write", "1"],
         ["unmapped", "0x0c000000", "4", "invalid_mem", "read", "1"],
-        ["wdt0", "", "", "unimp", "write", "4"],
+        ["unplaced:wdt0+0x14", "", "", "unimp", "write", "4"],      # no qtree
         ["other", "", "", "other", "", "2"],
+    ])
+
+
+
+def test_csv_places_unimp_offsets_through_the_run_qtree():
+    cov = collections.Counter({
+        ("unimp", "write", "wdt0+0x14", "4", ""): 4,
+        ("unimp", "read", "rzg2l_sysc_read+0x0", "", ""): 1,
+    })
+    rows = list(csv.reader(io.StringIO(
+        server.coverage_csv(cov, WINDOWS, {"wdt0": 0x12800800}))))
+    assert sorted(rows[1:]) == sorted([
+        ["WDT0", "0x12800800", "0x400", "unimp", "write", "4"],
+        ["unplaced:rzg2l_sysc_read+0x0", "", "", "unimp", "read", "1"],
     ])

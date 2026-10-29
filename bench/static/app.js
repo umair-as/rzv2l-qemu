@@ -66,11 +66,21 @@ function applyConsoleSettings() {
   term.options.convertEol = $("lf-crlf").checked;   // draws \n as \r\n
 }
 
+// The profile's TOML gives the defaults; a change is kept per profile here
+function consoleKey() { return `bench.console.${$("profile").value}`; }
+
 function consoleDefaults() {
   const p = profiles.find((x) => x.id === $("profile").value);
-  const c = (p && p.console) || { lf_to_crlf: false, enter: "cr" };
-  $("lf-crlf").checked = c.lf_to_crlf;
-  $("enter-sends").value = c.enter;
+  let c = (p && p.console) || { lf_to_crlf: false, enter: "cr" };
+  try { c = { ...c, ...JSON.parse(store.get(consoleKey()) || "{}") }; } catch (e) { /* bad entry */ }
+  $("lf-crlf").checked = !!c.lf_to_crlf;
+  $("enter-sends").value = ENTER[c.enter] ? c.enter : "cr";
+  applyConsoleSettings();
+}
+
+function saveConsoleSettings() {
+  store.set(consoleKey(), JSON.stringify(
+    { lf_to_crlf: $("lf-crlf").checked, enter: $("enter-sends").value }));
   applyConsoleSettings();
 }
 
@@ -98,10 +108,17 @@ async function loadProfiles() {
   consoleDefaults();
 }
 
+let lastStatus = { state: "none" };
+
 function showDesc() {
   const p = profiles.find((x) => x.id === $("profile").value);
   $("profile-desc").textContent = p ? p.description : "";
   showAssets(p);
+  // The readout describes the last run: say whose, once another is picked
+  const lr = $("lastrun");
+  lr.hidden = !(lastStatus.profile && lastStatus.state === "exited"
+                && lastStatus.profile !== $("profile").value);
+  lr.textContent = `last run: ${lastStatus.profile || ""}`;
 }
 
 // Before Start: is the QEMU binary there, and the guest files (or a step that builds them)?
@@ -171,6 +188,10 @@ function showReadout(s) {
   const expect = s.expect || [];
   markers.hidden = !(s.verdict === "running" && expect.length);
   markers.textContent = `markers ${expect.length - (s.expect_missing || []).length}/${expect.length}`;
+  markers.title = (s.expect_missing || []).length
+    ? `Waiting for: ${s.expect_missing.map((m) => `'${m}'`).join(", ")}` : "";
+  nextMarker = s.verdict === "running" && (s.expect_missing || []).length
+    ? s.expect_missing[0] : "";
 
   const why = $("verdict-why");
   const reasons = s.verdict === "fail" ? s.verdict_reasons || [] : [];
@@ -199,7 +220,7 @@ function showReadout(s) {
   csv.hidden = !s.run;
   if (s.run) csv.href = `/api/runs/${encodeURIComponent(s.run)}/coverage.csv`;
 
-  if (s.run && s.run !== viewRun && s.state !== "starting") loadViews(s.run);
+  if (s.run && s.run !== viewRun && s.state !== "starting" && !viewPinned) loadViews(s.run);
 
   if (s.cmdline) {
     $("cmdline").hidden = false;
@@ -225,8 +246,14 @@ function appendStderr(text) {
   }
 }
 
+let nextMarker = "";
+
 function setStatus(s) {
+  const was = state;
   state = s.state;
+  lastStatus = s;
+  if (state === "exited" && was !== "exited") term.write("\x1b[?25l");  // no cursor: nothing listens
+  else if (state !== "exited" && was === "exited") term.write("\x1b[?25h");
   const pill = $("state");
   pill.dataset.state = state;
   pill.textContent = state === "none" ? "no session" : state;
@@ -241,6 +268,7 @@ function setStatus(s) {
   $("gdb").disabled = live;
   showReadout(s);
   showConsoleHint();
+  showDesc();
   const exit = $("exit");
   if (state === "exited") {
     exit.hidden = false;
@@ -298,20 +326,36 @@ async function refreshCoverage() {
 // ---- map and devices (captured at start, kept with the run) ----------------
 
 let viewRun = null;
+let viewPinned = false;     // a run picked in the Runs tab, not the session's
 let mapRows = [];
 let mapFilter = "all";
 let mapExtra = [];
+let mapUnplaced = [];
 let devTree = [];
+
+function showViewRun(info) {
+  const current = !viewPinned;
+  for (const id of ["map", "devices"]) {
+    const p = document.querySelector(`[data-testid=${id}-run]`);
+    p.querySelector(".which").textContent = info
+      ? `${current ? "This session" : "Picked run"}: ${info.run} · ${info.machine || info.profile || ""}`
+      : "";
+    p.querySelector(".back").hidden = current;
+  }
+}
 
 async function loadViews(run) {
   viewRun = run;
   const enc = encodeURIComponent(run);
+  showViewRun({ run });
   try {
     const m = await api("GET", `/api/runs/${enc}/map`);
     mapRows = m.windows;
     mapExtra = m.extra;
+    mapUnplaced = m.unplaced || [];
+    showViewRun(m);
     renderMap();
-  } catch (e) { mapRows = []; mapExtra = []; renderMap(e.message); }
+  } catch (e) { mapRows = []; mapExtra = []; mapUnplaced = []; renderMap(e.message); }
   try {
     devTree = (await api("GET", `/api/runs/${enc}/devices`)).tree;
   } catch (e) { devTree = []; }
@@ -344,7 +388,9 @@ function renderMap(error) {
     const st = document.createElement("span");
     st.className = "st"; st.dataset.status = r.status; st.dataset.partial = String(r.partial);
     st.textContent = r.status;
-    st.title = r.partial ? "The live regions cover only part of this window" : "";
+    st.title = r.status === "covered"
+      ? "A larger region lies across this window; nothing in the build fits it"
+      : r.partial ? "The live regions cover only part of this window" : "";
     live.append(st);
     if (r.regions.length) {
       const rn = document.createElement("div");
@@ -357,11 +403,25 @@ function renderMap(error) {
     plan.title = [r.milestone, r.plan].filter(Boolean).join(" · ");
     body.append(tr);
   }
-  const counts = { modelled: 0, ram: 0, unimp: 0, missing: 0 };
+  const counts = { modelled: 0, ram: 0, unimp: 0, covered: 0, missing: 0 };
   mapRows.forEach((r) => { counts[r.status] += 1; });
   $("map-summary").textContent = mapRows.length
-    ? `${counts.modelled} modelled · ${counts.ram} RAM · ${counts.unimp} UNIMP · ${counts.missing} missing`
+    ? `${counts.modelled} modelled · ${counts.ram} RAM · ${counts.unimp} UNIMP · `
+      + `${counts.covered} covered · ${counts.missing} missing`
     : "";
+  // Hits the Map cannot place are listed, never dropped
+  const un = $("map-unplaced");
+  un.innerHTML = "";
+  mapUnplaced.forEach((u) => {
+    const li = document.createElement("li");
+    li.setAttribute("data-testid", "map-unplaced-row");
+    li.textContent = `${u.where} ×${u.count} `;
+    const why = document.createElement("span");
+    why.textContent = `(not placed: ${u.why})`;
+    li.append(why);
+    un.append(li);
+  });
+  un.hidden = !mapUnplaced.length;
   const empty = $("map-empty");
   empty.hidden = mapRows.length > 0;
   if (error) empty.textContent = error.charAt(0).toUpperCase() + error.slice(1) + ".";
@@ -506,6 +566,8 @@ async function refreshRuns() {
 
 async function openRun(id) {
   currentRun = id;
+  viewPinned = !(lastStatus.run === id);   // the session's own run is not a pin
+  loadViews(id);
   document.querySelectorAll("#runs tr").forEach((tr) =>
     tr.setAttribute("aria-selected", String(tr.dataset.run === id)));
   $("run-view").hidden = false;
@@ -551,7 +613,10 @@ function connect() {
       case "con": appendConsole(m.d); break;
       case "stderr": appendStderr(m.d); break;
       case "log": appendPre("log", m.d); refreshCoverageSoon(); break;
-      case "event": appendPre("events", JSON.stringify(m.d)); break;
+      case "event":
+        appendPre("events", JSON.stringify(m.d));
+        if (m.d.event === "RESET") term.write("\r\n\x1b[2m── reset: the verdict counts from here ──\x1b[0m\r\n");
+        break;
       case "status": setStatus(m.d); break;
     }
   };
@@ -570,7 +635,10 @@ const CON_HINT = {
 function showConsoleHint() {
   const h = $("con-hint");
   h.dataset.state = state;
-  h.textContent = CON_HINT[state] || CON_HINT.none;
+  let text = CON_HINT[state] || CON_HINT.none;
+  if (state === "running" || state === "paused") text += " · Ctrl+] leaves the terminal";
+  if (nextMarker) text += ` · waiting for '${nextMarker}'`;
+  h.textContent = text;
 }
 
 let nudgeTimer;
@@ -592,6 +660,7 @@ term.onData((d) => {
 // ---- controls ----------------------------------------------------------------
 
 async function start(paused) {
+  viewPinned = false;
   resetViews();
   setStatus({ state: "starting" });
   try {
@@ -618,7 +687,12 @@ async function monitor(cmd) {
 }
 
 $("profile").addEventListener("change", () => { showDesc(); consoleDefaults(); });
-$("lf-crlf").onchange = applyConsoleSettings;
+$("lf-crlf").onchange = saveConsoleSettings;
+$("enter-sends").onchange = saveConsoleSettings;
+$("console-reset").onclick = () => {
+  try { localStorage.removeItem(consoleKey()); } catch (e) { /* no storage */ }
+  consoleDefaults();
+};
 $("start").onclick = () => start(false);
 $("start-paused").onclick = () => start(true);
 $("pause").onclick = () => action(state === "paused" ? "/api/session/resume" : "/api/session/pause");
@@ -646,16 +720,50 @@ $("monitor-form").onsubmit = (e) => {
   if (cmd) monitor(cmd);
 };
 
-document.querySelectorAll(".tabs button").forEach((b) => {
-  b.onclick = () => {
-    document.querySelectorAll(".tabs button").forEach((x) =>
-      x.setAttribute("aria-selected", String(x === b)));
-    document.querySelectorAll(".tab-body").forEach((p) => {
-      p.hidden = p.dataset.panel !== b.dataset.tab;
-    });
-    if (b.dataset.tab === "coverage" && state !== "none") refreshCoverage();
-    if (b.dataset.tab === "runs") refreshRuns();
-    if ((b.dataset.tab === "map" || b.dataset.tab === "devices") && viewRun) loadViews(viewRun);
+const tabs = [...document.querySelectorAll(".tabs button")];
+
+function selectTab(b) {
+  tabs.forEach((x) => {
+    x.setAttribute("aria-selected", String(x === b));
+    x.tabIndex = x === b ? 0 : -1;          // one tab stop for the row
+  });
+  document.querySelectorAll(".tab-body").forEach((p) => {
+    p.hidden = p.dataset.panel !== b.dataset.tab;
+  });
+  if (b.dataset.tab === "coverage" && state !== "none") refreshCoverage();
+  if (b.dataset.tab === "runs") refreshRuns();
+  if ((b.dataset.tab === "map" || b.dataset.tab === "devices") && viewRun) loadViews(viewRun);
+}
+
+tabs.forEach((b, i) => {
+  b.onclick = () => selectTab(b);
+  b.onkeydown = (e) => {
+    const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    const t = tabs[(to + tabs.length) % tabs.length];
+    selectTab(t);
+    t.focus();
+  };
+});
+selectTab(tabs.find((b) => b.getAttribute("aria-selected") === "true") || tabs[0]);
+
+// The terminal takes every key, Tab included: Ctrl+] (as in telnet) hands
+// focus back to the page, to the side panel's tab row
+term.attachCustomKeyEventHandler((e) => {
+  if (e.type === "keydown" && e.ctrlKey && (e.key === "]" || e.code === "BracketRight")) {
+    e.preventDefault();
+    tabs.find((b) => b.tabIndex === 0).focus();
+    return false;
+  }
+  return true;
+});
+
+document.querySelectorAll(".view-run .back").forEach((a) => {
+  a.onclick = (e) => {
+    e.preventDefault();
+    viewPinned = false;
+    if (lastStatus.run) loadViews(lastStatus.run);
   };
 });
 

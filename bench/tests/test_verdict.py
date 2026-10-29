@@ -3,6 +3,7 @@
 reads, and combine with expect_exit as documented in bench/README.md."""
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 
@@ -24,9 +25,9 @@ def session(tmp_path, monkeypatch):
 
     made = []
 
-    def make(expect, expect_exit=None):
+    def make(expect, expect_exit=None, prepare=()):
         made.append(None)                       # run dirs need unique names
-        profile = {"name": "t", "qemu": "q", "args": [], "prepare": [],
+        profile = {"name": "t", "qemu": "q", "args": [], "prepare": list(prepare),
                    "semihosting": False, "log": "", "expect": expect,
                    "expect_exit": expect_exit, "description": ""}
         return server.Session(FakeBench(), f"t{len(made)}", profile)
@@ -149,3 +150,38 @@ def test_reset_restarts_the_verdict(session):
     assert s.verdict() == ("running", [])
     s.state = "exited"
     assert s.verdict()[0] == "fail"
+
+
+
+def test_stop_during_prepare_cancels_the_launch(session):
+    """Stop while the prepare step runs: the step is killed, QEMU is never
+    started, and Stop returns once the run is recorded."""
+    s = session(["x"], 0, prepare=["sleep", "30"])
+
+    async def run():
+        start = asyncio.create_task(s.start(paused=False))
+        for _ in range(100):                    # until the step is running
+            if s.prep_proc:
+                break
+            await asyncio.sleep(0.02)
+        t0 = asyncio.get_running_loop().time()
+        await s.stop()
+        took = asyncio.get_running_loop().time() - t0
+        await asyncio.wait_for(start, 5)
+        return took
+    took = asyncio.run(run())
+    assert took < 5
+    assert s.state == "exited" and s.proc is None and s.error is None
+    assert s.verdict()[1][0] == "stopped by the bench before the guest exited"
+    assert json.loads((s.run_dir / "run.json").read_text())["state"] == "exited"
+
+
+def test_uptime_stops_at_exit(session):
+    s = session([])
+    s.state, s.ended = "exited", s.started + 2.0
+    assert s.status()["uptime"] == 2.0
+
+
+def test_run_id_takes_no_trailing_newline():
+    assert server.RUN_ID.match("20261029-000000-000-virt-echo")
+    assert not server.RUN_ID.match("20261029-000000-000-virt-echo\n")
