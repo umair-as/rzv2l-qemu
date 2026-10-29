@@ -217,26 +217,38 @@ void irq_handler(void)
 
 /* ---------------- the console, as TF-A drives it ---------------- */
 
+/* Wait until the TX FIFO has room (ldrh FDR, FDR.T < 16); bounded here */
+static int tfa_wait_fifo(void)
+{
+    for (uint64_t n = 0;
+         ((mmio_read16(SCIF0 + FDR) >> FDR_T_SHIFT) & FDR_T_MASK) >= FIFO_SIZE;
+         n++) {
+        if (n == SPIN_LIMIT) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 /*
  * TF-A console_rz_putc (plat/renesas/rz/common/drivers/scifa.S:188-222
  * @ f59ed5a31), with the same accesses in the same order and widths:
- * for '\n' send '\r' first; wait until FDR.T < 16 (ldrh FDR); store the
- * byte to FTDR (strb); read FSR (ldrh) and write it back with TEND
- * cleared (strh). The waits are bounded here.
+ * for '\n' wait and store '\r' to FTDR (strb) first; wait and store the
+ * byte; then, once per call, read FSR (ldrh) and write it back with
+ * TEND cleared (strh). A '\n' thus clears TEND once, after both bytes.
  */
 static int tfa_putc(char c)
 {
     uint16_t fsr;
-    uint64_t n;
 
-    if (c == '\n' && tfa_putc('\r')) {
-        return -1;
-    }
-    for (n = 0; ((mmio_read16(SCIF0 + FDR) >> FDR_T_SHIFT) & FDR_T_MASK) >=
-                FIFO_SIZE; n++) {
-        if (n == SPIN_LIMIT) {
+    if (c == '\n') {
+        if (tfa_wait_fifo()) {
             return -1;
         }
+        mmio_write8(SCIF0 + FTDR, '\r');
+    }
+    if (tfa_wait_fifo()) {
+        return -1;
     }
     mmio_write8(SCIF0 + FTDR, c);
     fsr = mmio_read16(SCIF0 + FSR);
