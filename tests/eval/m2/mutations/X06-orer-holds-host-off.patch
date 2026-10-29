@@ -1,0 +1,14 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index e811c99992..1e816f2368 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -350,8 +350,7 @@ static int rz_scifa_can_receive(void *opaque)
+ {
+     RenesasRZSCIFAState *s = opaque;
+ 
+-    if (!FIELD_EX16(s->scr, SCR, RE) || FIELD_EX16(s->fcr, FCR, RFRST) ||
+-        (s->lsr & R_LSR_ORER_MASK)) {
++    if (!FIELD_EX16(s->scr, SCR, RE) || FIELD_EX16(s->fcr, FCR, RFRST)) {
+         return 1;       /* the line is not sampled: the byte is lost */
+     }
+     return fifo8_num_free(&s->rx_fifo);

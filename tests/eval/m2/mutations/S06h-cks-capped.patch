@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index e811c99992..dce60eb8aa 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -284,7 +284,7 @@ static void rz_scifa_update(RenesasRZSCIFAState *s)
+  */
+ static uint64_t rz_scifa_bits_ns(RenesasRZSCIFAState *s, unsigned bits)
+ {
+-    unsigned n = FIELD_EX16(s->smr, SMR, CKS);
++    unsigned n = MIN(FIELD_EX16(s->smr, SMR, CKS), 1);
+     /* base clock 16 or 8 times the bit rate, halved in double-speed mode */
+     unsigned k = 64 >> (FIELD_EX8(s->semr, SEMR, ABCS0) +
+                         FIELD_EX8(s->semr, SEMR, BGDM));

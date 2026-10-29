@@ -92,7 +92,7 @@ Offsets are from each channel's base. "Post-firmware" is the direct-mode start s
 
 **Frame time (F formulas, A for use).** bit rate B = P0 / (K × 2^(2n−1) × (N + 1)) × (BRME ? MDDR/256 : 1). P0 = 100 MHz (device map, SCIF row). n = SMR.CKS. N = BRR. K = 64 (BGDM = 0, ABCS0 = 0), 32 (exactly one of BGDM or ABCS0 set) or 16 (both set) (p.1282, p.1287). Frame = 1 start + 8 or 7 data (CHR) + 1 parity (PE) + 1 or 2 stop (STOP) bits. The rate is used only for timing; nothing checks it against the host (device map §4 row 13). TF-A's settings (BRR `0x1A`, MDDR `0xFE`, SEMR `0x30`, SMR 0) give 114 836 bit/s and an 87.1 µs frame.
 
-**Receive.** The chardev's `can_receive` reports the free RX FIFO space. With RE = 0, incoming bytes are discarded; DR keeps its value (p.1279 note). Each byte enters the FIFO, FDR.R increments, RDF follows its rule, and the DR timer is armed for **15 bit times** (15 ETU), counted from the byte's arrival (that is, the end of its stop bit) (§22.2.7 p.1279). "1.5 frames" is true only for 8N1 (p.1279 note 1), so the timeout does not use the frame time. If the timer expires with 0 < count < RX trigger, DR sets. Draining the FIFO clears DR. RFRST = 1 empties and holds the RX FIFO. **Overrun:** from the chardev the FIFO cannot overflow, because `can_receive` gives the host flow control. With FCR.LOOP = 1 the TX side feeds the RX side with no flow control, so a byte that arrives with 16 bytes in the RX FIFO is lost and sets LSR.ORER (§22.2.13 p.1296; that loopback reception follows the normal receive rules is I). While ORER is set the receiver is stopped: every further byte, looped or from the chardev, is dropped (as with RE = 0) until ORER is cleared (§22.2.13 "cannot continue subsequent serial reception"; §22.4.2 overrun check; review R2). FER, PER and BRK stay 0, because no backend produces line errors.
+**Receive.** The chardev's `can_receive` reports the free RX FIFO space. With RE = 0, incoming bytes are discarded; DR keeps its value (p.1279 note). Each byte enters the FIFO, FDR.R increments, RDF follows its rule, and the DR timer is armed for **15 bit times** (15 ETU), counted from the byte's arrival (that is, the end of its stop bit) (§22.2.7 p.1279). "1.5 frames" is true only for 8N1 (p.1279 note 1), so the timeout does not use the frame time. If the timer expires with 0 < count < RX trigger, DR sets. Draining the FIFO clears DR. RFRST = 1 empties and holds the RX FIFO. **Overrun:** from the chardev the FIFO cannot overflow, because `can_receive` gives the host flow control. With FCR.LOOP = 1 the TX side feeds the RX side with no flow control, so a byte that arrives with 16 bytes in the RX FIFO is lost and sets LSR.ORER (§22.2.13 p.1296; that loopback reception follows the normal receive rules is I). While ORER is set the receiver is stopped: every further byte, looped or from the chardev, is consumed and dropped (as with RE = 0; the host is not held off, so a byte typed then is lost, as on the real line) until ORER is cleared (§22.2.13 "cannot continue subsequent serial reception"; §22.4.2 overrun check; review R2). FER, PER and BRK stay 0, because no backend produces line errors.
 
 ## 5. Interrupts (F, Table 22.19 p.1323, all level-high)
 
@@ -104,7 +104,7 @@ Offsets are from each channel's base. "Post-firmware" is the direct-mode start s
 | TXI | 383 | 415 | TIE & TDFE |
 | TEI/DRI | 384 | 416 | (TEIE & TEND) \| (RIE & DR) |
 
-SCIF*n* uses SPIs 380 + 5*n* .. 384 + 5*n*, in the same order (device map; DTB-U `interrupts` read on the built DTB: SCIF0 `0x17c 0x17e 0x17f 0x17d 0x180 0x180` = eri, rxi, txi, bri, tei, dri). The outputs are re-evaluated after every register access and every timer event.
+SCIF*n* uses SPIs 380 + 5*n* .. 384 + 5*n*, in the same order (device map; DTB-U `interrupts` read on the built DTB: SCIF0 `0x17c 0x17e 0x17f 0x17d 0x180 0x180` = eri, rxi, txi, bri, dri, tei). The outputs are re-evaluated after every register access and every timer event.
 
 ## 6. Start states (spec §9)
 
@@ -126,6 +126,7 @@ SCIF*n* uses SPIs 380 + 5*n* .. 384 + 5*n*, in the same order (device map; DTB-U
 | noise filter (NFEN), DIR (LSB-first) | stored, no effect | gap (A) |
 | DMAC requests (RXI/TXI as DREQ) | none | UNSUPPORTED; no DT node has `dmas` (`scif.md` §8) |
 | pin mux | the chardev is wired whatever PFC selects | documented decision (device map §4 row 12) |
+| TE cleared mid-frame; TEND after TFRST with TE = 0 | the frame in flight finishes (the manual says clearing TE initializes TSR, p.1276); with TE = 0, an empty FIFO after TFRST and an idle shift register, TEND stays 0 until a transmission completes (the manual gives no setting condition for this case) | gap (recheck N3, 2026-10-29): code reading, not tested; none of the pinned firmware or sh-sci sequences clears TE mid-transmission; an EVK measurement would be needed to model it honestly (`requests.md`) |
 
 ## 8. Checks and the eval harness
 

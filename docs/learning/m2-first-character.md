@@ -94,6 +94,8 @@ The qtest steps the virtual clock to 200 ns before the end of the frame and chec
 | BRR hardwired to 0x1A (review R4) | `not ok …/scif/tend-deferred`: TEND already 1 at half the BRR = 0x35 frame |
 | TEND set with TE off and a byte still queued (review R1) | `not ok …/scif/tend-te-cleared`: `(0x00000040 == 0x00000000)` |
 | bit 7 sent in 7-bit mode (review R3) | `not ok …/scif/tx-7bit`: `(0x000000c1 == 0x00000041)` |
+| SEMR.ABCS0 ignored, or SEMR.BGDM ignored (recheck N1) | `not ok …/scif/tend-deferred`: `(0x00000000 == 0x00000040)`, TEND still 0 when the doubled-rate frame should be out |
+| CKS capped at 1 (recheck N1) | `not ok …/scif/tend-deferred`: `(0x00000040 == 0x00000000)`, TEND already 1 long before the CKS = 3 frame ends |
 
 ## 4. Receive, DR and overrun (M2-T03)
 
@@ -113,6 +115,7 @@ Two manual rules are easy to get wrong:
 | ORER clears without the prior read | `not ok …/scif/rx-overrun`: the same line |
 | RE ignored | `not ok …/scif/rx-disabled`: `(0x00000001 == 0x00000000)` |
 | reception continues while ORER is set (review R2) | `not ok …/scif/rx-stopped-by-orer`: `(0x00000010 == 0x0000000f)` |
+| the host held off while ORER is set, instead of losing the byte (recheck N2) | `not ok …/scif/rx-chardev-while-orer`: `(0x00000010 == 0x0000000f)` |
 
 ## 5. The interrupt lines (M2-T04)
 
@@ -157,4 +160,4 @@ The independent review of the finished unit read the model against the manual ra
 - **7-bit frames (R3).** With SMR.CHR = 1 only bits 6..0 go out (p.1274 note 3). The model changed the frame time but sent the whole byte. The receive side of 7-bit mode is still not modelled.
 - **The clock divider was untested (R4).** Every timing case ran at the firmware's divider (CKS = 0, BRR = 0x1A). The reviewer forced the CKS term to zero and the whole suite stayed green. Two new cases, CKS = 1 and BRR = 0x35, now quadruple and double the frame time, with the expected times derived from the manual's formula in the test's comment.
 
-Each fix came with its test shown red on the old model first, and each test has a mutation in `tests/eval/m2/` that makes it red again. The other two findings were a citation (the output order of the five IRQ lines comes from Table 8.2, not Table 22.19) and the hello probe's claim to reproduce TF-A's access order exactly (§6).
+Each fix came with its test shown red on the old model first, and each test has a mutation in `tests/eval/m2/` that makes it red again. The recheck of the fixes (a third model) then did what the first reviewer had done for CKS: it dropped the SEMR.ABCS0 and SEMR.BGDM terms and capped CKS at 1, and the suite stayed green. Three more timing cases close that: ABCS0 alone, BGDM alone and both, which halve and quarter the bit time (p.1284 note), and CKS = 3, which multiplies it by 64. A timing axis is only verified once a value other than the firmware's has been asserted on it. The other two findings were a citation (the output order of the five IRQ lines comes from Table 8.2, not Table 22.19) and the hello probe's claim to reproduce TF-A's access order exactly (§6).

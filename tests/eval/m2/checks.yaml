@@ -48,7 +48,7 @@ checks:
     kind: qtest
     test: /aarch64/rzv2l-smarc/scif/tend-deferred
     proves: TEND stays 0 until one frame per byte has passed and then becomes 1, at the programmed format and rate
-    golden: 87.08 us (8N1), 3 x 87.08 us, 95.79 us (7E2), 348.32 us (8N1, CKS 1), 174.16 us (8N1, BRR 0x35), +-0.2 us
+    golden: 87.08 us (8N1), 3 x 87.08 us, 95.79 us (7E2), 348.32 us (CKS 1), 5573.14 us (CKS 3), 43.54 us (ABCS0, and BGDM), 21.77 us (both), 174.16 us (BRR 0x35), +-0.2 us
     citation: 22.2.8 p.1282 and 22.2.9 p.1287 formulas, P0 100 MHz; scif.md section 7; EVK-R23
   - id: S07
     kind: qtest
@@ -158,6 +158,12 @@ checks:
     proves: while ORER is set the receiver drops bytes even with FIFO space; clearing ORER restarts it
     golden: FDR.R 15 after one pop and one more byte; LSR 0x0001; FDR.R 16 after the clear and one byte
     citation: 22.2.13 p.1296; 22.4.2 (overrun check before a byte is stored); review 2026-10-29 R2
+  - id: X06
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/rx-chardev-while-orer
+    proves: a serial-line byte that arrives while ORER is set is consumed and lost (the host is not held off); the line works again after the clear
+    golden: FDR.R 15 after the clear and one pop; 16 after one more byte
+    citation: 22.2.13 p.1296 (newly received data is lost); recheck 2026-10-29 N2
 
   - id: A01
     kind: acceptance
@@ -221,6 +227,9 @@ mutations:
   - {id: S06c-stop-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
   - {id: S06d-cks-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
   - {id: S06e-brr-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S06f-abcs0-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == FSR_TEND\)'}
+  - {id: S06g-bgdm-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == FSR_TEND\)'}
+  - {id: S06h-cks-capped, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
   - {id: S07-ttrg-hardwired, check: S07, red_line: 'check_tdfe_at: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TDFE == tdfe \? FSR_TDFE : 0\)'}
   - {id: S08a-frdr-no-pop, check: S08a, red_line: "test_rx_fifo: assertion failed \\(qtest_readb\\(qts, b \\+ FRDR\\) == 'b'\\)"}
   - {id: S08a2-rdf-set-again-ge, check: S08a, red_line: 'test_rx_fifo: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_RDF == 0\)'}
@@ -243,6 +252,7 @@ mutations:
   - {id: X03b-orer-clears-unarmed, check: X03, red_line: 'test_rx_overrun: assertion failed \(qtest_readw\(qts, b \+ LSR\) == LSR_ORER\)'}
   - {id: X04-re-ignored, check: X04, red_line: 'test_rx_disabled: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 0\)'}
   - {id: X05-rx-ignores-orer, check: X05, red_line: 'test_rx_stopped_by_orer: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 15\)'}
+  - {id: X06-orer-holds-host-off, check: X06, red_line: 'test_rx_chardev_while_orer: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 15\)'}
   - {id: A01-drop-L, check: A01, red_line: '^FAIL serial line differs from expected/serial.txt \(A01\)'}
   - {id: A02-tx-synchronous, check: A02, red_line: '^FAIL probe exited 2: no result or the flush timed out \(A02\)'}
   - {id: A03-txi-to-spi382, check: A03, red_line: '^FAIL IRQ taken: 0 \(expected 1\)'}
