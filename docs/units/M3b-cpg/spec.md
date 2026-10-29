@@ -12,7 +12,7 @@ A new device `renesas-rzv2l-cpg` at `0x11010000` (64 KiB, 32-bit accesses only),
 - **CLKSTATUS reads 0.** Every divider and selector switch completes inside the write.
 - **Two start states** behind a `direct-boot` property, which the board sets when it loads a kernel (as for SCIF0). The property selects the manual reset values or the EVK post-firmware values.
 
-**Not modelled, honest fault:** the PLL monitors (SAMPLLn_MON, SIPLLn_MON, OTPPLLn_MON), PLL4/PLL6 and SIPLL5_CLK1-5, PLL1_SETTING and SAMPLL1_STBY, the PCH handshake (`0xB30-0xB44`, Stage B, M7), WDTOVF_RST/WDTRST_SEL, OTHERFUNC1/2. Every offset that Table 7.5 does not list is also a fault. Each of these logs `LOG_UNIMP` and returns a bus error. No clock, reset or MSTOP state gates another device; that gap is already recorded in the device map.
+**Not modelled, honest fault:** the PLL monitors (SAMPLLn_MON, SIPLLn_MON, OTPPLLn_MON), PLL4/PLL6 and SIPLL5_CLK1-5, PLL1_SETTING and SAMPLL1_STBY, the PCH handshake (`0xB30-0xB44`, Stage B, M7), WDTOVF_RST/WDTRST_SEL. (OTHERFUNC1/2 are modelled: the kernel reads OTHERFUNC1 at probe.) Every offset that Table 7.5 does not list is also a fault. Each of these logs `LOG_UNIMP` and returns a bus error. No clock, reset or MSTOP state gates another device; that gap is already recorded in the device map.
 
 ## What the guest needs
 
@@ -61,6 +61,8 @@ The terminal stays empty; see `../../learning/building-and-testing.md` §8 for t
 
 ## Next blocker (2026-10-29, fork `4ae1d307eb`)
 
+From the diagnostic run (`keep_bootcon`); a later run differs only in the timestamps.
+
 ```
 [    2.108378] Internal error: synchronous external abort: 0000000096000010 [#1] PREEMPT SMP
 [    2.158650] pc : ostm_timer_stop+0x8/0x60
@@ -77,13 +79,14 @@ The terminal stays empty; see `../../learning/building-and-testing.md` §8 for t
 | Log lines | Window (device map) | Class | Status |
 |---|---|---|---|
 | `rz-dmac: unimplemented device write` × 18 (CHCTRL of channels 0-15, DCTRL of both groups) | DMAC `0x11820000` | write-retaining STUB | mapped this unit |
-| `usbphy-ctrl: unimplemented device read/write` at `+0x0` | USB PHY control `0x11C40000` | UNIMP | mapped this unit |
-| `tsu: unimplemented device read/write` × 15; guest prints `Failed to start TSU`, probe -110 | TSU `0x10059400` | UNIMP (honest bounded failure, as the device map predicts) | mapped this unit |
+| `usbphy-ctrl: unimplemented device read/write` at `+0x0` | USB PHY control `0x11C40000` | write-retaining STUB (operator decision after review, 2026-10-29; was UNIMP) | mapped this unit |
+| `tsu: unimplemented device read/write` (a bounded poll of TSU_SS; 15 lines on an idle host, fewer under load); guest prints `Failed to start TSU`, probe -110 | TSU `0x10059400` | UNIMP (honest bounded failure, as the device map predicts) | mapped this unit |
 | `Invalid read at addr 0x12801410, size 1` | OSTM1 `0x12801400` | FUNCTIONAL, needs a model | next unit |
 
 No CPG line appears: every CPG access the kernel makes is to a modelled register.
 
-### Listed for the operator (classes not changed here)
+### Listed for the operator
 
 - **CPG offsets Table 7.5 does not list** (question 4 above) answer with a bus error, while silicon reads live values at 60 of them. No guest touches them yet.
+- **USB PHY control (decided 2026-10-29):** the driver sets and clears reset bits in its RESET register (`+0x0`) with read-modify-writes and reads it back for the reset status (linux v6.12.59 `drivers/reset/reset-rzg2l-usbphy-ctrl.c:54-58`, `:73-77`, `:91`, `:156-158`). Read-as-zero would lose those bits, so the operator chose a write-retaining stub, as for the DMAC.
 - **DMAC:** the stub keeps written values with a reset to 0. That is the device map's class; at probe the driver only writes, so read-as-zero would behave the same until a client starts a transfer.
