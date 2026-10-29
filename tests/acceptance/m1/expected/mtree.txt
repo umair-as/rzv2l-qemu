@@ -12,19 +12,33 @@
 #   GIC distributor 0x11900000; QEMU backs 0x10000 of the 0x20000 window
 #   GIC redistributors 0x11940000, 0x40000 (2 frames of 0x20000)
 #   DDR 0x40000000, 2 GiB
+#   PFC 0x11030000 and IRQC 0x110A0000, 64 KiB each (pin and interrupt controller unit)
+#   Stubs (UNIMP, device-map rows RIIC, SDHI, ravb, USB): RIIC0/1/3 0x10058000 + n * 0x400,
+#   0x400 each; SDHI0/1, ETH0/1, USB0 and USB1 host, 64 KiB each
 000000001004b800-000000001004bbff (prio 0, i/o): renesas-rz-scifa
 000000001004bc00-000000001004bfff (prio 0, i/o): renesas-rz-scifa
 000000001004c000-000000001004c3ff (prio 0, i/o): renesas-rz-scifa
 000000001004c400-000000001004c7ff (prio 0, i/o): renesas-rz-scifa
 000000001004c800-000000001004cbff (prio 0, i/o): renesas-rz-scifa
+0000000010058000-00000000100583ff (prio -1000, i/o): riic0
+0000000010058400-00000000100587ff (prio -1000, i/o): riic1
+0000000010058c00-0000000010058fff (prio -1000, i/o): riic3
 0000000010059400-00000000100597ff (prio -1000, i/o): tsu
 0000000011010000-000000001101ffff (prio 0, i/o): renesas-rzv2l-cpg
 0000000011020000-000000001102ffff (prio 0, i/o): renesas-rzg2l-sysc
+0000000011030000-000000001103ffff (prio 0, i/o): renesas-rzg2l-pfc
+00000000110a0000-00000000110affff (prio 0, i/o): renesas-rzg2l-irqc
 0000000011820000-000000001182ffff (prio -1000, i/o): rz-dmac
 0000000011830000-000000001183ffff (prio -1000, i/o): rz-dmac-ext
 0000000011900000-000000001190ffff (prio 0, i/o): gicv3_dist
 0000000011940000-000000001197ffff (prio 0, i/o): gicv3_redist_region[0]
+0000000011c00000-0000000011c0ffff (prio -1000, i/o): sdhi0
+0000000011c10000-0000000011c1ffff (prio -1000, i/o): sdhi1
+0000000011c20000-0000000011c2ffff (prio -1000, i/o): ravb-eth0
+0000000011c30000-0000000011c3ffff (prio -1000, i/o): ravb-eth1
 0000000011c40000-0000000011c4ffff (prio -1000, i/o): usbphy-ctrl
+0000000011c50000-0000000011c5ffff (prio -1000, i/o): usb0-host
+0000000011c70000-0000000011c7ffff (prio -1000, i/o): usb1-host
 0000000012801000-00000000128013ff (prio 0, i/o): renesas-rz-ostm
 0000000012801400-00000000128017ff (prio 0, i/o): renesas-rz-ostm
 0000000012801800-0000000012801bff (prio 0, i/o): renesas-rz-ostm
