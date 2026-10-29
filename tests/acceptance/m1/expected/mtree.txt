@@ -8,6 +8,7 @@
 #   Stubs at prio -1000 (M3b-cpg; device-map rows TSU, DMAC, USB):
 #   TSU 0x10059400, 0x400; DMAC 0x11820000 + 0x11830000, 64 KiB each;
 #   USB PHY control 0x11C40000, 64 KiB
+#   OSTM0-2 0x12801000 + n * 0x400, 0x400 each (OS timer unit; device-map row OSTM0-2)
 #   GIC distributor 0x11900000; QEMU backs 0x10000 of the 0x20000 window
 #   GIC redistributors 0x11940000, 0x40000 (2 frames of 0x20000)
 #   DDR 0x40000000, 2 GiB
@@ -24,4 +25,7 @@
 0000000011900000-000000001190ffff (prio 0, i/o): gicv3_dist
 0000000011940000-000000001197ffff (prio 0, i/o): gicv3_redist_region[0]
 0000000011c40000-0000000011c4ffff (prio -1000, i/o): usbphy-ctrl
+0000000012801000-00000000128013ff (prio 0, i/o): renesas-rz-ostm
+0000000012801400-00000000128017ff (prio 0, i/o): renesas-rz-ostm
+0000000012801800-0000000012801bff (prio 0, i/o): renesas-rz-ostm
 0000000040000000-00000000bfffffff (prio 0, ram): rzv2l-smarc.ram

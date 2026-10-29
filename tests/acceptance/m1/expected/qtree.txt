@@ -50,6 +50,17 @@ dev: unimplemented-device @0000000011c40000
   name = "usbphy-ctrl"
   retain-writes = true
   mmio 0000000011c40000/0000000000010000
+# OSTM0-2: device-map row OSTM0-2; count clock P0 = 100 MHz (manual
+# 20.3.2; CPG_PL2_DDIV at its reset value 0).
+dev: renesas-rz-ostm @0000000012801000
+  clock-frequency = 100000000 (0x5f5e100)
+  mmio 0000000012801000/0000000000000400
+dev: renesas-rz-ostm @0000000012801400
+  clock-frequency = 100000000 (0x5f5e100)
+  mmio 0000000012801400/0000000000000400
+dev: renesas-rz-ostm @0000000012801800
+  clock-frequency = 100000000 (0x5f5e100)
+  mmio 0000000012801800/0000000000000400
 dev: arm-gicv3
   num-cpu = 2 (0x2)
   num-irq = 512 (0x200)
