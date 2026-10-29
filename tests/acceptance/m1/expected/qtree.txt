@@ -32,8 +32,8 @@ dev: renesas-rz-scifa @000000001004c800
 dev: renesas-rzv2l-cpg
   direct-boot = true
   mmio 0000000011010000/0000000000010000
-# Stubs: device-map rows TSU (UNIMP), DMAC (write-retaining STUB) and USB
-# (UNIMP).
+# Stubs: device-map rows TSU (UNIMP), DMAC and USB PHY control
+# (write-retaining STUB).
 dev: unimplemented-device @0000000010059400
   name = "tsu"
   retain-writes = false
@@ -48,7 +48,7 @@ dev: unimplemented-device @0000000011830000
   mmio 0000000011830000/0000000000010000
 dev: unimplemented-device @0000000011c40000
   name = "usbphy-ctrl"
-  retain-writes = false
+  retain-writes = true
   mmio 0000000011c40000/0000000000010000
 dev: arm-gicv3
   num-cpu = 2 (0x2)

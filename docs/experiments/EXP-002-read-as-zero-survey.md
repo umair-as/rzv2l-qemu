@@ -46,4 +46,4 @@ First access to each 4 KiB window, in log order:
 
 ## Conclusion
 
-The unit maps the three windows before OSTM by their device-map class (DMAC write-retaining, USB PHY control and TSU read-as-zero) and stops at OSTM1. A read-as-zero OSTM would be silently wrong: it stops time. This confirms the device map's FUNCTIONAL class for OSTM.
+The unit maps the three windows before OSTM by their device-map class (DMAC write-retaining, USB PHY control and TSU read-as-zero; after the review the operator made the USB PHY control write-retaining too) and stops at OSTM1. A read-as-zero OSTM would be silently wrong: it stops time. This confirms the device map's FUNCTIONAL class for OSTM.

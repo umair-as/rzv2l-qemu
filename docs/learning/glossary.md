@@ -68,7 +68,7 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | Monitor | QEMU's command console (`info mtree`, `info qtree`, `xp`). |
 | qtest | Test mode where a test program reads and writes addresses directly, with no guest CPU ([`testing.md` §1](testing.md#1-qtest-and-guest-probes)). |
 | UNIMP / `unimplemented-device` | QEMU's stub device: logs every access under `-d unimp`, reads 0, ignores writes. "UNIMP" in the device map means a window mapped this way. |
-| `retain-writes` | This project's option on `unimplemented-device`: reads return the last value written (the DMA controller stub). |
+| `retain-writes` | This project's option on `unimplemented-device`: reads return the last value written (the DMA controller and USB PHY control stubs). |
 | Semihosting | A channel letting a guest program talk to QEMU, for example to report an exit status; used by the M1 probe. |
 
 **This project's process**
