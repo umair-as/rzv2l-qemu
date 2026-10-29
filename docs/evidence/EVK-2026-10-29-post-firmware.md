@@ -102,8 +102,8 @@ U-Boot echoes each command on SCIF0, so a read straight after the echo sees the 
 
 | ID | Measured | Expected | Result |
 |---|---|---|---|
-| EVK-X01 | no abort. Every CLK_MON word equals its CLK_ON word except WDT: `+0x548` `0xFF` vs `+0x6C8` `0x3F`. Holes read `0` | CLK_MON == CLK_ON | **DIFFERS** for WDT bits 7:6 only (reserved read-as-1 in CLK_ON, read as 0 in CLK_MON). Implemented bits agree everywhere |
-| EVK-X02 | no abort. Every RST/RSTMON word pair satisfies RSTMON = ~RST within the bits either word sets. Holes read `0` | inverted pairs | MATCH |
+| EVK-X01 | no abort. Every CLK_MON word equals its CLK_ON word except WDT: `+0x548` `0xFF` vs `+0x6C8` `0x3F`. Offsets Table 7.5 does not list are not all zero: 19 CLK_ON words (`0x510`, `0x530`, `0x59C`-`0x5A4`, `0x5B0`-`0x5F0`) read non-zero, mirrored at `+0x180` (corrected 2026-10-29, M3b-cpg) | CLK_MON == CLK_ON | **DIFFERS** for WDT bits 7:6 only (reserved read-as-1 in CLK_ON, read as 0 in CLK_MON). Implemented bits agree everywhere |
+| EVK-X02 | no abort. Every RST/RSTMON word pair satisfies RSTMON = ~RST within the bits either word sets. Offsets Table 7.5 does not list are not all zero: `0x810`, `0x824` (`0x1FFF`), `0x830`, `0x89C`-`0x8F0` and RSTMON `0x9F4` read non-zero (corrected 2026-10-29, M3b-cpg) | inverted pairs | MATCH |
 | EVK-R50 | no abort. CNTCR `0x1`, CNTSR `0`, CNTCV `0x00000009_DAF80D31`, `+0x20` `0x016E3600`, rest `0` | CNTCR b0 = 1; `+0x20` = `0x016E3600` (I) | MATCH: CNTFID0 at `+0x20` = 24 MHz, now (O) |
 | EVK-R51 | no abort. `0xE33E0947 0x00000009 0 0` | CNTCV advancing | MATCH: the read frame mirrors CNTCV |
 | EVK-R70 | no abort. SCIF0 `+0x18` reads `0x0000` | `0x0000` or abort | answered: zero, no bus error (scif.md Q4) |

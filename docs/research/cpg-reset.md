@@ -116,7 +116,7 @@ Sources: FACT, Table 7.5 (1/6), p.246; §7.2.4.2-7.2.4.5, p.254-260.
 | 0x408 PL3_SSEL | `SEL_PLL3_3` b8 | 0x111 | read-only mux |
 | 0x414 PL6_SSEL | `SEL_GPU2` b12 | 0x101 | read-only mux |
 | 0x418 PL6_ETH_SSEL | `SEL_PLL6_2` b0 | 0x10 | `HP` mux, writable |
-| 0xBE8 OTHERFUNC1 | `SEL_PLL5_4` b0 (whole register read as parent index) | 0x0 | DSI only |
+| 0xBE8 OTHERFUNC1 | `SEL_PLL5_4` b0 (whole register read as parent index) | 0x0 | read at probe when the PLL5_4 mux registers (rzg2l-cpg.c:734-740; seen in the M3b-cpg boot); written for DSI only |
 
 Sources: FACT, Table 7.5, p.246, p.250; §7.2.4.16-25, p.274-286; r9a07g044-cpg.c:119-192; rzg2l-cpg.h:20-29, :67-81.
 
