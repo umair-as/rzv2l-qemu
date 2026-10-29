@@ -1,8 +1,8 @@
 # M3: a Linux shell
 
-> **Context.** Milestone M3 (spec [§17](../spec/project.md#17-milestones)): the G0 Linux kernel boots to a shell through the real `sh-sci` driver, on both CPUs, with time advancing. The units are cut by what the kernel blocks on. Unit M3b-cpg: [spec](../units/M3b-cpg/spec.md), [tasks](../units/M3b-cpg/tasks.md). The CPG facts are in [`cpg-reset.md`](../research/cpg-reset.md). The EVK values are in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md).
+> **Context.** Milestone M3 (spec [§17](../spec/project.md#17-milestones)): the G0 Linux kernel boots to a shell through the real `sh-sci` driver, on both CPUs, with time advancing. The units are cut by what the kernel blocks on. Unit M3b-cpg: [spec](../units/M3b-cpg/spec.md), [tasks](../units/M3b-cpg/tasks.md). Unit M3b-ostm: [spec](../units/M3b-ostm/spec.md), [tasks](../units/M3b-ostm/tasks.md). The CPG facts are in [`cpg-reset.md`](../research/cpg-reset.md). The EVK values are in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md).
 
-Code references are at fork commit `4ae1d307eb`.
+Code references are at fork commit `4ae1d307eb` (§1) and `afe1e5b71b` (§2).
 
 ## 1. The clock pulse generator (unit M3b-cpg)
 
@@ -69,7 +69,35 @@ After the CPG, three more blocks were probed before the next blocker: the DMA co
 
 `qemu/tests/qtest/rzv2l-cpg-test.c` checks reset values, direct-boot values, the write-enable rule and the monitors. Every expected value comes from Table 7.5, a §7.2.4 bit table or the EVK. Seven mutations each turn one assertion red ([tasks](../units/M3b-cpg/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). For example, a reset monitor with the same polarity as RST fails at offset `0x980`.
 
-## 2. Pitfalls
+## 2. The OS timer (unit M3b-ostm)
+
+### 2.1 What the kernel needs
+
+Linux takes the first enabled OS timer channel, OSTM1, as a free-running clock source and as `sched_clock`, the clock behind every printk timestamp (`renesas-ostm.c:61-83`). It takes OSTM2 for one-shot and periodic timer events (:85-119). Each stop is TT followed by a busy wait until TE reads 0 (:46-59).
+
+The clock controller unit ended at the first TE read. A diagnostic build read the timer as zero. `sched_clock` switched to OSTM1 at 100 MHz, and kernel time stood still at 2.133 s ([EXP-002](../experiments/EXP-002-read-as-zero-survey.md)). So the model must count.
+
+### 2.2 How the model is shaped
+
+`qemu/hw/timer/renesas_rz_ostm.c` is one channel; the SoC maps three. The counter is never stored while it runs. A read computes it from the virtual clock: ticks = elapsed ns × 100 MHz. A QEMU timer fires only at the next interrupt.
+
+**Worked example: the two modes from the same writes.** The count clock is 100 MHz, so one count every 10 ns. `rzv2l-ostm-test.c` asserts each cell except two, which come from the manual: the free-running CMP rewrite (§20.3.6.1) and the interval restart after TT (§20.2.2.3 Note 1).
+
+| Step | Free-running (CTL = `0x02`) | Interval (CTL = `0x00`), CMP = 999 |
+|---|---|---|
+| after the CTL write | CNT `0x00000000` | CNT `0xFFFFFFFF` (Table 20.4) |
+| TS, then 1000 ns | CNT 100: counts up from 0 | CNT 899: counts down from CMP |
+| TS again while running | ignored: CNT keeps counting | forced restart: CNT back to 999 |
+| CMP rewritten while running | takes effect at once | takes effect at the next reload |
+| TT, then TS | restarts from 0 | restarts from CMP |
+
+The interrupt follows the same split. Free-running mode requests one when the count passes CMP, the first time after CMP + 1 counts. Interval mode requests one every CMP + 1 counts. The SoC wires each request as a pulse to an edge-triggered GIC input, SPI 46-48.
+
+### 2.3 The proof
+
+`rzv2l-ostm-test.c` checks reset values, both modes, the CTL rules and the CMP = 0 level. The interrupt itself is checked on a real CPU, in the hello probe. qtest cannot count a pulse. With no kernel loaded, the GIC also keeps its interrupts secure, out of qtest's reach. The probe arms OSTM2 the way Linux arms a one-shot event. It then checks that the interrupt arrives as INTID 80, no earlier than CMP + 1 counts, and only once. Ten mutations each turn one check red ([tasks](../units/M3b-ostm/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+
+## 3. Pitfalls
 
 - **A Renesas write-enable bit covers a field, not one bit.** In PL2_DDIV, bit 16 enables the 3-bit field at bits 2:0. Linux writes a mask of all field bits into the upper half, so it also sets bits 17 and 18. They have no function. A model that applies each upper bit to the bit 16 below gets the divider wrong (manual §7.2.4.17 p.275; tasks proof 3).
 - **RSTMON is the inverse of RST.** In RST, 1 means released; in RSTMON, 1 means in reset. A model that copies RST makes every Linux reset release time out after 200 µs (manual §7.2.4.135 p.409, §7.2.4.173 p.450; `rzg2l-cpg.c:1480`).
@@ -78,3 +106,9 @@ After the CPG, three more blocks were probed before the next blocker: the DMA co
 - **A register named "DSI only" was read at probe.** The research note listed OTHERFUNC1 (`0xBE8`) as used only for the display. The driver reads it when it registers the PLL5_4 mux, so the first boot stopped there. Registration reads every mux, used or not (`rzg2l-cpg.c:734-740`).
 - **A QEMU stub that reads as zero can stop time.** In a diagnostic build with every window read-as-zero, OSTM1 became `sched_clock` and its counter read 0. The kernel clock stayed at 2.133 s while the boot went on. A zero is only honest where the guest does not depend on the value (spec, Next blocker).
 - **In QEMU, the unimplemented device logs every access but keeps nothing.** That is wrong for a register the driver read-modify-writes: the USB PHY control driver sets reset bits at `+0x0` and reads them back (`reset-rzg2l-usbphy-ctrl.c:54-58`, `:91`), so a zero read loses them. The new `retain-writes` property of `unimplemented-device` keeps written values and still logs every access; the DMA controller and the USB PHY control use it (`qemu/hw/misc/unimp.c`).
+- **A timer that reads as zero stops kernel time, not just the timer.** Linux's `sched_clock` moves to the fastest counter it finds (OSTM1, 100 MHz, over the 24 MHz arch timer), so a stuck OSTM freezes every timestamp (EXP-002).
+- **Compute a counter on read; never store it while it runs.** `sched_clock` reads CNT constantly. A model that updates CNT in a timer callback is wrong between callbacks, and one that arms a QEMU timer per count is far too slow (10 ns per count).
+- **"Interrupt when the counter reaches 0" and "every CMP + 1 clocks" describe the same event.** The manual gives both (§20.3.3, §20.3.5.1). The model uses the cycle count of Table 20.5, and a mutation that drops the + 1 changes when the reload happens, which the interval test sees.
+- **CMP = 0 in interval mode is not a 10 ns periodic timer.** The manual holds the request high while the counter runs (§20.3.5.2), so the model raises the line and arms no timer.
+- **In QEMU, qtest cannot see an edge.** An interrupt that is a pulse leaves no trace in qtest's interrupt intercept, and the GIC's pending state is out of reach with no kernel loaded. Test pulses from a guest probe on a real CPU.
+
