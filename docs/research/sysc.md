@@ -180,3 +180,9 @@ All are read-only `md.l` reads at the **U-Boot prompt before `bootm`** (post-fir
 | The manual contradicts itself on DEVID | **Confirmed** | HW manual Rev 1.50 Table 6.1 lists `H'x841_C447` (the RZ/G2L value); §6.3.43 p.208 gives `H'844_7447` for bits [27:0]. Silicon decides; this is an EVK question. |
 | `LP_CTL5` "acknowledge" bit | **Resolved** | TF-A `f59ed5a31` `plat_pm.c:92-98`: CPU_OFF polls `SYS_LP_CTL5` bit (8 + core) after writing `LP_CTL6`/`LP_CTL1` bit (8 + core) |
 | Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7`. No change to the SYSC register contract: G0 has no RZ SYSC driver; G1's `rz-sysc.c` and its `renesas-soc.c` delta do not touch V2L. v6.18.55 layout kept under "Newer mainline". |
+
+## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
+
+- **OBSERVED.** Q1: SYS_LSI_MODE `0x00010200`, DEVID `0x18447447`, PRR 0 at the U-Boot stage, as BL2 prints them. Q2: RVAL/RVAH at reset values. Q3: the low-power registers fit their Table 6.1 reset patterns, and LP_CTL5 bits 8-9 are 0.
+- **OBSERVED, conflicts with the prediction.** Q4: SYS_MSTACCCTL0 (`0x11020000`) and SYS_SLVACCCTL0 (`0x11020100`) give a synchronous external abort (`esr 0x96000010`) when read from U-Boot (non-secure). INFERENCE: secure-only on this firmware. The reset values in Table 6.1 cannot be confirmed from the non-secure side.
+- **OBSERVED.** Q5 / claim 2: the SYC control frame is readable from the non-secure side. CNTCR = 1, CNTFID0 at `+0x20` = `0x016E3600` (24 MHz), and the read frame at `0x11001000` mirrors CNTCV (EVK-R50, R51). The `+0x20` offset label moves from (I) to (O).

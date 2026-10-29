@@ -335,3 +335,8 @@ All are read-only.
 
 - HW manual p.530 (GIC-600, 16 PPIs), p.534 (`nCNTVIRQ` = PPI 11 = ID 27, PMU PPI 7, maintenance PPI 9, `nCNTPNSIRQ` PPI 14) and p.83 (Cortex-A55 r2p0, no L2, 256 KB L3) confirmed against the manual text.
 - The QEMU stage A SMCCC gap is confirmed: qemu v11.1.2 `target/arm/tcg/psci.c` has no `SMCCC_VERSION` handling, so the guest falls back to SMCCC v1.0 (board: v1.4).
+
+## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
+
+- **OBSERVED.** Q1: GICD CTLR `0x12`, TYPER `0x0079040F`, IIDR `0x0201743B`, TYPER2 0; the GICD and both GICR identity blocks (`… 92 B4 3B …`, `… 93 B4 3B …`); GICR0/1 IIDR `0x0201743B`, TYPER `0x20`/`0x0` and `0x130`/`0x100`. These match the TRM values the model asserts (EVK-R60-R63, R65, R66). REQ-MACH-007 moves to V.
+- **OBSERVED, conflicts with the prediction (I).** GICR1_WAKER reads `0x0` (awake) at the U-Boot prompt, before any CPU_ON for CPU1. The prediction was `0x6` (asleep), and QEMU resets GICR_WAKER to ProcessorSleep|ChildrenAsleep. INFERENCE: firmware wakes both redistributors. That matters for the direct-mode start state (rule 9), not for firmware mode.

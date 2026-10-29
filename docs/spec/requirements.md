@@ -24,7 +24,7 @@ The format and states are defined in `project.md` §15. Evidence paths are relat
 | REQ-MACH-004 | In direct mode the kernel SHALL be entered at NS-EL1, with PSCI over SMC (implementation: `has_el2=false`, `psci_conduit=SMC`, per EXP-001). | EVK logs `started at EL1`; boot-chain-firmware.md (`RCAR_BL33_EXECUTION_EL`) | guest dmesg | M3 | D |
 | REQ-MACH-005 | The CPU SHALL implement the A55 IMPDEF sysregs accessed by the G1 TF-A (`CPUPWRCTLR_EL1` required; `CLUSTERIDR_EL1`/`CLUSTERCFR_EL1` precautionary). | boot-chain-firmware.md; EXP-001 (all three UNDEF on QEMU 11.1.2 cortex-a55) | BL31 CPU_OFF path runs without UNDEF | M7 | P |
 | REQ-MACH-006 | DDR SHALL appear at 0x40000000 (2 GiB on the EVK), and `/memory` passed to Linux SHALL equal 0x48000000 + 0x78000000. | boot-chain-firmware.md; DTB-V | guest `/proc/iomem` vs EVK | M1 | D |
-| REQ-MACH-007 | GIC-600 distributor and redistributors SHALL be at the stock DTB addresses, with no ITS. | DTSI `gic@11900000` | `info mtree`; qtest `GICD_IIDR` vs EVK | M1 | D |
+| REQ-MACH-007 | GIC-600 distributor and redistributors SHALL be at the stock DTB addresses, with no ITS. | DTSI `gic@11900000` | `info mtree`; qtest `GICD_IIDR` vs EVK | M1 | V |
 | REQ-MACH-008 | Modelled MMIO devices and interrupts SHALL sit at the addresses and SPI numbers of the stock DTB and firmware. | device-map.md; r9a07g054.dtsi | `info mtree` / `info qtree` vs device-map.md | M1+ | D |
 
 ## SoC blocks

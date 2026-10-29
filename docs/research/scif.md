@@ -161,7 +161,7 @@ If the port clock rate reads as 0, the baud computation is skipped and BRR/SMR c
 
 Table 22.4 values: SMR 0, BRR 0xFF, MDDR 0xFF, SCR 0, FSR 0x0020, FCR 0, FDR 0, SPTR 0x00xx, LSR 0, SEMR 0, FTCR 0x1F1F. Per §22.8.9 (p.1330), the module is in standby at reset; register access needs the module clock and MSTOP released. That is a CPG concern, and what silicon does on access while the module is stopped is an open question (spec §7, §14).
 
-### 6.2 Post-firmware (direct mode), derived from code (INFERENCE; to be measured)
+### 6.2 Post-firmware (direct mode), derived from code; OBSERVED on the EVK 2026-10-29
 
 | Step | Writes |
 |---|---|
@@ -257,3 +257,10 @@ All reads are 16-bit unless noted. FSR, LSR and FDR reads have no side effect. *
 | DTB-U has no `earlycon` in bootargs | **Confirmed** | linux v6.12.59 `rzg2l-smarc-som.dtsi:29` `bootargs = "ignore_loglevel rw root=/dev/nfs ip=on"`; `rz-smarc-common.dtsi:26,32` `serial0 = &scif0`, `stdout-path = "serial0:115200n8"`. M3a needs a bare `earlycon` on the command line, recorded as a REQ-GUEST-004 gap. |
 | `CONFIG_SERIAL_SH_SCI` built in for G0 | **Confirmed (defconfig)** | linux v6.12.59 `arch/arm64/configs/defconfig:488`; the built `.config` is still to be checked (claim 6) |
 | Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (one-line `sh-sci.c` delta, no register effect). Corrections against the first draft: the bare-`earlycon` path goes through `earlycon_acpi_spcr_enable` and `acpi_boot_table_init` when `ACPI_SPCR_TABLE` is set (§5); the `fdt.c` matching is now read, not inferred; DMA is skipped by an explicit `dmas` check rather than a failed channel request (§8); the error handler also kicks TX (§4.4). v6.18.55 differences kept under "Newer mainline". EVK boot-log evidence folded into §1, §2, §4.1, §5 and §6.2. |
+
+## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
+
+- **OBSERVED.** The §6.2 overlay holds on silicon: SMR 0, MDDR `0xFE` (MDDRS = 1), SCR `0x0030`, FSR `0x0060` with the line idle, FCR/FDR/LSR 0, SEMR `0x30`, FTCR `0x1F1F`, SPTR `0x0001` (EVK-R20-R26). Claims 2 and 3: confirmed on this firmware. BRR is still seen only indirectly.
+- **OBSERVED.** Right after U-Boot echoes a command, FSR reads `0x0020` (TEND = 0) and FDR.T = 1. After `sleep 1` it reads `0x0060`. TEND stays 0 while a character is in flight and rises when the line goes idle, as §7 requires (indirect: the read timing is U-Boot's).
+- **OBSERVED.** Q4: the undefined offset `+0x18` reads `0x0000`, no bus error (EVK-R70).
+- Q2: SCIF1 is not clocked after firmware (CLK_MON SCIF = `0x1`), so claim 1 stays unmeasured on silicon (EVK-R27 skipped).

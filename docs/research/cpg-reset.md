@@ -242,3 +242,10 @@ All are read-only `md.l` reads at the **U-Boot prompt before `bootm`** (post-fir
 | CLK_MON polled for 10 µs with no delay | **Confirmed** | linux v6.12.59 `rzg2l-cpg.c:1239-1240` `readl_poll_timeout_atomic(..., 0, 10)` in the module clock enable path (same in G1 and v6.18.55) |
 | PCHMON semantics (PACCEPT/PDENY, not "0x08") | **Confirmed; the earlier doc was wrong** | TF-A `f59ed5a31` `plat_pm.c:30-70`: PSTATE `0x08` is written to PCHCTL[23:16] together with PREQ; PCHMON bit 0 (PACCEPT) follows PREQ in a four-phase handshake |
 | Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7`. Behaviour changes: no MSTOP writes on V2L in G0/G1 (§2.4), no reset-timeout revert (§2.3), DRP_A/PL3C_SDIV and DRP module clocks are G1-only (§2.6, §3). v6.18.55 behaviour kept under "Newer mainline". |
+
+## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
+
+- **OBSERVED.** The PLL1 readback, the GIC600/IA55, SCIF, GPIO, SYC and DRP clock/reset pairs, MSTOP (all 0) and PL3C_SDIV `0x401` match (EVK-R10, R12-R14, R18, R19, R72).
+- **OBSERVED, post-firmware state differs from the prediction** (direct-mode values for M3b): PL3A_DDIV `0x208` = `0x100` (DIVPL3C = 1); PL2SDHI_DSEL `0x218` = `0x22` (SEL_SDHI0 = SEL_SDHI1 = 2); PL3_SSEL `0x408` = `0x11` (b8 = 0, against the reset value `0x111`); GTM CLK_ON/CLK_MON `0` (OSTM clocks off); WDT CLK_ON `0xFF`, RST `0xF`, RSTMON 0; SDHI CLK_ON/CLK_MON `0xFF`, RST `0x3`, RSTMON 0 (EVK-R11, R15-R17).
+- **OBSERVED.** RSTMON is the inverse of RST in every word of `0x800-0xAFF` (EVK-X02).
+- **Conflict recorded (manual vs silicon).** CLK_MON equals CLK_ON for every implemented bit, but not for the WDT reserved bits 7:6: CLK_ON_WDT reads `0xFF` and CLK_MON_WDT reads `0x3F` (EVK-X01, R16). Table 7.5 gives both a reset value of `0xC3` (bits 7:6 = 1), so the manual says CLK_MON's reserved bits read 1, while silicon reads 0. The rule "CLK_MON = CLK_ON" therefore holds for implemented bits only.
