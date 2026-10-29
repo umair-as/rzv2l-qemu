@@ -240,6 +240,7 @@ function setStatus(s) {
   $("pause").textContent = state === "paused" ? "Resume" : "Pause";
   $("gdb").disabled = live;
   showReadout(s);
+  showConsoleHint();
   const exit = $("exit");
   if (state === "exited") {
     exit.hidden = false;
@@ -557,8 +558,32 @@ function connect() {
   ws.onclose = () => setTimeout(connect, 1000);
 }
 
+// Above the terminal: where keys go in this state, so typing never vanishes silently
+const CON_HINT = {
+  none: "Start a session to type",
+  starting: "Starting…",
+  running: "serial + semihosting · click to type",
+  paused: "Paused: keys are queued; the guest sees them on Resume",
+  exited: "Run ended: keys go nowhere. Start to type again",
+};
+
+function showConsoleHint() {
+  const h = $("con-hint");
+  h.dataset.state = state;
+  h.textContent = CON_HINT[state] || CON_HINT.none;
+}
+
+let nudgeTimer;
 term.onData((d) => {
-  if (ws && ws.readyState === WebSocket.OPEN && (state === "running" || state === "paused")) {
+  if (!(state === "running" || state === "paused")) {
+    // Typed with no guest to receive it: say so where the eye already is
+    const h = $("con-hint");
+    h.classList.add("nudge");
+    clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(() => h.classList.remove("nudge"), 1200);
+    return;
+  }
+  if (ws && ws.readyState === WebSocket.OPEN) {
     // Enter arrives as \r: send what the profile or the menu asks for
     ws.send(JSON.stringify({ t: "key", d: d.replace(/\r/g, ENTER[$("enter-sends").value]) }));
   }

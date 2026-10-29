@@ -147,6 +147,8 @@ main {
 }
 .panel-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; position: relative; }
 .con-menu { margin-left: auto; font-size: 13px; }
+.con-hint[data-state="paused"], .con-hint[data-state="exited"], .con-hint[data-state="none"] { color: var(--warn); }
+.con-hint.nudge { font-weight: 700; }
 .con-menu summary { cursor: pointer; color: var(--muted); list-style: none; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--sunken); }
 .con-menu summary::-webkit-details-marker { display: none; }
 .con-menu[open] summary { color: var(--ink); border-color: var(--accent); }

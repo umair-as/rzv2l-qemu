@@ -615,3 +615,27 @@ def test_page_is_revalidated(server):
     for path in ("/", "/static/app.js", "/static/style.css"):
         with urllib.request.urlopen(server + path, timeout=5) as r:
             assert r.headers.get("Cache-Control") == "no-cache", path
+
+
+def test_console_hint_says_where_keys_go(server):
+    """Above the terminal: what happens to typing in each state."""
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 860})
+        post(server, "/api/session/stop", b"{}", JSON_H)
+        page.goto(server)
+        hint = page.get_by_test_id("console-hint")
+        page.get_by_test_id("profile-select").select_option("virt-echo")
+        page.get_by_test_id("btn-start-paused").click()
+        expect(hint).to_have_attribute("data-state", "paused", timeout=60_000)
+        expect(hint).to_contain_text("on Resume")
+        page.get_by_test_id("btn-pause").click()             # Resume
+        expect(hint).to_have_attribute("data-state", "running")
+        expect(hint).to_contain_text("click to type")
+        page.get_by_test_id("btn-stop").click()
+        expect(hint).to_have_attribute("data-state", "exited")
+        expect(hint).to_contain_text("keys go nowhere")
+        page.get_by_test_id("console").click()
+        page.keyboard.type("x")                              # typed into nothing
+        expect(hint).to_have_class(re.compile(r"\bnudge\b"))
+        browser.close()
