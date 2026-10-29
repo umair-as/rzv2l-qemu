@@ -14,6 +14,8 @@ uv run bench/server.py --port 8091   # a second bench next to the first
 
 Pick a profile, press **Start**. Click the console to type.
 
+The header readout is the one status line: session state, then PASS or FAIL once a profile with markers is decided (marker progress while it runs), the exit status and the run time. A FAIL names what was missing just below the header. **System / Light / Dark** sets the theme, terminal included; the choice is kept per browser. The full QEMU command line sits in a collapsed, copyable block at the top of the Log tab.
+
 | Profile | Needs |
 |---|---|
 | `rzv2l-smarc-m1-probe` | the project QEMU in `build/qemu/` and `aarch64-linux-gnu-gcc` |
@@ -21,7 +23,9 @@ Pick a profile, press **Start**. Click the console to type.
 
 A profile is a small TOML file in [`profiles/`](profiles/): QEMU binary, arguments, an optional prepare step, semihosting on or off, the log mask, and optional expectations. The bench adds the QMP, console and log options itself. `BENCH_QEMU` replaces the project build (a `qemu` value with a `/`, such as `build/qemu/qemu-system-aarch64`); a bare name like `qemu-system-aarch64` stays the stock QEMU on `PATH`.
 
-Each run keeps its command line, console, stderr, QEMU log and `run.json` (profile, times, exit code, verdict) in `build/bench/<time>-<profile>/`. The **Runs** tab lists them, newest first, and opens each one's files.
+Each run keeps its command line, console, stderr, QEMU log and `run.json` (profile, times, exit code, verdict, origin) in `build/bench/<time>-<profile>/`. The **Runs** tab lists them, newest first, with their duration, and opens each one's files. Runs started by the bench's own tests (`BENCH_RUN_ORIGIN=test`, set by `bench/tests`) carry a *test* tag and can be hidden.
+
+The console shows serial output byte for byte. Semihosting text ends lines with a bare `\n`, so the bench turns each lone `\n` on the semihosting stream into `\r\n`; the transcript and `console.log` hold it that way.
 
 ## Verdict
 

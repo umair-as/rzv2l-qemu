@@ -4,16 +4,55 @@
 const $ = (id) => document.getElementById(id);
 const KEEP = 256 * 1024;  // console transcript characters kept in the DOM
 
+// ---- per-browser settings (storage may be missing or throw) ------------------
+
+const store = {
+  get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
+  set(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* keep going */ } },
+};
+
+// ---- terminal and theme --------------------------------------------------------
+
 const term = new Terminal({
   convertEol: false, cursorBlink: true, fontSize: 13, scrollback: 5000,
   fontFamily: 'ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace',
-  theme: { background: "#10141c", foreground: "#d8dee9" },
 });
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open($("term"));
-fit.fit();
-window.addEventListener("resize", () => fit.fit());
+new ResizeObserver(() => fit.fit()).observe($("term"));
+
+const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
+let themeChoice = "system";
+
+function termTheme() {
+  // The terminal takes its colours from the page tokens (style.css)
+  const css = getComputedStyle(document.documentElement);
+  const v = (name) => css.getPropertyValue(name).trim();
+  return {
+    background: v("--term-bg"), foreground: v("--term-ink"),
+    cursor: v("--term-cursor"), cursorAccent: v("--term-bg"),
+    selectionBackground: v("--term-sel"),
+  };
+}
+
+function applyTheme(choice, save) {
+  themeChoice = ["light", "dark"].includes(choice) ? choice : "system";
+  if (themeChoice === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = themeChoice;
+  document.querySelectorAll("[data-theme-choice]").forEach((b) =>
+    b.setAttribute("aria-checked", String(b.dataset.themeChoice === themeChoice)));
+  term.options.theme = termTheme();
+  if (save) store.set("bench.theme", themeChoice);
+}
+
+document.querySelectorAll("[data-theme-choice]").forEach((b) => {
+  b.onclick = () => applyTheme(b.dataset.themeChoice, true);
+});
+darkQuery.addEventListener("change", () => {
+  if (themeChoice === "system") term.options.theme = termTheme();
+});
+applyTheme(store.get("bench.theme"), false);
 
 let profiles = [];
 let state = "none";
@@ -63,26 +102,61 @@ function resetViews() {
   $("monitor-out").textContent = "";
   $("coverage").innerHTML = "";
   $("cov-count").textContent = "0";
+  $("cmdline").hidden = true;
+  showCoverageEmpty(0);
 }
 
-function showVerdict(s) {
+function fmtDuration(sec) {
+  if (sec == null || sec < 0) return "";
+  if (sec < 10) return `${sec.toFixed(1)} s`;
+  if (sec < 120) return `${Math.round(sec)} s`;
+  const m = Math.floor(sec / 60);
+  return `${m} min ${Math.round(sec - m * 60)} s`;
+}
+
+// The readout: state, then the verdict only when a profile has markers.
+// While a verdict is pending it shows marker progress instead of a second
+// "running"; PASS/FAIL replace it once decided.
+function showReadout(s) {
+  const r = $("readout");
+  r.dataset.state = s.state;
+  r.dataset.verdict = s.verdict === "pass" || s.verdict === "fail" ? s.verdict : "";
+
   const v = $("verdict");
-  v.hidden = !s.verdict;
   v.dataset.verdict = s.verdict || "";
   v.textContent = (s.verdict || "").toUpperCase();
+  v.hidden = !(s.verdict === "pass" || s.verdict === "fail");
+
+  const markers = $("markers");
+  const expect = s.expect || [];
+  markers.hidden = !(s.verdict === "running" && expect.length);
+  markers.textContent = `markers ${expect.length - (s.expect_missing || []).length}/${expect.length}`;
+
   const why = $("verdict-why");
-  const reasons = s.verdict_reasons || [];
+  const reasons = s.verdict === "fail" ? s.verdict_reasons || [] : [];
   why.hidden = !reasons.length;
   why.textContent = reasons.join("; ");
+
+  const dur = $("duration");
+  dur.hidden = !(s.state === "exited" && s.started && s.ended);
+  dur.textContent = dur.hidden ? "" : fmtDuration(s.ended - s.started);
+
   const gdb = $("gdb-info");
   gdb.hidden = !(s.gdb_port && s.state !== "exited");
   gdb.dataset.port = s.gdb_port || "";
   gdb.textContent = s.gdb_port
-    ? `gdbstub on 127.0.0.1:${s.gdb_port}: gdb-multiarch -ex "target remote 127.0.0.1:${s.gdb_port}"`
+    ? `gdbstub on 127.0.0.1:${s.gdb_port} · gdb-multiarch -ex "target remote 127.0.0.1:${s.gdb_port}", then continue in gdb`
     : "";
+
   const csv = $("cov-csv");
   csv.hidden = !s.run;
   if (s.run) csv.href = `/api/runs/${encodeURIComponent(s.run)}/coverage.csv`;
+
+  if (s.cmdline) {
+    $("cmdline").hidden = false;
+    $("cmdline-text").textContent = s.cmdline;
+    $("cmdline-bin").textContent = s.cmdline.split(" ")[0].split("/").pop();
+  }
 }
 
 function appendPre(id, line) {
@@ -90,6 +164,16 @@ function appendPre(id, line) {
   const atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
   pre.textContent += line.endsWith("\n") ? line : line + "\n";
   if (atEnd) pre.scrollTop = pre.scrollHeight;
+}
+
+// QEMU's own command line is long: the Command line block holds it in full
+function appendStderr(text) {
+  if (text.startsWith("$ ") && text.includes(" -qmp unix:")) {
+    const bin = text.slice(2).split(" ")[0].split("/").pop();
+    appendPre("log", `$ ${bin} … (full command: Command line, above)`);
+  } else {
+    appendPre("log", text);
+  }
 }
 
 function setStatus(s) {
@@ -106,7 +190,7 @@ function setStatus(s) {
   $("pause").disabled = !(state === "running" || state === "paused");
   $("pause").textContent = state === "paused" ? "Resume" : "Pause";
   $("gdb").disabled = live;
-  showVerdict(s);
+  showReadout(s);
   const exit = $("exit");
   if (state === "exited") {
     exit.hidden = false;
@@ -117,13 +201,24 @@ function setStatus(s) {
   } else {
     exit.hidden = true;
   }
-  if (s.profile && live) $("profile").value = s.profile;
+  if (s.profile && live) { $("profile").value = s.profile; showDesc(); }
 }
 
 let covTimer;
 function refreshCoverageSoon() {
   clearTimeout(covTimer);
   covTimer = setTimeout(refreshCoverage, 300);
+}
+
+function showCoverageEmpty(rows) {
+  const empty = $("cov-empty");
+  empty.hidden = rows > 0;
+  empty.textContent = state === "none"
+    ? "Start a session to see what the guest touches outside the model."
+    : state === "exited"
+      ? "Nothing touched outside the model in this run."
+      : "Nothing touched outside the model so far.";
+  document.querySelector('[data-testid="coverage-table"]').hidden = rows === 0;
 }
 
 async function refreshCoverage() {
@@ -141,41 +236,74 @@ async function refreshCoverage() {
     body.append(tr);
   }
   $("cov-count").textContent = String(coverage.length);
+  showCoverageEmpty(coverage.length);
 }
 
 // ---- runs ------------------------------------------------------------------
 
 let currentRun = null;
+const LOST_WHY = "The bench stopped (killed or restarted) before this run ended, "
+  + "so it has no exit code or verdict. Its console and log are kept.";
 
 function runsShown() {
   return !document.querySelector('[data-panel="runs"]').hidden;
 }
 
 function fmtTime(t) {
-  return t ? new Date(t * 1000).toLocaleString() : "";
+  if (!t) return "";
+  const d = new Date(t * 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} `
+    + `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function cell(tr, text, cls) {
+  const td = document.createElement("td");
+  td.textContent = text;
+  if (cls) td.className = cls;
+  tr.append(td);
+  return td;
 }
 
 async function refreshRuns() {
-  const runs = await api("GET", "/api/runs");
+  const hideTests = $("hide-tests").checked;
+  const runs = (await api("GET", "/api/runs"))
+    .filter((r) => !(hideTests && r.origin === "test"));
   const body = $("runs");
   body.innerHTML = "";
   for (const r of runs) {
     const tr = document.createElement("tr");
     tr.setAttribute("data-testid", "run-row");
     tr.dataset.run = r.run;
+    tr.dataset.origin = r.origin || "";
     tr.setAttribute("aria-selected", String(r.run === currentRun));
-    const cells = [r.profile, fmtTime(r.started) || r.run.slice(0, 15),
-                   r.exit_code ?? (r.state === "exited" ? "" : r.state),
-                   r.verdict ? r.verdict.toUpperCase() : ""];
-    cells.forEach((v, i) => {
-      const td = document.createElement("td");
-      td.textContent = v;
-      if (i === 3) { td.className = "verdict"; td.dataset.verdict = r.verdict || ""; }
-      tr.append(td);
-    });
+
+    const prof = cell(tr, "");
+    const name = document.createElement("span");
+    name.className = "name"; name.textContent = r.profile; name.title = r.profile;
+    prof.append(name);
+    if (r.origin === "test") {
+      const tag = document.createElement("span");
+      tag.className = "tag"; tag.textContent = "test";
+      tag.title = "Started by the bench's own tests";
+      prof.append(tag);
+    }
+    cell(tr, fmtTime(r.started) || r.run.slice(0, 15)).title =
+      r.started ? new Date(r.started * 1000).toLocaleString() : "";
+    const exit = cell(tr, r.exit_code ?? (r.state === "exited" ? "" : r.state));
+    if (r.state === "lost") { exit.className = "lost"; exit.title = LOST_WHY; }
+    const v = cell(tr, r.verdict ? r.verdict.toUpperCase() : "", "v");
+    v.dataset.verdict = r.verdict || "";
+    if (r.verdict_reasons && r.verdict_reasons.length) v.title = r.verdict_reasons.join("; ");
+    cell(tr, r.started && r.ended ? fmtDuration(r.ended - r.started) : "");
+
     tr.onclick = () => openRun(r.run);
     body.append(tr);
   }
+  $("runs-empty").hidden = runs.length > 0;
+  $("runs-empty").textContent = hideTests
+    ? "No runs besides test runs. Clear “Hide test runs” to see them."
+    : "No runs yet. Start a session and it is kept here.";
 }
 
 async function openRun(id) {
@@ -202,6 +330,11 @@ async function showRunFile(file) {
 document.querySelectorAll("#run-view button[data-file]").forEach((b) => {
   b.onclick = () => showRunFile(b.dataset.file);
 });
+$("hide-tests").checked = store.get("bench.hideTests") === "1";
+$("hide-tests").onchange = () => {
+  store.set("bench.hideTests", $("hide-tests").checked ? "1" : "0");
+  refreshRuns();
+};
 
 // ---- websocket ---------------------------------------------------------------
 
@@ -218,7 +351,7 @@ function connect() {
         if (m.d.status.state !== "none") refreshCoverage();
         break;
       case "con": appendConsole(m.d); break;
-      case "stderr": appendPre("log", m.d); break;
+      case "stderr": appendStderr(m.d); break;
       case "log": appendPre("log", m.d); refreshCoverageSoon(); break;
       case "event": appendPre("events", JSON.stringify(m.d)); break;
       case "status": setStatus(m.d); break;
@@ -267,6 +400,18 @@ $("start-paused").onclick = () => start(true);
 $("pause").onclick = () => action(state === "paused" ? "/api/session/resume" : "/api/session/pause");
 $("reset").onclick = () => action("/api/session/reset");
 $("stop").onclick = () => action("/api/session/stop");
+$("cmdline-copy").onclick = async () => {
+  const b = $("cmdline-copy");
+  try {
+    await navigator.clipboard.writeText($("cmdline-text").textContent);
+    b.textContent = "Copied";
+  } catch (e) {
+    // No clipboard access (plain http on a non-loopback name): select instead
+    getSelection().selectAllChildren($("cmdline-text"));
+    b.textContent = "Selected";
+  }
+  setTimeout(() => { b.textContent = "Copy"; }, 1500);
+};
 
 document.querySelectorAll("[data-panel=monitor] .chips button").forEach((b) => {
   b.onclick = () => monitor(b.dataset.cmd);
