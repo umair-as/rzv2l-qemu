@@ -40,6 +40,7 @@ void write16(uint64_t addr, uint16_t value);
  * with a bus error rather than read as zero.
  */
 #define CPG                 0x11010000UL
+#define IRQC                0x110a0000UL
 #define CPG_UNLISTED        0x510
 #define CPG_CLUSTER_PCHMON  0xb30
 
@@ -519,6 +520,10 @@ void probe_main(void)
     puts_("-- OSTM2 accesses of the wrong size\n");
     check_read_aborts("OSTM2 TE as 32-bit", OSTM2 + OSTM_TE);
     check_read_aborts("OSTM2 +0x08 (unlisted)", OSTM2 + 0x08);
+
+    /* The IRQC (Table 8.3) has no register at +0x08 */
+    puts_("-- IRQC read outside Table 8.3\n");
+    check_read_aborts("IRQC +0x08 (unlisted)", IRQC + 0x08);
 
     puts_(failures ? "RESULT: FAIL (" : "RESULT: PASS (");
     putdec(failures);
