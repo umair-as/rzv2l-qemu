@@ -23,6 +23,9 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect, sync_playwright
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import server as server_mod  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 SHOT = ROOT / "build" / "bench" / "e2e.png"
 # The project QEMU: BENCH_QEMU (the server uses it for every profile) or the
@@ -280,6 +283,10 @@ def test_m1_probe_through_the_bench(server):
     on_disk = (ROOT / st["run_dir"] / "qemu.log").read_text().splitlines()
     assert on_disk and log["lines_total"] == len(on_disk)
     assert sum(r["count"] for r in log["coverage"]) == len(on_disk)
+    # A past run's coverage is re-read from disk: same rows as the live one
+    disk = server_mod.coverage_rows(
+        server_mod.count_log(ROOT / st["run_dir"] / "qemu.log"))
+    assert sorted(map(str, disk)) == sorted(map(str, log["coverage"]))
     # The verdict comes from the probe's console line and its exit status
     assert st["verdict"] == "pass", st["verdict_reasons"]
     meta = json.loads((ROOT / st["run_dir"] / "run.json").read_text())
