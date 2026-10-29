@@ -607,3 +607,11 @@ def test_map_and_devices_on_rzv2l(server):
         page.get_by_test_id("devices-filter").fill("no-such-thing")
         expect(page.get_by_test_id("devices-empty")).to_contain_text("Nothing matches")
         browser.close()
+
+
+def test_page_is_revalidated(server):
+    """The page and its scripts carry no-cache: a changed bench is never
+    hidden behind a browser's stored copy."""
+    for path in ("/", "/static/app.js", "/static/style.css"):
+        with urllib.request.urlopen(server + path, timeout=5) as r:
+            assert r.headers.get("Cache-Control") == "no-cache", path
