@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index e811c99992..af35a3f4bf 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -436,7 +436,7 @@ static void rz_scifa_tx_start(RenesasRZSCIFAState *s)
+     s->tsr = fifo8_pop(&s->tx_fifo);
+     /* a 7-bit frame does not carry bit 7 (SMR note 3) */
+     if (FIELD_EX16(s->smr, SMR, CHR)) {
+-        s->tsr &= 0x7f;
++        s->tsr &= 0xff;
+     }
+     s->tx_busy = true;
+     s->tx_frame_done = false;

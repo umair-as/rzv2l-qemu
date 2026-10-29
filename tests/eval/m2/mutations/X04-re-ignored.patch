@@ -1,8 +1,8 @@
 diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
-index b2363faa36..f4f450569d 100644
+index e811c99992..ebfa2668ef 100644
 --- a/hw/char/renesas_rz_scifa.c
 +++ b/hw/char/renesas_rz_scifa.c
-@@ -307,7 +307,7 @@ static uint64_t rz_scifa_frame_ns(RenesasRZSCIFAState *s)
+@@ -311,7 +311,7 @@ static uint64_t rz_scifa_frame_ns(RenesasRZSCIFAState *s)
  /* A received byte, at the end of its stop bit */
  static void rz_scifa_rx_byte(RenesasRZSCIFAState *s, uint8_t byte)
  {
@@ -10,4 +10,4 @@ index b2363faa36..f4f450569d 100644
 +    if (FIELD_EX16(s->fcr, FCR, RFRST)) {
          return;
      }
-     if (fifo8_is_full(&s->rx_fifo)) {
+     /* an overrun stops the receiver until ORER is cleared */

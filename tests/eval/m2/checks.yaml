@@ -48,7 +48,7 @@ checks:
     kind: qtest
     test: /aarch64/rzv2l-smarc/scif/tend-deferred
     proves: TEND stays 0 until one frame per byte has passed and then becomes 1, at the programmed format and rate
-    golden: 87.08 us (8N1), 3 x 87.08 us, 95.79 us (7E2), +-0.2 us
+    golden: 87.08 us (8N1), 3 x 87.08 us, 95.79 us (7E2), 348.32 us (8N1, CKS 1), 174.16 us (8N1, BRR 0x35), +-0.2 us
     citation: 22.2.8 p.1282 and 22.2.9 p.1287 formulas, P0 100 MHz; scif.md section 7; EVK-R23
   - id: S07
     kind: qtest
@@ -116,6 +116,18 @@ checks:
     proves: an FTDR write clears TEND at once
     golden: TEND 1 before, 0 right after the write
     citation: 22.2.7 p.1281
+  - id: S14
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/tend-te-cleared
+    proves: TEND needs an empty TX FIFO, not just an idle shift register; with TE cleared over a queued byte it stays 0
+    golden: after two frames FDR.T 1 and TEND 0
+    citation: 22.2.7 p.1281 (setting condition); review 2026-10-29 R1
+  - id: S15
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/tx-7bit
+    proves: a 7-bit frame does not carry FTDR bit 7; an 8-bit frame does
+    golden: 0xC1 looped back reads 0xC1 in 8N1 and 0x41 in 7E2
+    citation: 22.2.5 p.1274 note 3; review 2026-10-29 R3
   - id: X01
     kind: qtest
     test: /aarch64/rzv2l-smarc/scif/smr-mask
@@ -140,6 +152,12 @@ checks:
     proves: with RE = 0 the receiver ignores the line
     golden: FDR.R 0
     citation: 22.2.6 p.1276
+  - id: X05
+    kind: qtest
+    test: /aarch64/rzv2l-smarc/scif/rx-stopped-by-orer
+    proves: while ORER is set the receiver drops bytes even with FIFO space; clearing ORER restarts it
+    golden: FDR.R 15 after one pop and one more byte; LSR 0x0001; FDR.R 16 after the clear and one byte
+    citation: 22.2.13 p.1296; 22.4.2 (overrun check before a byte is stored); review 2026-10-29 R2
 
   - id: A01
     kind: acceptance
@@ -201,6 +219,8 @@ mutations:
   - {id: S06-tend-sync, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
   - {id: S06b-brme-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
   - {id: S06c-stop-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S06d-cks-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S06e-brr-ignored, check: S06, red_line: 'check_tend_after: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
   - {id: S07-ttrg-hardwired, check: S07, red_line: 'check_tdfe_at: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TDFE == tdfe \? FSR_TDFE : 0\)'}
   - {id: S08a-frdr-no-pop, check: S08a, red_line: "test_rx_fifo: assertion failed \\(qtest_readb\\(qts, b \\+ FRDR\\) == 'b'\\)"}
   - {id: S08a2-rdf-set-again-ge, check: S08a, red_line: 'test_rx_fifo: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_RDF == 0\)'}
@@ -215,11 +235,14 @@ mutations:
   - {id: S11-accept-cm, check: S11, red_line: 'test_sync_mode_refused: assertion failed \(qtest_readw\(qts, b \+ SMR\) == 0x0008\)'}
   - {id: S12-direct-boot-ignored, check: S12, red_line: 'test_direct_boot: assertion failed \(qtest_readb\(qts, b \+ BRR\) == MDDR_FW\)'}
   - {id: S13-ftdr-keeps-tend, check: S13, red_line: 'test_ftdr_clears_tend: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S14-tend-te-off, check: S14, red_line: 'test_tend_te_cleared: assertion failed \(qtest_readw\(qts, b \+ FSR\) & FSR_TEND == 0\)'}
+  - {id: S15-7bit-full-byte, check: S15, red_line: 'test_tx_7bit: assertion failed \(qtest_readb\(qts, b \+ FRDR\) == 0x41\)'}
   - {id: X01-smr-mask, check: X01, red_line: 'test_smr_mask: assertion failed \(qtest_readw\(qts, b \+ SMR\) == SMR_READBACK\)'}
   - {id: X02-rx-drops-bytes, check: X02, red_line: 'test_rx_chardev: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 3\)'}
   - {id: X03-no-orer, check: X03, red_line: 'test_rx_overrun: assertion failed \(qtest_readw\(qts, b \+ LSR\) == LSR_ORER\)'}
   - {id: X03b-orer-clears-unarmed, check: X03, red_line: 'test_rx_overrun: assertion failed \(qtest_readw\(qts, b \+ LSR\) == LSR_ORER\)'}
   - {id: X04-re-ignored, check: X04, red_line: 'test_rx_disabled: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 0\)'}
+  - {id: X05-rx-ignores-orer, check: X05, red_line: 'test_rx_stopped_by_orer: assertion failed \(qtest_readw\(qts, b \+ FDR\) == 15\)'}
   - {id: A01-drop-L, check: A01, red_line: '^FAIL serial line differs from expected/serial.txt \(A01\)'}
   - {id: A02-tx-synchronous, check: A02, red_line: '^FAIL probe exited 2: no result or the flush timed out \(A02\)'}
   - {id: A03-txi-to-spi382, check: A03, red_line: '^FAIL IRQ taken: 0 \(expected 1\)'}

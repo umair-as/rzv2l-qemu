@@ -1,0 +1,13 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index e811c99992..07c4020655 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -455,7 +455,7 @@ static void rz_scifa_tx_complete(RenesasRZSCIFAState *s)
+     s->tx_frame_done = false;
+     rz_scifa_tx_start(s);
+     /* TEND needs an empty FIFO, not just an idle shift register */
+-    if (!s->tx_busy && fifo8_is_empty(&s->tx_fifo)) {
++    if (!s->tx_busy) {
+         rz_scifa_set_flags(s, R_FSR_TEND_MASK);
+     }
+     rz_scifa_update(s);

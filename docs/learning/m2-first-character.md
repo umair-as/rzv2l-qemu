@@ -90,6 +90,10 @@ The qtest steps the virtual clock to 200 ns before the end of the frame and chec
 | an FTDR write leaves TEND | `not ok …/scif/ftdr-clears-tend`: `(0x00000040 == 0x00000000)` |
 | the MDDR correction (SEMR.BRME) ignored | `not ok …/scif/tend-deferred`: TEND already 1 at 86.88 µs |
 | the second stop bit ignored | `not ok …/scif/tend-deferred`: the 7E2 frame ends 8.7 µs early |
+| SMR.CKS ignored (review R4) | `not ok …/scif/tend-deferred`: TEND already 1 at a quarter of the CKS = 1 frame |
+| BRR hardwired to 0x1A (review R4) | `not ok …/scif/tend-deferred`: TEND already 1 at half the BRR = 0x35 frame |
+| TEND set with TE off and a byte still queued (review R1) | `not ok …/scif/tend-te-cleared`: `(0x00000040 == 0x00000000)` |
+| bit 7 sent in 7-bit mode (review R3) | `not ok …/scif/tx-7bit`: `(0x000000c1 == 0x00000041)` |
 
 ## 4. Receive, DR and overrun (M2-T03)
 
@@ -108,6 +112,7 @@ Two manual rules are easy to get wrong:
 | no ORER on overrun | `not ok …/scif/rx-overrun`: `(0x00000000 == 0x00000001)` |
 | ORER clears without the prior read | `not ok …/scif/rx-overrun`: the same line |
 | RE ignored | `not ok …/scif/rx-disabled`: `(0x00000001 == 0x00000000)` |
+| reception continues while ORER is set (review R2) | `not ok …/scif/rx-stopped-by-orer`: `(0x00000010 == 0x0000000f)` |
 
 ## 5. The interrupt lines (M2-T04)
 
@@ -128,9 +133,9 @@ A trap in the test: qtest learns a line's level only when the device drives the 
 ## 6. Hello, and the M2 acceptance run (M2-T08, T09)
 
 The hello probe is a bare-metal guest program in `tests/probes/hello-rzv2l/`. It does not set the UART up. It writes `Hello from RZ/V2L` the way TF-A's console does (`scifa.S:188-222` @ `f59ed5a31`):
-1. Wait until FDR.T is below 16.
-2. Store the byte to FTDR.
-3. Read FSR and write it back with TEND cleared.
+1. For a newline, wait until FDR.T is below 16 and store CR to FTDR.
+2. Wait until FDR.T is below 16 and store the byte to FTDR.
+3. Read FSR and write it back with TEND cleared, once per call. A newline therefore clears TEND once, after both bytes. The first version of the probe sent CR through a recursive call and cleared TEND twice; the final review caught the difference (R6).
 
 At the end it waits for TEND, as TF-A's flush does. Each wait has a limit, so a model bug makes the probe fail instead of hang. The probe works because direct mode starts SCIF0 as the firmware leaves it (§1.4 and the evidence file).
 
@@ -143,3 +148,13 @@ The probe then checks what only a CPU can see:
 
 One acceptance mutation needed thought. The ticket proposed "TEND set in the FTDR write" for A02, but this model also sets TEND again when the frame timer fires, so TF-A's flush still finishes. The failure that matters on real firmware is a model that completes the whole transmission inside the write: TEND rises at once, TF-A clears it, and nothing sets it again. That mutation makes the probe's flush time out with exit 2, which is the red line A02 expects.
 
+## 7. What the final review found (M2-T13)
+
+The independent review of the finished unit read the model against the manual rather than against the tests, and found three places where the model was silently wrong and one where the tests could not tell.
+
+- **TEND and an idle shift register (R1).** The model set TEND whenever the shift register went idle. The manual's condition is stricter: FTDR must hold no data at the last bit (§22.2.7 p.1281). The two differ when software clears TE with bytes still queued: the frame in flight ends, nothing follows, and TEND must stay 0. The new test `tend-te-cleared` queues two bytes, clears TE, waits two frames and expects FDR.T = 1 and TEND = 0.
+- **Reception after an overrun (R2).** Once ORER is set, the hardware stops receiving until software clears it (§22.2.13 p.1296). The model only checked whether the FIFO was full, so reading one byte let the next one in. Now a set ORER drops every incoming byte, looped or from the chardev, the way RE = 0 does. Bytes typed on the host while ORER is set are lost, as on the real line.
+- **7-bit frames (R3).** With SMR.CHR = 1 only bits 6..0 go out (p.1274 note 3). The model changed the frame time but sent the whole byte. The receive side of 7-bit mode is still not modelled.
+- **The clock divider was untested (R4).** Every timing case ran at the firmware's divider (CKS = 0, BRR = 0x1A). The reviewer forced the CKS term to zero and the whole suite stayed green. Two new cases, CKS = 1 and BRR = 0x35, now quadruple and double the frame time, with the expected times derived from the manual's formula in the test's comment.
+
+Each fix came with its test shown red on the old model first, and each test has a mutation in `tests/eval/m2/` that makes it red again. The other two findings were a citation (the output order of the five IRQ lines comes from Table 8.2, not Table 22.19) and the hello probe's claim to reproduce TF-A's access order exactly (§6).

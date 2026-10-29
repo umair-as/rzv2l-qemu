@@ -1,0 +1,14 @@
+diff --git a/hw/char/renesas_rz_scifa.c b/hw/char/renesas_rz_scifa.c
+index e811c99992..5c0371289f 100644
+--- a/hw/char/renesas_rz_scifa.c
++++ b/hw/char/renesas_rz_scifa.c
+@@ -315,9 +315,6 @@ static void rz_scifa_rx_byte(RenesasRZSCIFAState *s, uint8_t byte)
+         return;
+     }
+     /* an overrun stops the receiver until ORER is cleared */
+-    if (s->lsr & R_LSR_ORER_MASK) {
+-        return;
+-    }
+     if (fifo8_is_full(&s->rx_fifo)) {
+         if (!(s->lsr & R_LSR_ORER_MASK)) {
+             s->lsr |= R_LSR_ORER_MASK;
