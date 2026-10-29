@@ -1,6 +1,7 @@
 /*
  * Bench self-test program for QEMU virt (PL011 at 0x09000000).
- * Prints a banner, echoes every key, and on:
+ * Prints a banner, echoes every key like a terminal line (Enter as \r\n,
+ * Backspace/DEL as "\b \b"; any other byte, \n included, as is), and on:
  *   'u'  reads an unmapped address (0x0c000000) once: an invalid_mem log line
  *   'q'  exits QEMU with status 0 through semihosting
  * SPDX-License-Identifier: GPL-2.0-or-later
@@ -38,6 +39,18 @@ static char getc_(void)
     return (char)(UART_DR & 0xff);
 }
 
+/* What a terminal line discipline would show for the key */
+static void echo(char c)
+{
+    if (c == '\r') {
+        puts_("\r\n");
+    } else if (c == 0x7f || c == '\b') {
+        puts_("\b \b");                    /* erase the last cell */
+    } else {
+        putc_(c);
+    }
+}
+
 void main(void);
 void main(void)
 {
@@ -54,7 +67,7 @@ void main(void)
             (void)read32(HOLE);
             puts_("\r\nread hole\r\n");
         } else {
-            putc_(c == '\r' ? '\n' : c);
+            echo(c);
         }
     }
 }

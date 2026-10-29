@@ -417,14 +417,14 @@ def test_semihosting_lines_start_at_column_0(server):
 
 
 def test_serial_output_stays_byte_exact(server):
-    """virt-echo answers Enter with a bare \\n on the PL011: it must arrive as is."""
+    """virt-echo echoes a raw LF byte as a bare \\n on the PL011: it must arrive as is."""
     post(server, "/api/session/stop", b"{}", JSON_H)
     assert post(server, "/api/session", b'{"profile": "virt-echo"}', JSON_H) == 200
     for _ in range(100):
         if "echo ready" in get_json(server, "/api/session/console")["text"]:
             break
         time.sleep(0.1)
-    post(server, "/api/session/console", b'{"data": "a\\rb"}', JSON_H)
+    post(server, "/api/session/console", b'{"data": "a\\nb"}', JSON_H)
     for _ in range(50):
         text = get_json(server, "/api/session/console")["text"]
         if text.endswith("b"):
@@ -454,3 +454,33 @@ def test_shutdown_records_the_running_session():
         proc.wait(20)
     meta = json.loads((run_dir / "run.json").read_text())
     assert meta["state"] == "exited", meta["state"]
+
+
+def test_echo_terminal_keys(server):
+    """Typing in the terminal: Enter starts a new line at column 0 and
+    Backspace erases, as on a serial console with a line discipline."""
+    post(server, "/api/session/stop", b"{}", JSON_H)
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={"width": 1280, "height": 860})
+        page.goto(server)
+        page.get_by_test_id("profile-select").select_option("virt-echo")
+        page.get_by_test_id("btn-start").click()
+        console = page.get_by_test_id("console-text")
+        expect(console).to_contain_text("echo ready", timeout=60_000)
+        page.get_by_test_id("console").click()
+        page.keyboard.type("abx")
+        page.keyboard.press("Backspace")
+        page.keyboard.press("Enter")
+        page.keyboard.type("de")
+        page.keyboard.press("Enter")
+        page.keyboard.type("f")
+        rows_js = """() => [...document.querySelectorAll('#term .xterm-rows > div')]
+            .map((r) => r.textContent.trimEnd()).filter((r) => r)"""
+        # xterm draws on the next frames: wait until the last key is on screen
+        page.wait_for_function(f"({rows_js})().slice(-1)[0]?.endsWith('f')")
+        rows = page.evaluate(rows_js)
+        page.get_by_test_id("btn-stop").click()
+        browser.close()
+    printed = [r for r in rows if r]
+    assert printed[-3:] == ["ab", "de", "f"], printed
