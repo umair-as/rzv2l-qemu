@@ -96,6 +96,7 @@ static volatile uint64_t abort_esr;
 static volatile uint64_t irq_intid = SPURIOUS_INTID;
 static volatile uint64_t irq_count;
 static volatile uint32_t ostm_cnt_at_irq;
+static volatile int ostm_oneshot;
 static volatile uint64_t cntvct_at_irq;
 static int failures;
 
@@ -240,10 +241,12 @@ void irq_handler(void)
         mmio_write16(SCIF0 + SCR, SCR_TE_RE);
     }
     if (intid == OSTM2_INTID) {
-        /* As Linux ends a one-shot event: stop the counter */
         cntvct_at_irq = READ_SYSREG(cntvct_el0);
         ostm_cnt_at_irq = mmio_read32(OSTM2 + OSTM_CNT);
-        mmio_write8(OSTM2 + OSTM_TT, 1);
+        if (ostm_oneshot) {
+            /* As Linux ends a one-shot event: stop the counter */
+            mmio_write8(OSTM2 + OSTM_TT, 1);
+        }
     }
     irq_intid = intid;
     irq_count++;
@@ -451,6 +454,7 @@ void probe_main(void)
         gic_enable_spi(OSTM2_INTID);
         irq_count = 0;
         irq_intid = SPURIOUS_INTID;
+        ostm_oneshot = 1;
         mmio_write32(OSTM2 + OSTM_CMP, OSTM_ONESHOT_CMP);
         mmio_write8(OSTM2 + OSTM_CTL, OSTM_CTL_FREERUN);
         t0 = READ_SYSREG(cntvct_el0);
@@ -473,6 +477,42 @@ void probe_main(void)
             __asm__ volatile("yield");
         }
         check("OSTM2 IRQs in all", irq_count, 1, 0);
+
+        /*
+         * A compare value rewritten while free-running takes effect at
+         * once (Table 20.5 rows c, d): start with a match 43 s away,
+         * then move it 1 ms ahead; the interrupt must come within 20 ms.
+         */
+        puts_("-- OSTM2 compare rewritten while free-running\n");
+        irq_count = 0;
+        mmio_write32(OSTM2 + OSTM_CMP, 0xfffffff0);
+        mmio_write8(OSTM2 + OSTM_TS, 1);
+        mmio_write32(OSTM2 + OSTM_CMP, OSTM_ONESHOT_CMP);
+        t0 = READ_SYSREG(cntvct_el0);
+        while (!irq_count && READ_SYSREG(cntvct_el0) - t0 < 20 * min_ticks) {
+            __asm__ volatile("yield");
+        }
+        check("OSTM2 IRQ after the rewrite", irq_count, 1, 1);
+
+        /*
+         * Interval mode as Linux's periodic event (renesas-ostm.c:107-119):
+         * CMP = period - 1, an interrupt every period, the timer keeps
+         * running. Expect at least 3 interrupts within 5 periods.
+         */
+        puts_("-- OSTM2 interval (periodic) interrupts\n");
+        ostm_oneshot = 0;
+        irq_count = 0;
+        mmio_write8(OSTM2 + OSTM_TT, 1);
+        mmio_write32(OSTM2 + OSTM_CMP, OSTM_ONESHOT_CMP);
+        mmio_write8(OSTM2 + OSTM_CTL, 0);
+        mmio_write8(OSTM2 + OSTM_TS, 1);
+        t0 = READ_SYSREG(cntvct_el0);
+        while (irq_count < 3 && READ_SYSREG(cntvct_el0) - t0 < 5 * min_ticks) {
+            __asm__ volatile("yield");
+        }
+        mmio_write8(OSTM2 + OSTM_TT, 1);
+        check("OSTM2 interval IRQs within 5 periods >= 3", irq_count >= 3, 1, 0);
+        check("OSTM2 interval IRQ INTID", irq_intid, OSTM2_INTID, 1);
     }
 
     /* Each OSTM register takes only its own access size (20.2.1) */
