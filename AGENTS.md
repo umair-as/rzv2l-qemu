@@ -112,7 +112,7 @@ Consequences for this project:
 - PSCI goes over SMC. CPUs are `cpu@0` and `cpu@100`, so set `mp-affinity` = `0x0`, `0x100`.
 - `CNTFRQ` = 24 MHz. TF-A copies it from SYC `CNTFID0`; the DT timer has no `clock-frequency`.
 - BL2 panics unless `SYS_LSI_DEVID[27:0] == 0x8447447`. U-Boot and BL2 read `SYS_LSI_MODE` @ `0x11020A00` for the boot source.
-- CPG monitors: `CLK_MON` = `CLK_ON` (same polarity); `RSTMON` = `~RST & implemented_mask` (inverted, 1 = in reset). Linux and TF-A poll both; getting either wrong makes drivers time out (U-Boot SDHI, Linux `sh-sci`).
+- CPG monitors: `CLK_MON` = `CLK_ON` (same polarity) for implemented bits; reserved bits can differ (WDT b7:6 read 1 in `CLK_ON`, 0 in `CLK_MON`; EVK-X01). `RSTMON` = `~RST & implemented_mask` (inverted, 1 = in reset). Linux and TF-A poll both; getting either wrong makes drivers time out (U-Boot SDHI, Linux `sh-sci`).
 - The production OP-TEE panics without TSIP, a closed crypto IP. Emulation uses an OP-TEE rebuilt with `CFG_RZ_SCE=n`; TSIP is honest-fault.
 
 ## Repo layout
