@@ -111,6 +111,13 @@ def test_echo_session(server):
             "document.querySelector('[data-testid=console-text]')"
             ".textContent.split('echo ready').length === 3")
 
+        # Markers count from the last reset: print 'read hole' again
+        page.get_by_test_id("console").click()
+        page.keyboard.type("u")
+        page.wait_for_function(
+            "document.querySelector('[data-testid=console-text]')"
+            ".textContent.split('read hole').length === 3")
+
         page.get_by_test_id("tab-log").click()
         SHOT.parent.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(SHOT))
@@ -144,7 +151,7 @@ def test_echo_session(server):
             page.get_by_test_id("run-coverage-csv").click()
         rows = list(csv.reader(io.StringIO(Path(dl.value.path()).read_text())))
         assert rows[0] == ["name", "base", "size", "kind", "access", "count"]
-        assert ["unmapped", "0x0c000000", "4", "invalid_mem", "read", "1"] in rows
+        assert ["unmapped", "0x0c000000", "4", "invalid_mem", "read", "2"] in rows  # u twice
         browser.close()
 
 
@@ -171,7 +178,8 @@ def test_stop_before_exit_fails(server):
             break
         time.sleep(0.1)
     st = get_json(server, "/api/session")
-    assert st["verdict"] == "running" and st["expect_missing"] == ["bye"]
+    assert st["verdict"] == "running"
+    assert st["expect_missing"] == ["read hole", "bye"]
     post(server, "/api/session/stop", b"{}", JSON_H)
     st = wait_state(server, "exited")
     assert st["verdict"] == "fail"
@@ -179,6 +187,40 @@ def test_stop_before_exit_fails(server):
     assert "stopped by the bench before the guest exited" in st["verdict_reasons"]
     meta = get_json(server, f"/api/runs/{st['run']}")
     assert meta["verdict"] == "fail" and meta["profile"] == "virt-echo"
+
+
+def test_marker_before_reset_does_not_count(server):
+    """'read hole' appears before a Reset and not after: never PASS."""
+    post(server, "/api/session/stop", b"{}", JSON_H)
+    assert post(server, "/api/session", b'{"profile": "virt-echo"}', JSON_H) == 200
+
+    def console():
+        return get_json(server, "/api/session/console")["text"]
+
+    def wait_for(pred):
+        for _ in range(100):
+            if pred():
+                return
+            time.sleep(0.1)
+        raise AssertionError(f"timed out; console {console()!r}")
+
+    wait_for(lambda: "echo ready" in console())
+    post(server, "/api/session/console", b'{"data": "u"}', JSON_H)
+    wait_for(lambda: "read hole" in console())
+    assert get_json(server, "/api/session")["expect_missing"] == ["bye"]
+
+    post(server, "/api/session/reset", b"{}", JSON_H)
+    wait_for(lambda: console().count("echo ready") == 2)
+    st = get_json(server, "/api/session")
+    assert st["verdict"] == "running"
+    assert st["expect_missing"] == ["read hole", "bye"]
+
+    # Every marker has now appeared in the run, but not since the reset
+    post(server, "/api/session/console", b'{"data": "q"}', JSON_H)
+    st = wait_state(server, "exited")
+    assert st["exit_code"] == 0 and "bye" in console()
+    assert st["verdict"] == "fail"
+    assert st["verdict_reasons"] == ["missing on the console: 'read hole'"]
 
 
 def test_gdbstub_option(server):

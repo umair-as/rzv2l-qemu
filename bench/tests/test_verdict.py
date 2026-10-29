@@ -121,3 +121,31 @@ def test_unfinished_run_is_listed_as_lost(tmp_path, monkeypatch):
         session = None
     info = server.Bench.run_info(NoSession(), run)
     assert info["state"] == "lost" and info["verdict"] is None
+
+
+def test_reset_restarts_the_verdict(session):
+    """A marker seen before a QMP RESET is forgotten; no expect_exit here,
+    so it would otherwise stay PASS while the guest runs on."""
+    s = session(["hello"])
+    s.state = "running"
+
+    async def run():
+        r = asyncio.StreamReader()
+        pump = asyncio.create_task(s._pump_console_inner(r))
+        r.feed_data(b"hel")
+        await asyncio.sleep(0.01)
+        r.feed_data(b"lo\n")
+        await asyncio.sleep(0.01)
+        assert s.verdict() == ("pass", [])
+        await s._on_qmp_event({"event": "RESET"})
+        assert s.verdict() == ("running", [])
+        r.feed_data(b"hel")               # half a marker before the reset ...
+        await asyncio.sleep(0.01)
+        await s._on_qmp_event({"event": "RESET"})
+        r.feed_data(b"lo\n")              # ... never joins one after it
+        r.feed_eof()
+        await pump
+    asyncio.run(run())
+    assert s.verdict() == ("running", [])
+    s.state = "exited"
+    assert s.verdict()[0] == "fail"
