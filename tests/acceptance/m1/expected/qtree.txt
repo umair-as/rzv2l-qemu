@@ -27,6 +27,29 @@ dev: renesas-rz-scifa @000000001004c400
 dev: renesas-rz-scifa @000000001004c800
   direct-boot = false
   mmio 000000001004c800/0000000000000400
+# CPG: device-map row CPG; direct-boot follows -kernel like SCIF0
+# (M3b-cpg spec).
+dev: renesas-rzv2l-cpg
+  direct-boot = true
+  mmio 0000000011010000/0000000000010000
+# Stubs: device-map rows TSU (UNIMP), DMAC (write-retaining STUB) and USB
+# (UNIMP).
+dev: unimplemented-device @0000000010059400
+  name = "tsu"
+  retain-writes = false
+  mmio 0000000010059400/0000000000000400
+dev: unimplemented-device @0000000011820000
+  name = "rz-dmac"
+  retain-writes = true
+  mmio 0000000011820000/0000000000010000
+dev: unimplemented-device @0000000011830000
+  name = "rz-dmac-ext"
+  retain-writes = true
+  mmio 0000000011830000/0000000000010000
+dev: unimplemented-device @0000000011c40000
+  name = "usbphy-ctrl"
+  retain-writes = false
+  mmio 0000000011c40000/0000000000010000
 dev: arm-gicv3
   num-cpu = 2 (0x2)
   num-irq = 512 (0x200)

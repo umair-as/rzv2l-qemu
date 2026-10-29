@@ -58,7 +58,8 @@ done
 # 3. The G0 kernel prints through earlycon on SCIF0 (L02), with the
 #    unmodified DTB-U and its bootargs plus a bare earlycon (decision (b),
 #    device map section 4 row 6). Earlycon prints within the first second;
-#    the run ends at the CPG abort (first-blocker.md), so it is bounded.
+#    the timeout bounds the run (it ends at the first unmodelled block:
+#    the CPG in M2, OSTM after M3b-cpg).
 step "G0 kernel earlycon"
 KERNEL="$HERE/../../guests/out/g0/linux/arch/arm64/boot/Image"
 DTB_U="$HERE/../../guests/out/g0/r9a07g054l2-smarc.dtb"

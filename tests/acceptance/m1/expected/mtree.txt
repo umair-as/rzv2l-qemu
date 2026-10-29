@@ -3,7 +3,11 @@
 # GIC-600 redistributors, DDR); region names are QEMU's.
 #   SCIF0-4 0x1004B800, 0x1004BC00, 0x1004C000, 0x1004C400, 0x1004C800, 0x400 each
 #   (rows SCIF0, SCIF2, SCIF1/SCIF3/SCIF4)
+#   CPG 0x11010000, 64 KiB (M3b-cpg)
 #   SYSC 0x11020000, 64 KiB
+#   Stubs at prio -1000 (M3b-cpg; device-map rows TSU, DMAC, USB):
+#   TSU 0x10059400, 0x400; DMAC 0x11820000 + 0x11830000, 64 KiB each;
+#   USB PHY control 0x11C40000, 64 KiB
 #   GIC distributor 0x11900000; QEMU backs 0x10000 of the 0x20000 window
 #   GIC redistributors 0x11940000, 0x40000 (2 frames of 0x20000)
 #   DDR 0x40000000, 2 GiB
@@ -12,7 +16,12 @@
 000000001004c000-000000001004c3ff (prio 0, i/o): renesas-rz-scifa
 000000001004c400-000000001004c7ff (prio 0, i/o): renesas-rz-scifa
 000000001004c800-000000001004cbff (prio 0, i/o): renesas-rz-scifa
+0000000010059400-00000000100597ff (prio -1000, i/o): tsu
+0000000011010000-000000001101ffff (prio 0, i/o): renesas-rzv2l-cpg
 0000000011020000-000000001102ffff (prio 0, i/o): renesas-rzg2l-sysc
+0000000011820000-000000001182ffff (prio -1000, i/o): rz-dmac
+0000000011830000-000000001183ffff (prio -1000, i/o): rz-dmac-ext
 0000000011900000-000000001190ffff (prio 0, i/o): gicv3_dist
 0000000011940000-000000001197ffff (prio 0, i/o): gicv3_redist_region[0]
+0000000011c40000-0000000011c4ffff (prio -1000, i/o): usbphy-ctrl
 0000000040000000-00000000bfffffff (prio 0, ram): rzv2l-smarc.ram
