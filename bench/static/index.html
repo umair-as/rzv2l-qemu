@@ -166,6 +166,9 @@
       <p class="view-run" data-testid="devices-run"><span class="which"></span> <a href="#" class="back" data-testid="devices-current" hidden>Show the current session</a></p>
       <form class="row" onsubmit="return false">
         <input id="dev-filter" data-testid="devices-filter" aria-label="Filter devices" placeholder="Filter: type, name or property" autocomplete="off" spellcheck="false">
+        <span id="dev-count" class="search-count" data-testid="devices-count" aria-live="polite"></span>
+        <button type="button" id="dev-expand" data-testid="devices-expand">Expand all</button>
+        <button type="button" id="dev-collapse" data-testid="devices-collapse">Collapse all</button>
       </form>
       <p id="dev-empty" class="empty" data-testid="devices-empty">Start a session: its device tree is read before the guest runs.</p>
       <div id="dev-tree" class="tree scroll" data-testid="devices-tree" hidden></div>

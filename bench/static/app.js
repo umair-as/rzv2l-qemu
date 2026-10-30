@@ -603,6 +603,7 @@ function renderNode(n, q, depth) {
   const kids = n.children.map((c) => renderNode(c, q, depth + 1)).filter(Boolean);
   const hit = q && nodeText(n).includes(q);
   if (q && !hit && !kids.length) return null;
+  if (hit) devHits += 1;
   const d = document.createElement("details");
   d.setAttribute("data-testid", n.kind === "dev" ? "device-node" : "bus-node");
   d.open = q ? true : depth < 1;
@@ -617,8 +618,18 @@ function renderNode(n, q, depth) {
     const props = document.createElement("div");
     props.className = "props";
     n.props.forEach((line) => {
+      // "name = value" as two columns; the row's text stays the qtree line
       const row = document.createElement("div");
-      row.textContent = line;
+      const eq = line.indexOf(" = ");
+      if (eq > 0) {
+        const k = document.createElement("span");
+        k.className = "pk"; k.textContent = line.slice(0, eq);
+        const v = document.createElement("span");
+        v.className = "pv"; v.textContent = line.slice(eq);
+        row.append(k, v);
+      } else {
+        row.textContent = line;
+      }
       props.append(row);
     });
     d.append(props);
@@ -627,8 +638,11 @@ function renderNode(n, q, depth) {
   return d;
 }
 
+let devHits = 0;
+
 function renderDevices() {
   const q = $("dev-filter").value.trim().toLowerCase();
+  devHits = 0;
   const tree = $("dev-tree");
   tree.innerHTML = "";
   devTree.map((n) => renderNode(n, q, 0)).filter(Boolean).forEach((d) => tree.append(d));
@@ -637,8 +651,12 @@ function renderDevices() {
   empty.hidden = devTree.length > 0 && tree.children.length > 0;
   if (devTree.length && !tree.children.length) empty.textContent = `Nothing matches “${q}”.`;
   else empty.textContent = "Start a session: its device tree is read before the guest runs.";
+  $("dev-count").textContent = q && devTree.length ? `${devHits} match${devHits === 1 ? "" : "es"}` : "";
 }
 $("dev-filter").addEventListener("input", renderDevices);
+for (const [id, open] of [["dev-expand", true], ["dev-collapse", false]]) {
+  $(id).onclick = () => $("dev-tree").querySelectorAll("details").forEach((d) => { d.open = open; });
+}
 
 // ---- runs ------------------------------------------------------------------
 

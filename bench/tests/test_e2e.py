@@ -914,3 +914,37 @@ def test_runs_filter_failures_and_band_past_runs(server):
         page.evaluate("viewPinned = false; showViewRun({run: 'r3', profile: 'virt-echo'})")
         expect(band).to_have_attribute("data-pinned", "false")
         browser.close()
+
+
+DEV_TREE = [  # the shape of GET /api/runs/<run>/devices "tree"
+    {"kind": "bus", "label": "main-system-bus", "props": ["type System"], "children": [
+        {"kind": "dev", "label": "renesas-rzg2l-sysc, id \"\"", "props": ["lsi-devid = 0x18447447"],
+         "children": []},
+        {"kind": "dev", "label": "renesas-rz-scifa, id \"\"", "props": ["chardev = \"serial0\""],
+         "children": [{"kind": "bus", "label": "inner", "props": [], "children": []}]},
+    ]},
+]
+
+
+def test_devices_expand_count_and_property_columns(server):
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = offline_page(browser, server)
+        page.evaluate("(t) => { devTree = t; renderDevices(); }", DEV_TREE)
+        page.get_by_test_id("tab-devices").click()
+        details = page.locator("#dev-tree details")
+        page.get_by_test_id("devices-expand").click()
+        assert details.evaluate_all("(ds) => ds.every((d) => d.open)")
+        page.get_by_test_id("devices-collapse").click()
+        assert details.evaluate_all("(ds) => ds.every((d) => !d.open)")
+
+        page.get_by_test_id("devices-filter").fill("devid")
+        expect(page.get_by_test_id("devices-count")).to_have_text("1 match")
+        prop = page.get_by_test_id("device-node").locator(".props div")
+        expect(prop.locator(".pk")).to_have_text("lsi-devid")
+        expect(prop).to_have_text("lsi-devid = 0x18447447")        # the qtree line, unchanged
+        page.get_by_test_id("devices-filter").fill("renesas")
+        expect(page.get_by_test_id("devices-count")).to_have_text("2 matches")
+        page.get_by_test_id("devices-filter").fill("")
+        expect(page.get_by_test_id("devices-count")).to_have_text("")
+        browser.close()

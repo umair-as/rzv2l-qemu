@@ -449,7 +449,13 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, tran
 .tree summary .k { color: var(--muted); }
 .tree summary .t { color: var(--ink); font-weight: 600; }
 .tree .props { margin: 2px 0 4px 18px; color: var(--muted); }
-.tree .props div { white-space: pre-wrap; word-break: break-all; }
+.tree .props div { white-space: pre-wrap; word-break: break-all; display: grid; grid-template-columns: minmax(10ch, max-content) 1fr; }
+.tree .props div:not(:has(.pk)) { display: block; }
+.tree .props .pk { color: var(--muted); padding-right: 4px; }
+.tree .props .pv { color: var(--ink); }
+.tree details { border-left: 1px solid var(--line); padding-left: 8px; }
+.tree > details { border-left: 0; padding-left: 0; }
+.tree summary:hover .t { color: var(--accent); }
 .tree mark { background: var(--warn-soft); color: var(--ink); border-radius: 2px; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: pre; }
