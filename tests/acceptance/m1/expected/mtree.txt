@@ -15,15 +15,31 @@
 #   PFC 0x11030000 and IRQC 0x110A0000, 64 KiB each (pin and interrupt controller unit)
 #   Stubs (UNIMP, device-map rows RIIC, SDHI, ravb, USB): RIIC0/1/3 0x10058000 + n * 0x400,
 #   0x400 each; SDHI0/1, ETH0/1, USB0 and USB1 host, 64 KiB each
+#   WDT0-2 0x12800800, 0x12800C00, 0x12800400, 0x400 each (rows WDT0, WDT1, WDT2)
+#   Stubs for the drivers the vendor kernel builds in (UNIMP; rows display, SSI/RSPI/CAN-FD/ADC,
+#   RPC, USB): DSI 0x10850000 (0x20000), VSPD, FCPVD, DU 64 KiB each; SSI0/1, RSPI1, ADC
+#   0x400 each; CAN-FD 32 KiB; USB0 function 64 KiB; RPC registers and write buffer
+#   64 KiB each, flash window 0x20000000, 256 MiB
+0000000010049c00-0000000010049fff (prio -1000, i/o): ssi0
+000000001004a000-000000001004a3ff (prio -1000, i/o): ssi1
+000000001004b000-000000001004b3ff (prio -1000, i/o): rspi1
 000000001004b800-000000001004bbff (prio 0, i/o): renesas-rz-scifa
 000000001004bc00-000000001004bfff (prio 0, i/o): renesas-rz-scifa
 000000001004c000-000000001004c3ff (prio 0, i/o): renesas-rz-scifa
 000000001004c400-000000001004c7ff (prio 0, i/o): renesas-rz-scifa
 000000001004c800-000000001004cbff (prio 0, i/o): renesas-rz-scifa
+0000000010050000-0000000010057fff (prio -1000, i/o): canfd
 0000000010058000-00000000100583ff (prio -1000, i/o): riic0
 0000000010058400-00000000100587ff (prio -1000, i/o): riic1
 0000000010058c00-0000000010058fff (prio -1000, i/o): riic3
+0000000010059000-00000000100593ff (prio -1000, i/o): adc
 0000000010059400-00000000100597ff (prio -1000, i/o): tsu
+0000000010060000-000000001006ffff (prio -1000, i/o): rpc-if
+0000000010070000-000000001007ffff (prio -1000, i/o): rpc-if-wbuf
+0000000010850000-000000001086ffff (prio -1000, i/o): mipi-dsi
+0000000010870000-000000001087ffff (prio -1000, i/o): vspd
+0000000010880000-000000001088ffff (prio -1000, i/o): fcpvd
+0000000010890000-000000001089ffff (prio -1000, i/o): du
 0000000011010000-000000001101ffff (prio 0, i/o): renesas-rzv2l-cpg
 0000000011020000-000000001102ffff (prio 0, i/o): renesas-rzg2l-sysc
 0000000011030000-000000001103ffff (prio 0, i/o): renesas-rzg2l-pfc
@@ -38,8 +54,13 @@
 0000000011c30000-0000000011c3ffff (prio -1000, i/o): ravb-eth1
 0000000011c40000-0000000011c4ffff (prio -1000, i/o): usbphy-ctrl
 0000000011c50000-0000000011c5ffff (prio -1000, i/o): usb0-host
+0000000011c60000-0000000011c6ffff (prio -1000, i/o): usb0-func
 0000000011c70000-0000000011c7ffff (prio -1000, i/o): usb1-host
+0000000012800400-00000000128007ff (prio 0, i/o): renesas-rzg2l-wdt
+0000000012800800-0000000012800bff (prio 0, i/o): renesas-rzg2l-wdt
+0000000012800c00-0000000012800fff (prio 0, i/o): renesas-rzg2l-wdt
 0000000012801000-00000000128013ff (prio 0, i/o): renesas-rz-ostm
 0000000012801400-00000000128017ff (prio 0, i/o): renesas-rz-ostm
 0000000012801800-0000000012801bff (prio 0, i/o): renesas-rz-ostm
+0000000020000000-000000002fffffff (prio -1000, i/o): rpc-if-dirmap
 0000000040000000-00000000bfffffff (prio 0, ram): rzv2l-smarc.ram
