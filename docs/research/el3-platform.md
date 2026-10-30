@@ -13,8 +13,8 @@ What the board's BL31 (TF-A `f59ed5a31`, `PLAT=v2l BOARD=smarc_2 SPD=opteed DEBU
 
 | Block, offset | Register | Reset (manual) | Fields used | Class | BL31 `file:line` | Cite |
 |---|---|---|---|---|---|---|
-| SYC `+0x000` | `CNTCR` | 0 (A: CoreSight SoC-400 TRM, not in the repo) | EN | config | `drivers/syc.c:29` | §15.3 p.727 → CoreSight SoC-400 TRM 3.10 |
-| SYC `+0x020` | `CNTFID0` | 0 (A: as above) | frequency, 24 000 000 written | config | `drivers/syc.c:34` | as above |
+| SYC `+0x000` | `CNTCR` | 0 (A: CoreSight SoC-400 TRM, not in the repo); EVK after firmware `0x1` (O, EVK-R50) | EN | config | `drivers/syc.c:29` | §15.3 p.727 → CoreSight SoC-400 TRM 3.10 |
+| SYC `+0x020` | `CNTFID0` | 0 (A: as above); EVK after firmware `0x016E3600` (O, EVK-R50) | frequency, 24 000 000 written | config | `drivers/syc.c:34` | as above |
 | TZC0/1 `+0x000` | `BUILD_CONFIG` | configuration | `NO_OF_FILTERS` | ID | `drivers/arm/tzc/tzc400.c:206` | §13.1 p.622-623 (8 regions + base; 1 filter, DDR 4) |
 | TZC0/1 `+0x008` | `GATE_KEEPER` | 0 | open request, open status (polled) | command / status | `tzc400.c:171-175` | TZC-400 TRM (not in the repo) |
 | TZC0/1 `+0x100 + 0x20n` | region base, top, attributes, ID access | 0 | all | config | `plat_security.c:76-110` | as above |
@@ -30,6 +30,8 @@ What the board's BL31 (TF-A `f59ed5a31`, `PLAT=v2l BOARD=smarc_2 SPD=opteed DEBU
 | CPG `+0xB38/0xB40` | `CORE0/1_PCHMON` | `—` | `PACCEPT` [0] (polled), `PDENY` [1] | status | as above | §7.2.4.186, 7.2.4.188 p.464, 466 |
 | WDT0 `+0x014` | `PEEN` | 0 | 1 forces a parity error: system reset | command | `drivers/wdt.c` | §21 (modelled in M4) |
 | A55 `S3_0_C15_C2_7` | `CPUPWRCTLR_EL1` | 0 (A55 TRM) | `CORE_PWRDN_EN` set before the last WFI | config | `lib/cpus/aarch64/cortex_a55.S` (`cortex_a55_core_pwr_dwn`) | EXP-001 (QEMU UNDEFs it) |
+
+**Direct-mode start state (rule 9):** SYC as read on the EVK at the U-Boot prompt, `CNTCR` `0x1`, `CNTFID0` `0x016E3600` (O, EVK-R50, [evidence](../evidence/EVK-2026-10-29-post-firmware.md)); the SYSC reset-vector and sleep registers, the P-Channels and the TZCs at their reset values (I: no direct-mode guest touches them, and BL31 writes `RVAL1` only at `CPU_ON`).
 
 ## 3. The core power sequences
 

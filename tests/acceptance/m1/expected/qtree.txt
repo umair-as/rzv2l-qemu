@@ -31,6 +31,7 @@ dev: renesas-rz-scifa @000000001004c800
 # (M3b-cpg spec).
 # SYC and TZC0-3: device-map rows SYC, TZC-400 (M7-el3-platform)
 dev: coresight-tsgen
+  direct-boot = true
   mmio 0000000011000000/0000000000002000
 dev: arm-tzc400 @0000000011040000
   num-filters = 1 (0x1)

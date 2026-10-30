@@ -35,7 +35,7 @@ BL31 (`plat/renesas/rz/common/`, TF-A `f59ed5a31`), in the order it runs:
 
 The kernel (G1, as in M4) needs from BL31: PSCI 1.x over SMC, `CPU_ON(0x100)` to bring CPU1 up, and the same SoC state it has in direct mode.
 
-**Start states:** firmware mode starts the SYSC, CPG, TZC and the cores from manual reset values; CPU1 is off until BL31 starts it. Clocks and pins: see "For the operator".
+**Start states:** in firmware mode the new SYSC registers, the P-Channels, the TZCs and the SYC start from manual reset values, and CPU1 is off until BL31 starts it; the CPG clocks and resets, the PFC and SCIF0 keep the direct-mode start values (see "For the operator", gap 19). In direct mode the SYC starts as the EVK reads after the firmware (`CNTCR` 1, `CNTFID0` `0x016E3600`, EVK-R50, O); the new SYSC registers and the TZCs start from reset values there too (I: BL31 writes `RVAL1` only at `CPU_ON`, and nothing in direct mode reads the TZCs).
 
 ## Exit criterion
 

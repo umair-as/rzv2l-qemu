@@ -2,6 +2,8 @@
 
 Fork branch `unit/M7-el3-platform` from `rzv2l-dev` `10df946cc8`; project branch of the same name from `main` `f15f61e`.
 
+SYC direct-mode start state (`CNTCR` 1, `CNTFID0` 24 MHz, EVK-R50): the M1 device check sees `direct-boot = true`; no direct-mode guest reads the values, so no mutation proves them.
+
 | ID | Task | Files | Test | Status |
 |---|---|---|---|---|
 | T1 | BL31 build at the BSP's commit and flags, reproducible (the banner's build time is the commit) | `tests/guests/fw/build-tf-a.sh` | SHA-256 the same over two builds | done |
@@ -33,7 +35,7 @@ Fork branch `unit/M7-el3-platform` from `rzv2l-dev` `10df946cc8`; project branch
 
 Each mutation was applied to a copy-backed file, built with a confirmed relink, run alone, and restored; the build and the full tests were run again after the last one.
 
-## Boot evidence (fork `55a1e7877a`)
+## Boot evidence (fork `55a1e7877a`; the last fork commit adds the SYC direct-mode start state only)
 
 `QEMU=build/qemu/qemu-system-aarch64 python3 -I tests/acceptance/m7/firmware.py OUT`: 16 checks PASS. BL31 `8f8837388094b930…` (`tests/guests/fw/build-tf-a.sh`); the serial log, in order:
 
