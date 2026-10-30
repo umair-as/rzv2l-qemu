@@ -1,6 +1,6 @@
 # M5: storage
 
-> **Context.** Milestone M5 (spec [§17](../spec/project.md#17-milestones)): an SD card with an ext4 file system, used by the unchanged Linux driver. Unit M5-sdhi: [spec](../units/M5-sdhi/spec.md), [tasks](../units/M5-sdhi/tasks.md), register evidence [`../research/sdhi.md`](../research/sdhi.md). The manual chapter is §40 (SD/MMC host interface). Linux paths are under linux v6.12.59 `drivers/mmc/`.
+> **Context.** Milestone M5 (spec [§17](../spec/project.md#17-milestones)): an SD card with an ext4 file system, used by the unchanged Linux driver. Unit M5-sdhi: [spec](../units/M5-sdhi/spec.md), [tasks](../units/M5-sdhi/tasks.md), register evidence [`../research/sdhi.md`](../research/sdhi.md). Unit M5-sd-rootfs (user space from the card, §9): [spec](../units/M5-sd-rootfs/spec.md), [tasks](../units/M5-sd-rootfs/tasks.md). The manual chapter is §40 (SD/MMC host interface). Linux paths are under linux v6.12.59 `drivers/mmc/`.
 
 This page follows one SD card read from the card up to the block layer, and shows where the hardware, the Linux driver and the QEMU model each do their part. It is written for two readers. If you know embedded Linux, it shows how an SD host driver is built and what its DMA engine needs. If you are new to QEMU, it shows how a storage controller is modelled. Sections 5 and 6 end with what to take away for a driver of your own, and section 7 for a model.
 
@@ -304,17 +304,61 @@ You need the guests (`docs/learning/building-and-testing.md` §8) and the SD ima
 
 4. Stop QEMU with Ctrl-A X. Find the requests with `grep -n CMD18 build/sdhi-trace.log`, and compare one with §4.
 
-## 9. How we know it works
+## 9. User space from the card
 
-Three kinds of test cover this unit, from the smallest to the largest.
+Until now the shell came from an initramfs: an archive that QEMU loads into RAM next to the kernel. On the board, Linux instead mounts its root file system from the SD card. This section shows that boot, and how QEMU handles the power-off and the reset that end it.
+
+### 9.1 The root on a block device
+
+The board's U-Boot passes `rw rootwait earlycon root=/dev/mmcblk0p2` (EVK capture, [unit spec](../units/M5-sd-rootfs/spec.md#evidence)). QEMU passes the same line with `-append` and no `-initrd`:
+
+```
+[    6.527289] VFS: Mounted root (ext4 filesystem) on device 179:2.
+[    6.582336] Run /sbin/init as init process
+```
+
+- **`root=/dev/mmcblk0p2`** names partition 2 of the card on SDHI0. The name is stable only because of the `mmc0` alias (§11).
+- **`rootwait`** makes the kernel wait for the device (`wait_for_root`, linux `init/do_mounts.c:413`). The SD card appears only when its probe finishes, after the kernel is ready to mount.
+- **`rw`** mounts the root read-write at once. Nothing in this image checks the file system at boot.
+- With no initramfs, the kernel mounts `devtmpfs` on the card's `/dev` (`init/do_mounts.c:493`, `CONFIG_DEVTMPFS_MOUNT=y`). Then it runs `/sbin/init` from the card (`init/main.c:1537`).
+
+The card's `/sbin/init` is BusyBox `init`. It reads `/etc/inittab`, runs `/etc/init.d/rcS` once, and keeps a shell on the console. The image script writes these files ([`build-image.sh`](../../tests/guests/sd/build-image.sh)).
+
+### 9.2 Power-off and reset
+
+A clean shutdown has two halves: the guest leaves the file system consistent, then the firmware turns the board off. In direct mode, QEMU's built-in PSCI is the firmware.
+
+1. `poweroff` sends a signal to BusyBox `init`. `init` runs the `shutdown` lines of `inittab` first (`init/init.c:763` in BusyBox 1.36.1). Here that line is `umount -a -r`. The root is busy, so `umount` remounts it read-only.
+2. `init` stops all processes, calls `sync()` and then `reboot()` (`init/init.c:746`).
+3. The kernel prints `reboot: Power down` and calls PSCI `SYSTEM_OFF`. QEMU requests a shutdown, and the process exits (`qemu/target/arm/tcg/psci.c:131`).
+
+`reboot` takes the same path to PSCI `SYSTEM_RESET`. QEMU then resets the machine instead of exiting (`psci.c:123`). The reset does not start a boot loader: QEMU writes the kernel and the DTB into RAM again, because it registered them as ROM images (`qemu/hw/arm/boot.c:636`, `rom_reset` in `qemu/hw/core/loader.c:1242`). The primary CPU then restarts at the kernel's entry (`do_cpu_reset`, `boot.c:655`); the second CPU waits again for PSCI `CPU_ON`. The card image keeps what the guest wrote, so the new kernel mounts the same file system.
+
+The image counts its boots in `/var/boot-count`. The acceptance check `tests/acceptance/m5/rootfs.py` uses the count to see each boot: boot 1, `poweroff`, boot 2 in a new QEMU, `reboot`, boot 3 in the same QEMU.
+
+### 9.3 How the host sees a clean shutdown
+
+After QEMU exits, the root partition in the image must be consistent without help. Look at the superblock:
+
+```
+$ dumpe2fs -h p2.img | grep features
+Filesystem features:      has_journal ext_attr resize_inode dir_index filetype extent 64bit flex_bg sparse_super large_file huge_file dir_nlink extra_isize metadata_csum
+```
+
+If the file system was still mounted read-write at power-off, the list also has `needs_recovery`: the journal holds work that is not yet in place. `e2fsck -fn` does not see this. It skips the journal in a read-only check and exits 0. The acceptance check therefore reads the superblock too. A mutation proved the difference: without `umount -a -r` in `inittab`, `e2fsck -fn` passed and the superblock check failed ([tasks](../units/M5-sd-rootfs/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+
+## 10. How we know it works
+
+Four kinds of test cover the two units, from the smallest to the largest.
 
 1. **Register tests (qtest).** A qtest drives the SD host directly, without Linux, the way a driver would: it identifies a card, reads and writes blocks through the data port and through the DMA engine, and checks every value against the manual. The card behind it is a disk image that the test writes first. After the test, the written blocks are read back from the image file, so the check does not depend on the model at all. The test file is `qemu/tests/qtest/rzv2l-sdhi-test.c`.
 2. **Mutations.** Each check was seen to fail once. We broke the model on purpose, one plausible mistake at a time: the wrong version number, flags that clear on 1 instead of 0, the DMA engine reporting the wrong direction, no stop command after a multi-block read. Each break must turn a check red; nineteen did ([tasks](../units/M5-sdhi/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 3. **Linux end to end.** `tests/acceptance/m5/run.sh` boots both kernels with a fresh SD image. In the guest, it writes files of awkward sizes (1, 513, 4097 bytes and a little over 1 MiB), syncs and unmounts. On the host, `e2fsck` checks the file system in the image and `debugfs` reads each file back, and every MD5 must match the guest's. A second boot then reads the files again.
+4. **User space from the card.** The same script boots both kernels from the card's root partition, powers off, boots again, resets and powers off again (§9). It checks the root device, the boot count and the files in the guest, and the superblock, `e2fsck` and the files on the host. Four mutations turned it red ([tasks](../units/M5-sd-rootfs/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 
 Finally, the board itself was checked. At the EVK's U-Boot prompt, the SD host's version register, its DMA engine and its other registers read the values the model uses ([EVK evidence §9](../evidence/EVK-2026-10-30-linux.md)).
 
-## 10. Pitfalls
+## 11. Pitfalls
 
 - **The fallback may be the rare path.** The Linux driver can move data without DMA, but it does so only for unaligned buffers. A model of the data port alone would look complete and would still fail almost every request. Before you trust a fallback, read the condition that selects it.
 - **Start the DMA after the response.** The driver starts the DMA engine only when the card has accepted the command. A model that moves the data as soon as the command is written reports "done" before the driver expects it.
@@ -326,3 +370,5 @@ Finally, the board itself was checked. At the EVK's U-Boot prompt, the SD host's
 - **Card detect is a pin, and the board decides where it goes.** On the EVK, with a card in the SDHI0 slot, the SD host's "card present" and "writable" bits read 0. The module connects the slot's card-detect switch to the SD host only in a pin setting the board's device tree does not use, and the write-protect pin carries I2C. Linux does not ask, because the slot is marked non-removable. The model copies the board.
 - **Byte or block addresses.** A card up to 2 GB (SDSC) takes byte addresses; larger cards (SDHC, SDXC) take block numbers. The MMC core handles this. A test that drives a card by hand must do the same.
 - **Without `mmc` aliases, the card's name changes.** The two SD hosts start in parallel, so without aliases the card is `mmcblk0` in one boot and `mmcblk1` in the next. QEMU adds `mmc0` and `mmc1` aliases when the device tree has none, as the board's own product image does in its device tree.
+- **A console nobody reads can stop the guest.** QEMU's serial model waits until its chardev accepts each byte, as a UART with flow control does (`qemu/hw/char/renesas_rz_scifa.c:403`). In a test run with the console socket unread, QEMU had not exited 90 s after `poweroff`; with the socket read, it exited at once. The likely cause is that QEMU writes the socket one byte at a time, and each byte takes a whole socket buffer entry, so an unread socket fills soon (an inference, not measured). A test script must read the console until QEMU exits.
+- **`e2fsck -n` does not prove a clean shutdown.** A file system left mounted read-write keeps `needs_recovery` in its superblock, and a read-only `e2fsck` skips the journal and passes. Read the superblock (§9.3).

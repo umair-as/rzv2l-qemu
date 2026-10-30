@@ -11,7 +11,7 @@ The words used here: **M1, M2, …** are the milestones ([milestones page](miles
 ```bash
 sudo apt install git build-essential ninja-build python3-venv pkg-config \
     libglib2.0-dev libpixman-1-dev flex bison bc libssl-dev cpio \
-    gcc-aarch64-linux-gnu device-tree-compiler e2fsprogs fdisk
+    gcc-aarch64-linux-gnu device-tree-compiler e2fsprogs fdisk fakeroot
 ```
 
 **QEMU** (the fork is the `qemu/` submodule; a few minutes):
@@ -32,7 +32,7 @@ tests/guests/g0/build-kernel.sh       # G0: mainline Linux v6.12.59
 tests/guests/g0/build-dtb.sh          # G0's device tree for the board
 tests/guests/g0/build-initramfs.sh    # BusyBox shell, used by both kernels
 tests/guests/g1/build-kernel.sh       # G1: Renesas's kernel and its device tree
-tests/guests/sd/build-image.sh        # a 64 MiB SD card image with ext4
+tests/guests/sd/build-image.sh        # a 64 MiB SD card: ext4 data and root
 ```
 
 Everything they produce goes to `tests/guests/out/` (not tracked by git).
@@ -142,11 +142,36 @@ sync; umount /mnt
 Stop QEMU (Ctrl-A X) and read the file back from the host. The MD5 matches the one the guest printed:
 
 ```bash
-dd if=build/sd-try.img of=build/p1.img bs=512 skip=2048 status=none
+dd if=build/sd-try.img of=build/p1.img bs=512 skip=2048 count=32768 status=none
 debugfs -R "dump /f.bin build/f.bin" build/p1.img; md5sum build/f.bin
 ```
 
-Boot again with the same image, and the file is still there. Add `-- -trace 'renesas_sdhi_*' -D build/sdhi.log` to the `run.sh` line to log every access to the SD host. Read more: [`learning/m5-storage.md`](learning/m5-storage.md).
+Boot again with the same image, and the file is still there. Add `-- -trace 'renesas_sdhi_*' -D build/sdhi-trace.log` to the `run.sh` line to log every access to the SD host. Read more: [`learning/m5-storage.md`](learning/m5-storage.md).
+
+### User space from the card
+
+The card's second partition holds a root file system with the same BusyBox. Boot it without the initramfs, with the command line the board's U-Boot passes:
+
+```bash
+scripts/run.sh --sd build/sd-try.img -n -a "rw rootwait earlycon root=/dev/mmcblk0p2"
+```
+
+The kernel mounts the card and runs its init:
+
+```
+VFS: Mounted root (ext4 filesystem) on device 179:2.
+Run /sbin/init as init process
+  root file system on /dev/mmcblk0p2, boot 1 from this card
+SD-ROOT: ready, root /dev/mmcblk0p2, boot 1
+```
+
+Write something, then restart the board from inside: `reboot` resets it in the same QEMU, and the card counts boot 2. `poweroff` remounts the root read-only, powers the board down and ends QEMU. Start `run.sh` again with the same image and the count and your file are still there. On the host, the journal needs no recovery and `e2fsck` finds the root clean:
+
+```bash
+dd if=build/sd-try.img of=build/p2.img bs=512 skip=34816 status=none
+dumpe2fs -h build/p2.img | grep features   # no needs_recovery
+e2fsck -fn build/p2.img
+```
 
 ## Run every check at once
 

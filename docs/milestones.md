@@ -8,7 +8,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Traceability and requirement statuses are updated: 20 of 27 requirements verified, the rest planned for M4-M7 or noted ([traceability](spec/traceability.md)). **Tagged `rzv2l-v1.0`** (QEMU fork `rzv2l-dev` `aa1764973d`); the tag message lists the scope and the open requirements.
 
-**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 (storage) is under way:** both kernels read and write ext4 on an SD card ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)).
+**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 (storage) is under way:** both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)).
 
 | | Release | Milestones | State |
 |---|---|---|---|
@@ -45,6 +45,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M4-vendor-kernel](units/M4-vendor-kernel/spec.md) | M4 | the vendor kernel to a shell; watchdog timers WDT0-2, reset through the CPG |
 | ✅ | [M4-loader-fixups](units/M4-loader-fixups/spec.md) | M4 | U-Boot's device-tree edits: the SD0 supplies in eSD mode applied by QEMU, the others listed as gaps |
 | ✅ | [M5-sdhi](units/M5-sdhi/spec.md) | M5 | the SD/MMC host interface and its DMA engine; an SD card on SDHI0 with ext4 |
+| ✅ | [M5-sd-rootfs](units/M5-sd-rootfs/spec.md) | M5 | user space from an ext4 root file system on the SD card, both kernels; clean power-off and reset |
 
 ## The SoC blocks
 
@@ -94,5 +95,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 ## What comes next
 
-1. 🔄 **M5:** storage. The first unit, [M5-sdhi](units/M5-sdhi/spec.md), is merged: both kernels read and write ext4 on an SD card. ⏭️ Next in M5: Linux user space from a root file system on the card.
+1. 🔄 **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. ⏭️ Open in M5: an eMMC behind SDHI0 for boot mode 1, if the milestone is to include it (the operator's call); otherwise M5 is complete.
 2. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.
