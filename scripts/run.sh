@@ -10,6 +10,9 @@
 #   -b, --boot-mode N    MD_BOOT pins 0-5 (default 0, eSD); 1 = eMMC
 #   -a, --append "ARGS"  kernel command line (default: the DTB's own bootargs)
 #   -n, --no-initrd      boot without the BusyBox initramfs
+#   -s, --sd IMAGE       raw SD card image in the module slot (SDHI0, mmc0);
+#                        the guest writes to it, so pass a copy you can lose
+#                        (tests/guests/sd/build-image.sh builds one)
 #   -d, --debug MASK     QEMU -d mask (default unimp,guest_errors,invalid_mem;
 #                        "none" turns it off); the log goes to OUT/qemu.log
 #   -o, --out DIR        output directory (default build/run/<tier>)
@@ -32,6 +35,7 @@ tier=g1
 boot_mode=0
 append=""
 initrd=1
+sd=""
 debug="unimp,guest_errors,invalid_mem"
 out=""
 gdb=0
@@ -48,6 +52,7 @@ while [ $# -gt 0 ]; do
         -b|--boot-mode) boot_mode="${2:?}"; shift 2 ;;
         -a|--append) append="${2?}"; shift 2 ;;
         -n|--no-initrd) initrd=0; shift ;;
+        -s|--sd) sd="${2:?}"; shift 2 ;;
         -d|--debug) debug="${2:?}"; shift 2 ;;
         -o|--out) out="${2:?}"; shift 2 ;;
         -g|--gdb) gdb=1; shift ;;
@@ -73,6 +78,7 @@ out="${out:-$ROOT/build/run/$tier}"
 for f in "$KERNEL" "$DTB"; do
     [ -f "$f" ] || die "missing $f (run tests/guests/$tier/build-*.sh)"
 done
+[ -z "$sd" ] || [ -f "$sd" ] || die "no SD image at $sd"
 [ "$initrd" -eq 0 ] || [ -f "$INITRD" ] || die "missing $INITRD (run tests/guests/g0/build-initramfs.sh)"
 mkdir -p "$out"
 
@@ -83,6 +89,7 @@ cmd=("$QEMU" -M "$machine" -kernel "$KERNEL" -dtb "$DTB"
      -display none -nodefaults -serial mon:stdio)
 [ "$initrd" -eq 0 ] || cmd+=(-initrd "$INITRD")
 [ -z "$append" ] || cmd+=(-append "$append")
+[ -z "$sd" ] || cmd+=(-drive "if=sd,index=0,format=raw,file=$sd")
 [ "$debug" = none ] || cmd+=(-d "$debug" -D "$out/qemu.log")
 [ "$gdb" -eq 0 ] || cmd+=(-s -S)
 cmd+=("${extra[@]}")
@@ -100,6 +107,7 @@ if [ "$dumpdtb" -eq 1 ]; then
 fi
 
 echo "rzv2l-smarc: tier $tier, boot mode $boot_mode; quit with Ctrl-A X, monitor Ctrl-A C"
+[ -z "$sd" ] || echo "SD card (SDHI0, /dev/mmcblk0): $sd"
 [ "$debug" = none ] || echo "QEMU -d log: $out/qemu.log"
 [ "$gdb" -eq 0 ] || echo "waiting for gdb: target remote :1234"
 exec "${cmd[@]}"
