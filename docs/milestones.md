@@ -26,7 +26,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
 | ✅ | M5 | Storage | the SD controller with the real driver; ext4 root file system (real user space); eMMC deferred | G0, G1 |
 | ✅ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP, data checked both ways, link and reset recovery ([walkthrough](walkthrough.md#m6-ethernet)) | G0, G1 |
-| ⏳ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
+| 🔄 | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
 | ⏳ | M8 | Full boot chain | TF-A BL2 from an SPI flash image, with a DDR stub | G1 |
 | ⏳ | M9 | Platform behaviour | A/B selection, bootcount, rollback, FIT signatures | G1 |
 
@@ -47,6 +47,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M5-sdhi](units/M5-sdhi/spec.md) | M5 | the SD/MMC host interface and its DMA engine; an SD card on SDHI0 with ext4 |
 | ✅ | [M5-sd-rootfs](units/M5-sd-rootfs/spec.md) | M5 | user space from an ext4 root file system on the SD card, both kernels; clean power-off and reset |
 | ✅ | [M6-ravb](units/M6-ravb/spec.md) | M6 | Gigabit Ethernet (DMA rings, MDIO, checksum offload), the board's KSZ9131 PHYs, IRQ0-7 of the interrupt control unit |
+| ✅ | [M7-el3-platform](units/M7-el3-platform/spec.md) | M7 | the board's TF-A BL31 as the PSCI firmware (firmware mode): CPU1 on and off, reset through WDT0 |
 
 ## The SoC blocks
 
@@ -54,8 +55,9 @@ What the model does with each block the guest touches. Classes: [`device-map.md`
 
 | | Block | State | Milestone |
 |---|---|---|---|
-| ✅ | Cortex-A55 ×2, GIC-600, generic timer | modelled; PSCI from QEMU | M1 |
-| ✅ | SYSC | ID and boot-mode registers; other offsets fail visibly | M1 (rest M7) |
+| ✅ | Cortex-A55 ×2, GIC-600, generic timer | modelled; PSCI from QEMU, or from the board's TF-A BL31 in firmware mode | M1, M7 |
+| ✅ | SYSC | ID and boot-mode registers; the cores' reset vectors and sleep flags; other offsets fail visibly | M1, M7 |
+| ✅ | SYC (system counter), TZC0-3, on-chip SRAM | what the boot firmware programs; the TZCs store it, they do not filter | M7 |
 | ✅ | SCIF0-4 (serial) | modelled | M2 |
 | ✅ | CPG (clocks and resets) | modelled | M3 |
 | ✅ | OSTM0-2 (OS timer) | modelled | M3 |
@@ -76,7 +78,7 @@ What the model does with each block the guest touches. Classes: [`device-map.md`
 The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-guest-004-list-and-model-limits). The ones a user notices:
 
 - Guest time runs about 1.6 % fast: QEMU ticks the 24 MHz counter every 41 ns (gap 18).
-- QEMU's built-in PSCI replaces TF-A until M7; no OP-TEE until then.
+- In direct mode QEMU's built-in PSCI replaces TF-A; firmware mode (`-bios`, M7) runs the board's BL31 instead, with QEMU in BL2's place. No OP-TEE or U-Boot yet.
 - Ethernet links come up at 1 Gb/s full duplex at once and transfers take no wire time; flow control, the receive filters, wake-up and energy-efficient Ethernet are not modelled. A channel without `-nic` has no cable.
 - The SD hosts run SD cards at high speed and 3.3 V, as the EVK does; eMMC cards and the faster tuned modes are not modelled. Without `--sd` the slots are empty.
 
@@ -99,4 +101,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 ## What comes next
 
 1. ✅ **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
-2. ✅ **M6:** networking. [M6-ravb](units/M6-ravb/spec.md): both kernels get a DHCP lease through QEMU user networking and move data both ways with matching hashes. ⏭️ Next: M7 (firmware, needs M4 and M5).
+2. ✅ **M6:** networking. [M6-ravb](units/M6-ravb/spec.md): both kernels get a DHCP lease through QEMU user networking and move data both ways with matching hashes.
+3. 🔄 **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. ⏭️ Next in M7: OP-TEE (without TSIP) and U-Boot loading the kernel from the card.

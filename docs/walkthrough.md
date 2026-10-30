@@ -34,6 +34,7 @@ tests/guests/g0/build-dtb.sh          # G0's device tree for the board
 tests/guests/g0/build-initramfs.sh    # BusyBox shell, used by both kernels
 tests/guests/g1/build-kernel.sh       # G1: Renesas's kernel and its device tree
 tests/guests/sd/build-image.sh        # a 64 MiB SD card: ext4 data and root
+tests/guests/fw/build-tf-a.sh         # the board's TF-A BL31 (firmware mode, M7)
 ```
 
 Everything they produce goes to `tests/guests/out/` (not tracked by git).
@@ -195,13 +196,42 @@ wget -O /tmp/w.md http://10.0.2.2:8000/walkthrough.md; sha256sum /tmp/w.md
 
 The hash matches `sha256sum docs/walkthrough.md` on the host. To pull the cable, open the QEMU monitor (Ctrl-A C), type `set_link net0 off`, and return with Ctrl-A C: the guest prints `eth0: Link is Down`; `set_link net0 on` brings it back at 1 Gb/s. ETH1 has no backend, so it has no cable. Read more: [`learning/m6-network.md`](learning/m6-network.md).
 
+## M7: the board's own firmware
+
+In firmware mode the board's TF-A BL31 runs at EL3 and is the PSCI firmware, as on the board: QEMU's built-in PSCI is off. QEMU does BL2's job before it (loads BL31 and the kernel, leaves BL2's parameters), so the boot ROM, BL2 and U-Boot do not run. There is no initramfs, so boot from the card's root:
+
+```bash
+cp tests/guests/out/sd/sd.img build/sd-try.img
+scripts/run.sh -f --sd build/sd-try.img -a "rw rootwait earlycon root=/dev/mmcblk0p2"
+```
+
+BL31 prints first, and the kernel finds it:
+
+```
+NOTICE:  BL31: v2.10.5(release):2.10.5/rz_1.1.0
+ERROR:   Error initializing runtime service opteed_fast
+[    0.000000] psci: PSCIv1.1 detected in firmware.
+[    0.000000] psci: SMC Calling Convention v1.4
+[    0.099643] smp: Brought up 1 node, 2 CPUs
+```
+
+The OP-TEE line is expected: there is no OP-TEE yet. In direct mode the kernel reports SMC Calling Convention v1.0 (QEMU's PSCI); v1.4 is BL31's, as on the board. At the shell, take CPU1 down and up again; BL31 drives the SoC's reset and power registers to do it:
+
+```bash
+echo 0 > /sys/devices/system/cpu/cpu1/online   # psci: CPU1 killed
+echo 1 > /sys/devices/system/cpu/cpu1/online   # CPU1: Booted secondary processor
+reboot                                         # BL31 resets the board through WDT0
+```
+
+After `reboot` the BL31 banner comes again in the same QEMU. `poweroff` stops the kernel but not QEMU: this BL31 does not implement PSCI `SYSTEM_OFF`, and the board is not powered off either. Quit with Ctrl-A X.
+
 ## Run every check at once
 
 ```bash
-tests/acceptance/m6/run.sh       # several minutes: it boots both kernels several times
+tests/acceptance/m7/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn and ends with `M6 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, and ends with `M7 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 ## Options of `scripts/run.sh`
 
@@ -211,6 +241,7 @@ It runs the acceptance checks of M1 to M6 in turn and ends with `M6 ACCEPTANCE: 
 | `--sd IMAGE` | an SD card in the module slot (`/dev/mmcblk0`) |
 | `--no-net` | no network on ETH0 (by default ETH0 is on QEMU user networking, `net0`) |
 | `-b N` | boot mode pins 0-5 (0: SD card, the default; 1: eMMC) |
+| `-f` | firmware mode: the board's TF-A BL31 is the PSCI firmware; no initramfs |
 | `-a "ARGS"` | kernel command line instead of the device tree's |
 | `--dumpdtb` | write the device tree QEMU gives Linux, then stop |
 | `-g` | wait for gdb on port 1234 |

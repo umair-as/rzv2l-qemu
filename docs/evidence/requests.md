@@ -114,6 +114,12 @@ Measured at the U-Boot prompt (evidence file `EVK-2026-10-30-linux.md` §9). Reg
 | EVK-R77 | `md.l 0x11c01000 0x10` | SCC block (§40.6-40.7) | TAPNUM = 8 at reset (`DTCNTL` `0x00080000`), DT2FF `0x300` | as manual | none | M5-sdhi spec || `DTCNTL` `0x00080000`, `DT2FF` `0x300`, others 0: MATCH |
 | EVK-R78 | `md.l 0x11c10070 4; md.l 0x11c10388 1` | SDHI1 SD_INFO1/2, VERSION | SDHI1 with no card: card-detect bit 5 reads 0? | INFO5 = 0 | none | M5-sdhi spec || `SD_INFO1` `0x600` (INFO5 = 0, INFO10 = 0: no card), `SD_INFO2` `0x2080`, `VERSION` `0xcc10`: MATCH |
 
+### 1.9 TZC-400 build configuration (`0x11040000`-`0x11070000`; M7)
+
+| ID | Command | Register / meaning | Question it answers | Expected / predicted | Read effect | Source note | Result |
+|---|---|---|---|---|---|---|---|
+| EVK-R79 | `md.l 0x11040000 1; md.l 0x11050000 1; md.l 0x11060000 1; md.l 0x11070000 1` | TZC0-3 `BUILD_CONFIG` (TZC-400 TRM) | Address width (bits 13:8) of each controller; filters (25:24) and regions (4:0) as §13.1 gives them? | filters 1/1/1/4, regions 9; width unknown (model: 32/32/32/33, A) | none | M7-el3-platform spec | |
+
 ## 2. Optional: Linux side (post-Linux, read-only)
 
 **Boot stage:** post-Linux. These values are neither the reset state nor the post-firmware state. Record the image and kernel build ID. A downstream image carries its own DT, so DT-level answers apply to that image only. Rows marked `/dev/mem` need a project-owned G1 debug image with `devmem`.

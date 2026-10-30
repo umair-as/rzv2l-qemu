@@ -13,6 +13,7 @@ How this project's QEMU model works, explained from real monitor output, code an
 | [`m4-vendor-kernel.md`](m4-vendor-kernel.md) | M4: the vendor kernel's configuration, the watchdog model (overflows, the CPG reset mask and flag, the reset line), U-Boot's device-tree edits made by QEMU's loader; their pitfalls |
 | [`m5-storage.md`](m5-storage.md) | M5: the SD/MMC host interface and its DMA engine, an SD card with ext4; their pitfalls |
 | [`m6-network.md`](m6-network.md) | M6: Gigabit Ethernet descriptors, bit-banged MDIO, the PHY and its interrupt, checksum offload, the QEMU NIC; their pitfalls |
+| [`m7-firmware.md`](m7-firmware.md) | M7: the board's TF-A BL31 as the PSCI firmware: what BL2 hands it, starting a core through the SoC's registers, the failure loop that found the missing pieces; their pitfalls |
 | [`testing.md`](testing.md) | qtests, the guest probe, the acceptance run, the device-tree check |
 | [`building-and-testing.md`](building-and-testing.md) | the commands: building, running tests, style check, tracing, editor setup |
 | [`glossary.md`](glossary.md) | the terms |
