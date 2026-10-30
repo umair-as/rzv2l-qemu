@@ -19,7 +19,7 @@ The register contract of SDHI0 and SDHI1 as the Linux driver `renesas_sdhi` uses
 
 ## 2. Registers
 
-Start state: the manual reset value in both start states (A for direct mode until EVK-R74-R78 are read): U-Boot drives SDHI0 by PIO, and Linux resets the controller at probe through the CPG (`renesas_sdhi_core.c:585-596`), `SOFT_RST` (`tmio_mmc_core.c:195-197`) and `DM_CM_RST` (`renesas_sdhi_internal_dmac.c:320-321`). Driver accesses are 16-bit unless named; the driver's offset `CTL_x` is the manual offset / 4 (`tmio_mmc.h:26-46`).
+Start state: the manual reset value in both start states. On the EVK after U-Boot (EVK-R74-R78, [evidence §9](../evidence/EVK-2026-10-30-linux.md)) the IDs, the DMAC and SCC read their reset values, and SDHI0 holds U-Boot's masks and clock (O). That does not change the start state: U-Boot drives SDHI0 by PIO, and Linux resets the controller at probe through the CPG (`renesas_sdhi_core.c:585-596`), `SOFT_RST` (`tmio_mmc_core.c:195-197`) and `DM_CM_RST` (`renesas_sdhi_internal_dmac.c:320-321`). Driver accesses are 16-bit unless named; the driver's offset `CTL_x` is the manual offset / 4 (`tmio_mmc.h:26-46`).
 
 | Offset | Register | Reset (manual) | Fields the driver uses | Class | Guest | Cite |
 |---|---|---|---|---|---|---|
@@ -65,6 +65,11 @@ Start state: the manual reset value in both start states (A for direct mode unti
 - **Normal mode (A):** `SD_CMD[10:8]` = 000 takes the response length the card gives (48 or 136 bits); CMD0, CMD4 and CMD15 have no response, every other command times out when the card does not answer. Data moves only for CMD17/18/24/25. Linux uses extended mode only; U-Boot (M7) may need more. Logged as unimplemented.
 - **Not modelled:** SDIO functions, HPI, the read wait state, the `SD_BUF0` byte swap, CRC errors, the SCC (logged, reads 0, so tuning fails visibly).
 
-## 5. Open (EVK, U-Boot prompt)
+## 5. Measured on the EVK
 
-EVK-R74-R78 in [`../evidence/requests.md`](../evidence/requests.md) §1.8: `VERSION` on both channels, SDHI0 as U-Boot leaves it, the DMAC and SCC reset values, SDHI1 card detect.
+EVK-R74-R78 ([`../evidence/requests.md`](../evidence/requests.md) §1.8, [evidence §9](../evidence/EVK-2026-10-30-linux.md)), at the U-Boot prompt:
+
+- `VERSION` `0xCC10` on both channels; `CC_EXT_MODE` `0x1010` (bits 12 and 4 read 1); `SOFT_RST` `0x7`; the DMAC and SCC registers at their reset values (O, MATCH).
+- **Card pins (O):** with a card in the SDHI0 slot, `SD_INFO1` reads INFO10 = 1 but INFO5 = INFO7 = 0. The module routes SD0_CD only through P47_0 function 2, which the SD pin group selects and the board's eMMC-style group does not (`rzg2l-smarc-som.dtsi:302-303`), and SD0_WP's pin carries RIIC3 (SMARC module UM Table 4.1 p.20, p.25). The model has properties `cd-connected` and `wp-connected`: off for SDHI0, CD on and WP off for SDHI1. A device tree that selects the SD pin group would need SDHI0's CD routed: not modelled.
+- **Conflict (O vs manual):** `SD_STATUS` reads `0x1`; bit 0 is "reserved, read 0" in §40.2.24. Neither kernel reads it here; the model keeps the manual value.
+- **Not modelled (O):** INFO9/INFO8, the SDDAT3 insertion and removal events, are set on both channels; Linux masks them.

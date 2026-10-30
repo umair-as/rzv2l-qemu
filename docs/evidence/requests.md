@@ -104,15 +104,15 @@ These rows deliberately touch addresses whose read behaviour is **not documented
 
 ### 1.8 SD/MMC host interface, SDHI0/1 (`0x11C00000`, `0x11C10000`; M5)
 
-Open: needs a session at the U-Boot prompt (operator). Registers sit 8 bytes apart (the low word of each 8-byte slot), so the `md.l` counts below cover pairs. None reads `SD_BUF0` (`+0xC0`, the data port) or `SDIO_INFO1`; reading `SD_INFO1/2` does not clear them (flags clear on a 0 write, §40.2.6-40.2.7 p.3271-3274).
+Measured at the U-Boot prompt (evidence file `EVK-2026-10-30-linux.md` §9). Registers sit 8 bytes apart (the low word of each 8-byte slot), so the `md.l` counts below cover pairs. None reads `SD_BUF0` (`+0xC0`, the data port) or `SDIO_INFO1`; reading `SD_INFO1/2` does not clear them (flags clear on a 0 write, §40.2.6-40.2.7 p.3271-3274).
 
 | ID | Command | Register / meaning | Question it answers | Expected / predicted | Read effect | Source note | Result |
 |---|---|---|---|---|---|---|---|
-| EVK-R74 | `md.l 0x11c00388 1; md.l 0x11c10388 1` | VERSION (§40.2.21) | Does each channel report `0xCC10`, the value the Linux driver keys its Gen3 paths on? | `0x0000cc10` | none | M5-sdhi spec | |
-| EVK-R75 | `md.l 0x11c00070 8; md.l 0x11c00090 6; md.l 0x11c00360 1; md.l 0x11c00380 8; md.l 0x11c003c8 1` | SD_INFO1/2 and masks, SD_CLK_CTRL, SD_SIZE, SD_OPTION, CC_EXT_MODE, SOFT_RST, VERSION, HOST_MODE, SDIF_MODE, SD_STATUS | SDHI0 as U-Boot leaves it (the direct-mode start state); CC_EXT_MODE bits 12 and 4 read 1? | manual reset values except what U-Boot's PIO driver set (clock, option, HOST_MODE) | none | M5-sdhi spec | |
-| EVK-R76 | `md.l 0x11c00820 0x1a` | DM_CM_* and DM_DTRAN_ADDR (§40.2.25-40.2.32) | The internal DMAC after U-Boot (PIO only): reset values? | `0x30`, 0, `0xffffffff`, 0, `0xffffffff`, 0, `0xffffffff`, 0 | none | M5-sdhi spec | |
-| EVK-R77 | `md.l 0x11c01000 0x10` | SCC block (§40.6-40.7) | TAPNUM = 8 at reset (`DTCNTL` `0x00080000`), DT2FF `0x300` | as manual | none | M5-sdhi spec | |
-| EVK-R78 | `md.l 0x11c10070 4; md.l 0x11c10388 1` | SDHI1 SD_INFO1/2, VERSION | SDHI1 with no card: card-detect bit 5 reads 0? | INFO5 = 0 | none | M5-sdhi spec | |
+| EVK-R74 | `md.l 0x11c00388 1; md.l 0x11c10388 1` | VERSION (§40.2.21) | Does each channel report `0xCC10`, the value the Linux driver keys its Gen3 paths on? | `0x0000cc10` | none | M5-sdhi spec || `0000cc10` on both channels: MATCH |
+| EVK-R75 | `md.l 0x11c00070 8; md.l 0x11c00090 6; md.l 0x11c00360 1; md.l 0x11c00380 8; md.l 0x11c003c8 1` | SD_INFO1/2 and masks, SD_CLK_CTRL, SD_SIZE, SD_OPTION, CC_EXT_MODE, SOFT_RST, VERSION, HOST_MODE, SDIF_MODE, SD_STATUS | SDHI0 as U-Boot leaves it (the direct-mode start state); CC_EXT_MODE bits 12 and 4 read 1? | manual reset values except what U-Boot's PIO driver set (clock, option, HOST_MODE) | none | M5-sdhi spec || `SD_INFO1` `0x700` (INFO10 = 1, INFO9/8 = 1, INFO5 = INFO7 = 0 with a card in the slot: SD0_CD and SD0_WP not routed), `SD_INFO2` `0x2080`, masks `0x1030d`/`0xb30`, `SD_CLK_CTRL` `0x101`, `SD_SIZE` `0x200`, `SD_OPTION` `0x40ee`, `CC_EXT_MODE` `0x1010` (bits 12, 4 read 1: MATCH), `SOFT_RST` `0x7`, `HOST_MODE` `0`, `SDIF_MODE` `0`, `SD_STATUS` `0x1` (bit 0, reserved read-0 in the manual, reads 1: CONFLICT, recorded) |
+| EVK-R76 | `md.l 0x11c00820 6; md.l 0x11c00840 8; md.l 0x11c00880 2` (the defined offsets only) | DM_CM_* and DM_DTRAN_ADDR (§40.2.25-40.2.32) | The internal DMAC after U-Boot (PIO only): reset values? | `0x30`, 0, `0xffffffff`, 0, `0xffffffff`, 0, `0xffffffff`, 0 | none | M5-sdhi spec || `0x30`, `0`, `0xffffffff`, `0`, `0xffffffff`, `0`, `0xffffffff`, `0`: the reset values, MATCH (U-Boot does not use the DMAC) |
+| EVK-R77 | `md.l 0x11c01000 0x10` | SCC block (§40.6-40.7) | TAPNUM = 8 at reset (`DTCNTL` `0x00080000`), DT2FF `0x300` | as manual | none | M5-sdhi spec || `DTCNTL` `0x00080000`, `DT2FF` `0x300`, others 0: MATCH |
+| EVK-R78 | `md.l 0x11c10070 4; md.l 0x11c10388 1` | SDHI1 SD_INFO1/2, VERSION | SDHI1 with no card: card-detect bit 5 reads 0? | INFO5 = 0 | none | M5-sdhi spec || `SD_INFO1` `0x600` (INFO5 = 0, INFO10 = 0: no card), `SD_INFO2` `0x2080`, `VERSION` `0xcc10`: MATCH |
 
 ## 2. Optional: Linux side (post-Linux, read-only)
 

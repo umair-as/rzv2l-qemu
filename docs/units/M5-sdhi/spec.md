@@ -25,7 +25,7 @@ Both kernels build `CONFIG_MMC_SDHI=y` and `CONFIG_MMC_SDHI_INTERNAL_DMAC=y` (ef
 - **Interrupt mask** at probe: `0x8b7f031d` (`tmio_mmc.h:109`), the manual reset values of `SD_INFO1_MASK`/`SD_INFO2_MASK`. The handler writes the status back with only the bits it keeps set, then acks each source with a 0 write.
 - **Writes gated by status:** before 16-bit writes to `SD_CMD`, `SD_STOP`, `SD_SECCNT`, `SD_SIZE`, `SD_OPTION`, `SDIO_MODE`, `CC_EXT_MODE`, `HOST_MODE` the driver waits for `CBSY` = 0, and before `SD_CLK_CTRL` for `SCLKDIVEN` = 1; on a timeout it skips the write.
 - **Clocks and reset** (CPG, already modelled): SD mux `0x218`, `CLK_ON 0x554` bits 0-7, `RST 0x854` bits 0-1, `CLKSTATUS` bits 28-29.
-- **Start states:** firmware mode: manual reset values. Direct mode: the same (A) until EVK-R74-R78 (the U-Boot reads in `../../evidence/requests.md` §1.8) are measured; U-Boot uses SDHI0 by PIO only, and Linux resets the controller at probe (`SOFT_RST`, `DM_CM_RST`, the CPG reset).
+- **Start states:** firmware mode: manual reset values. Direct mode: the same; on the EVK after U-Boot the IDs, the DMAC and the SCC read their reset values and SDHI0 holds U-Boot's masks and clock (O, EVK-R74-R78, [evidence §9](../../evidence/EVK-2026-10-30-linux.md)); U-Boot uses SDHI0 by PIO only, and Linux resets the controller at probe (`SOFT_RST`, `DM_CM_RST`, the CPG reset).
 
 The register-by-register list (reset values, bits the driver reads and writes, line numbers) is built with the `register-evidence` skill as the first task and recorded in `docs/research/sdhi.md`.
 
@@ -43,7 +43,7 @@ Manual §40 (p.3259-3347), Table 8.2 (p.537); EVK evidence §8 (O: SD card, 4-bi
 ## For the operator
 
 - **SD card on SDHI0, not eMMC.** The DTB describes SDHI0 as an 8-bit eMMC with HS200, but the EVK boots from eSD and runs an SD card at high speed behind that node (evidence §8). The unit models that. An eMMC for boot mode 1 is a separate decision.
-- **Five U-Boot reads** (EVK-R74-R78) would fix the direct-mode start state and confirm `VERSION`, `CC_EXT_MODE` and the SCC reset values; they need a session at the U-Boot prompt. U-Boot also writes an offset the manual does not list (`0x08`); reading it could abort and reboot the board, so it is not in the list. The model accepts writes there and logs them.
+- **Card pins (O, EVK-R75):** with a card in the slot, SDHI0's card detect and write protect bits read 0 on the EVK: the module routes SD0_CD only in the SD pin mux, which the board's device trees do not select, and SD0_WP's pin carries RIIC3 (module UM Table 4.1 p.20, p.25). The model follows that wiring; SDHI1 has its card detect routed. `SD_STATUS` bit 0 reads 1 on the EVK where the manual says read-as-0 (recorded conflict; unused by the kernels). U-Boot's write to the unlisted offset `0x08` is accepted and logged; it was not read on the EVK (an unlisted offset could abort).
 - **No real-time behaviour:** transfers complete at once and the data timeout counter never fires; only "no card" ends in a timeout.
 
 ## Unit end
