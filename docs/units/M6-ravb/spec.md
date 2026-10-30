@@ -12,7 +12,7 @@
 - **PHY** (board, SoM UM §4.3): Microchip KSZ9131, address 7: the clause 22 registers, MMD skew/DLL/EEE registers, latched-low BMSR, the `0x1B` interrupt and `INT_N` (level-low), always-ready gigabit link partner; a cable while the NIC has a backend and `set_link` is on.
 - **IRQC** (§8.6.3-8.6.4): IRQ0-7 pin inputs, `IITSR` detection (low level, falling, rising, both), `ISCR`; IRQn → SPI 1 + n. ETH0's PHY drives IRQ2, ETH1's IRQ3.
 - **CPG:** `CPG_RST_ETH` drives each channel's reset (`eth-rst` lines). While held, registers read their reset values.
-- **Start states:** firmware mode: manual reset values (MAC address registers 0). Direct mode: the same registers; the vendor U-Boot's `fdt_fixup_ethernet()` is applied to the DT instead (each `ethernetN` alias node gets `local-mac-address` = the NIC's MAC), because on the EVK the address reaches Linux that way (O, [ravb.md §2](../../research/ravb.md#2-mac-address)). Gap 8 lists it.
+- **Start states:** firmware mode: manual reset values (MAC address registers 0). Direct mode: the same registers; the vendor U-Boot's `fdt_fixup_ethernet()` is applied to the DT instead (each `ethernetN` alias node gets `local-mac-address` = the NIC's MAC), because on the EVK the address reaches Linux that way (O, [EVK Ethernet evidence](../../evidence/EVK-2026-06-11-ethernet.md); I for the path, [ravb.md §2](../../research/ravb.md#2-mac-address)). Gap 8 lists it.
 - **Not modelled** (honest): timing (transfers complete at once), flow control and PAUSE, the hardware MDIO controller (`MDIOMOD.SEL_MDIO_N` must stay 1), EEE/LPI, the TOE filters, wake-up and ARP/NS (`int_fil_n`, `int_arp_ns_n` never asserted), DLR reloads, error frames (`RCR.EFFS`), TX frames over 1.5 KB (dropped, logged); IPv6 extension headers and IPv4 options read as unsupported in the TOE. Those registers fail with a decode error. IRQC NMI and TINT0-31 stay unrouted (gap 15).
 
 ## What the guest needs
@@ -34,7 +34,7 @@ Both kernels build `CONFIG_RAVB=y`, `CONFIG_MICREL_PHY=y`, `CONFIG_MDIO_BITBANG=
 
 ## Evidence
 
-Manual §30 (p.2077-2315), §8.6 (p.552-553), Table 8.2; SoM UM Table 4.1 p.19, Figures 4.3-4.4 p.35, 4.7 p.38; pinned U-Boot `boot/fdt_support.c:560-632`; EVK console captures (the PHY probe lines, link 1 Gb/s, the MAC from U-Boot's environment; O); [`research/ravb.md`](../../research/ravb.md). Leads from a research packet in the working area.
+Manual §30 (p.2077-2315), §8.6 (p.552-553), Table 8.2; SoM UM Table 4.1 p.19, Figures 4.3-4.4 p.35, 4.7 p.38; pinned U-Boot `boot/fdt_support.c:560-632`; [EVK Ethernet evidence](../../evidence/EVK-2026-06-11-ethernet.md) (the PHY probe lines, link 1 Gb/s, the MAC from U-Boot's environment; O); [`research/ravb.md`](../../research/ravb.md). Leads from a research packet in the working area.
 
 ## For the operator
 

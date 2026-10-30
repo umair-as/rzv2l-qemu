@@ -1,6 +1,6 @@
 # M6-ravb — tasks
 
-Fork branch `unit/M6-ravb` from `rzv2l-dev` `10df946cc8`; project branch of the same name from `main` `ad5a190`.
+Fork branch `unit/M6-ravb` from `rzv2l-dev` `10df946cc8`; project branch of the same name, rebased on `main` `f15f61e` (M5 merged).
 
 | ID | Task | Fork commit | Test | Status |
 |---|---|---|---|---|

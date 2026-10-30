@@ -19,7 +19,7 @@ When sources disagree, the disagreement is recorded with all sides and resolved 
 
 Pinned firmware sources studied so far: see `research/boot-chain-firmware.md` (TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b`, kernel 6.12.59-cip14). The vendor U-Boot (G1) is https://github.com/renesas-rz/renesas-u-boot-cip, `4eebfbaa4e` (on branch `v2024.07/rz`), `smarc-rzv2l_defconfig`.
 
-**Still missing:** standalone board schematics.
+**Still missing:** standalone board schematics; the Microchip KSZ9131RNX datasheet (the PHY model's vendor register reset values are assumptions until it or an EVK `mii read` is in hand, `research/ravb.md` §5).
 
 ## Pinned guest user space
 
