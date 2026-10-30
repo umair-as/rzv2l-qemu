@@ -1,12 +1,15 @@
 # Review prompt (independent reviewer)
 
-The validator of spec §15, as a reusable prompt. Give it to a **different model** from the one that wrote the work (AGENTS.md "How work flows"). Fill in the three fields, paste the rest unchanged.
+The validator of spec §15, as a reusable prompt. Give it to a **different model** from the one that wrote the work (AGENTS.md "How work flows"). Fill in the four fields, paste the rest unchanged.
 
 ---
 
 **Target:** <exact revisions: project commit and fork commit (or a commit range / PR), never "the current files">
 **Claims to disprove first:** <the 3–6 load-bearing claims, lettered A, B, C…; name the one everything else rests on>
 **Out of scope:** <what not to review this round>
+**Review build:** `build/review-<short-sha>/{src,build}` at the fork PR head.
+
+**Budget** (AGENTS.md "How work flows"): one round, plus at most one recheck limited to the fixes. First run `ninja` in the review build (it must have nothing to do) and `git status` in its worktree (clean, at the PR SHA). Do not clone, configure or build from scratch, run `scripts/eval.py` or rebuild the G0 kernel. Run the existing qtest binary; make about three mutations of your own with incremental `ninja`, plus follow-ups to any that stays green, and reverse each. The implementer's boot log is the boot evidence; re-run a boot only if you doubt it, and say why. Write the report to the operator's working area.
 
 You are the independent reviewer for qemu-rzv2l, a QEMU model of the Renesas RZ/V2L SMARC EVK. Read `AGENTS.md` first; its engineering rules and source authority apply. The work under review was written by an AI agent. Its prose may overstate what it checked. Your job is to find where it is wrong, not to confirm it. **Do not edit any file.**
 

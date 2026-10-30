@@ -120,7 +120,7 @@ Offsets, access and reset values are from FACT, HW manual Rev 1.50 §6.2, Table 
 
 ## 7. Minimal model proposal
 
-> **Staging (2026-10-08, after the M0 review):** this section is the **full target** for SYSC, reached in M7 (Stage B, real BL31). For M1 it is **superseded** by the narrower scope in `../milestones/M0-report.md` §M1: only items 2–4 (`LSI_DEVID`, `LSI_MODE`, `LSI_PRR`, read-only). Every other offset is UNSUPPORTED in M1 as a labelled experiment. Items 1 and 5–8 (register file, `RVAL1/RVAH1`, `LP_CTL5` ack, stored security/ECC/offset registers) are the M7 target.
+> **Staging:** this section is the **full target** for SYSC, reached in M7 (Stage B, real BL31). The model implements items 2–4 only (`LSI_DEVID`, `LSI_MODE`, `LSI_PRR`, read-only); every other offset is a bus error. Items 1 and 5–8 (register file, `RVAL1/RVAH1`, `LP_CTL5` ack, stored security/ECC/offset registers) are the M7 target.
 
 **SYSC: FUNCTIONAL / faithful for the registers listed; side effects STUB.**
 1. A 64 KiB MMIO region. All registers of Table 6.1 form a register file with the manual reset values and R/W attributes. Writes to read-only registers are ignored and logged under `-d guest_errors`. Undocumented offsets read 0, ignore writes and are logged.

@@ -374,7 +374,7 @@ Kept for the later v6.18 LTS regression target (`docs/sources.md`). Citations ar
 All are read-only.
 
 - **Q-B1** (post-Linux, remainder): full `dmesg` with `initcall_debug` *not* set. Record the relative order and timestamps of `rzg2l-cpg`, `rzg2l-irqc`, `pinctrl-rzg2l … support registered`, `bootconsole … disabled`, and the RIIC, ravb and SDHI lines, relative to the known `1004b800.serial: ttySC0` line. Also `cat /sys/kernel/debug/devices_deferred` if debugfs is mounted.
-- **Q-B4** (U-Boot, immediately before `bootm`): the SCIF0 post-firmware state earlycon inherits. Run EVK-R20–R26 in `../evidence/requests.md` (documented widths; FTDR and FRDR are never read). Superseded: an earlier single `md.w` sweep here crossed FRDR, which pops the RX FIFO.
+- **Q-B4** (U-Boot, immediately before `bootm`): the SCIF0 post-firmware state earlycon inherits. Run EVK-R20–R26 in `../evidence/requests.md` (documented widths; FTDR and FRDR are never read).
 - **Q-B5** (U-Boot): CPG `CLK_ON`/`CLK_MON` for SCIF0, GPIO, IA55, OSTM1/2 and WDT0, and `RST`/`RSTMON` for the same modules, plus MSTOP. Shared with `cpg-reset.md` questions 3-5.
 - **Q-B6** (post-Linux, remainder): `cat /proc/cmdline` and `zcat /proc/config.gz | grep -E 'CONFIG_ACPI=|SPCR'` on the EVK image, to record the exact boot arguments and which earlycon path that kernel takes.
 

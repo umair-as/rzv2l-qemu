@@ -241,7 +241,7 @@ Kept for the later v6.18 LTS regression target (`docs/sources.md`). Citations ar
 
 All reads are 16-bit unless noted. FSR, LSR and FDR reads have no side effect. **Never read FRDR** (it pops the FIFO).
 
-1. **U-Boot prompt (post-firmware):** run EVK-R20–R26 in `../evidence/requests.md`, which read each register at its documented width and skip FTDR and FRDR. (Superseded: an earlier single `md.w` sweep here crossed FRDR and read 8-bit registers as 16-bit.) Expect SMR 0, 0x02 = 0xFE (MDDR via MDDRS=1), SCR 0x30, FSR 0x60, FCR 0, FDR 0, LSR 0, SEMR 0x30, FTCR 0x1F1F. This tests claims 2 and 3 and fixes the direct-mode overlay.
+1. **U-Boot prompt (post-firmware):** run EVK-R20–R26 in `../evidence/requests.md`, which read each register at its documented width and skip FTDR and FRDR. Expect SMR 0, 0x02 = 0xFE (MDDR via MDDRS=1), SCR 0x30, FSR 0x60, FCR 0, FDR 0, LSR 0, SEMR 0x30, FTCR 0x1F1F. This tests claims 2 and 3 and fixes the direct-mode overlay.
 2. **U-Boot:** is SCIF1 clocked? Read the CPG CLK_MON for SCIF (`cpg-reset.md` gives the offset). Only if it is clocked, read `md.w 0x1004bc08 1` (EVK-R27) for an untouched-channel FSR reset value (claim 1).
 3. **Post-Linux (G1 debug image, `/dev/mem`):** read SCIF0 FCR/SCR/SEMR/BRR (expect 0x0080, 0x0070 or 0x00F0, 0x00, 0x1A) and `/proc/interrupts` for SPIs 380-384 (conflict 1). Record that this is post-Linux, not post-firmware.
 4. **U-Boot:** read an undefined offset in the SCIF0 window (for example `md.w 0x1004b818 1`): zero, bus error, or alias? This decides the model's behaviour for undefined offsets.

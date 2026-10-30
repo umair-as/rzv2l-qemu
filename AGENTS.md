@@ -124,9 +124,9 @@ Consequences for this project:
 Each directory is described by its purpose, not its contents. `scripts/lint.py` checks this block against the tree: add or remove a line here when a directory is created or removed.
 
 ```
+docs/README.md      index of docs/ and reading order
 docs/spec/          specification, requirements, traceability
 docs/units/         work units per milestone, and their templates
-docs/milestones/    milestone reports
 docs/research/      per-block research notes
 docs/decisions/     decision records
 docs/experiments/   experiment records (EXP-NNN-*.md)

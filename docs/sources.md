@@ -19,11 +19,7 @@ When sources disagree, the disagreement is recorded with all sides and resolved 
 
 Pinned firmware sources studied so far: see `research/boot-chain-firmware.md` (TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b`, kernel 6.12.59-cip14).
 
-**Status (2026-10-08):**
-- Derived: the device map (`device-map.md`) and the boot dependency graph (`research/boot-dependency-graph.md`).
-- Pinned: guest and firmware sources (below, and `research/boot-chain-firmware.md`).
-- First EVK evidence recorded (`evidence/EVK-2026-10-08-boot-log.md`).
-- **Still missing:** standalone board schematics; built acceptance guest artifacts, including a checked effective G0 `.config` (the research used the arm64 defconfig source); and the post-firmware register measurements listed in `evidence/requests.md`.
+**Still missing:** standalone board schematics.
 
 ## Pinned guest kernels (2026-10-08)
 

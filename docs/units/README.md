@@ -1,21 +1,20 @@
 # Work units
 
-A work unit is one reviewable slice of a milestone, for example `M1-machine-skeleton`. Each unit lives in its own folder:
+A work unit is one reviewable slice of a milestone. Each unit has a folder here, named `<milestone><stage>-<block>`: M3 has two stages, M3a (earlycon output, done inside `M2-first-character`) and M3b (the `sh-sci` console to a shell), so `M3b-cpg`, `M3b-ostm` and `M3b-pfc-irqc` are steps of M3b.
 
 ```
 docs/units/<unit>/
-├── spec.md     what and why: REQ IDs, EARS acceptance criteria, scope, non-goals
-├── design.md   how: model structure, register behaviour, start states, evidence pointers
-└── tasks.md    ordered tasks with stable IDs, each tied to REQs, files and a test
+├── spec.md     one page: scope, what the guest needs, exit criterion, evidence
+└── tasks.md    tasks and tests, one proof line per test, boot evidence
 ```
 
-**Lifecycle:**
-1. `spec.md` is drafted from `../spec/requirements.md`, `../device-map.md` and the research notes.
-2. The operator reviews the spec. Nothing is implemented before that.
-3. `design.md` and `tasks.md` are written; DRs are opened where alternatives exist.
-4. Tasks are implemented on `unit/<unit>` branches in both repos (`../../AGENTS.md`, "Branches and PRs"), one task per commit where practical. Commit messages name the task ID.
-5. Each task closes only when its test passes; `../spec/traceability.md` is updated.
-6. An independent reviewer (a different model) reviews the unit's final revision with `templates/review-prompt.md`. Every finding gets a disposition; BLOCKERs are fixed, never only recorded, and the reviewer rechecks material fixes.
-7. The unit closes when the closure checklist in `tasks.md` is complete.
+M1 and M2 also have a `design.md` from the earlier three-file form.
 
-Templates are in `templates/`.
+**Lifecycle** (AGENTS.md "How work flows"):
+1. `spec.md` from `../device-map.md`, `../research/` and the EVK evidence; implementation follows on branches `unit/<unit>` in both repos.
+2. Each test is proven once: one line in `tasks.md`, the mutation and the red line.
+3. The boot loop runs to the next blocker; `spec.md` records it with the coverage list.
+4. One independent review round (`templates/review-prompt.md`) plus at most one recheck of the fixes; the PR body gets a short Review fixes list.
+5. The unit's learning page (`../learning/`) is written at its end.
+
+Templates: `templates/spec.md`, `templates/tasks.md`, `templates/review-prompt.md`, and `templates/fidelity-bug.md` for a model that is found wrong.

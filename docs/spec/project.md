@@ -261,15 +261,14 @@ A successful boot is evidence that a software path works. It is **not** evidence
 
 **Decision records** (`../decisions/DR-NNNN-*.md`) are required where reasonable alternatives exist. Fields: Context · Evidence · Alternatives · Decision · Consequences · Unknowns · Revisit condition. An agent may propose a decision; architecturally significant ones need human review.
 
-**Work units** (`../units/<unit>/`, from M1 on). Each milestone slice is a unit with three files, following a spec-driven pattern:
+**Work units** (`../units/<unit>/`). Each milestone slice is a unit with two files (`../units/README.md`):
 
 | File | Content |
 |---|---|
-| `spec.md` | the REQ IDs the unit satisfies, with acceptance criteria in EARS form ("WHEN … THEN the machine SHALL …"), scope and non-goals |
-| `design.md` | the model design derived from `../research/`, `../device-map.md` and the decision records; QEMU structure, register behaviour, start states |
-| `tasks.md` | tasks with stable IDs (`<unit>-T01`…), each naming the REQ(s) it serves, the files it touches, and the test that proves it |
+| `spec.md` | one page: the REQ IDs, scope, what the guest needs, the exit criterion, the evidence it rests on |
+| `tasks.md` | a short table of tasks and the tests that prove them, and one proof line per test (the mutation → the red line) |
 
-A unit starts only after its spec is reviewed by the operator. `traceability.md` links every REQ to its unit, tasks, tests and evidence, and is updated as tasks close. *Erratum 2026-10-29 (§22): from M3b on, a unit is `spec.md` (one page) and `tasks.md`; no `design.md`; traceability and statuses are updated at v1.0.* A consistency check (every REQ in a unit spec appears in a task; every task names a test) runs before a unit is marked done.
+`traceability.md` links every REQ to its unit, tests and evidence; it and the requirement statuses are updated once at v1.0. M1 and M2 also have a `design.md`, written under the earlier three-file form (§22).
 
 **Fidelity bugs** use `../units/templates/fidelity-bug.md`: observed behaviour, expected behaviour (with evidence), unchanged behaviour (what must not regress), and the layer verified.
 
@@ -381,7 +380,7 @@ RZ/V2L, with hardware available, calibrates the method: build the model, measure
 - Guest kernels pinned: G0 = mainline v6.12.59, G1 = `rz_linux-cip` `rz-6.12-cip14` @ `212f6e88b7` (same mainline base; see `../sources.md`).
 - §15: spec-driven work units (`spec`/`design`/`tasks`, EARS acceptance, task IDs traced to REQs), `traceability.md`, and a fidelity-bug template.
 - DR-0002 accepted; DR-0003 (GIC identity) accepted, option A.
-- M0 deliverables assembled: research notes, device map, EVK evidence and requests, M0 report (`../milestones/M0-report.md`). Operator exit review done 2026-10-08.
+- M0 deliverables assembled: research notes, device map, EVK evidence and requests, M0 report. Operator exit review done 2026-10-08.
 - Requirement IDs in §10 aligned with `requirements.md`; REQ-MACH-008 (MMIO/IRQ placement) and REQ-SYC-001 (CNTFID0, split from REQ-MACH-003) added.
 
 ### v0.1 → v0.2
