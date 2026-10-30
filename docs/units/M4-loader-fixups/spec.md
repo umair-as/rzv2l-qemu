@@ -34,12 +34,12 @@
 
 ## Evidence
 
-EVK evidence §4 (`../../evidence/EVK-2026-10-30-linux.md`, O: the U-Boot log of the edits); vendor U-Boot `renesas-u-boot-cip` `4eebfbaa4e` (C, lines above; `smarc-rzv2l_defconfig` read, no effective `.config` of a vendor build available: Kconfig defaults assumed for options it does not set, A); effective kernel `.config` files in `tests/guests/out/`.
+EVK evidence §4 and §7 (`../../evidence/EVK-2026-10-30-linux.md`, O: the U-Boot log of the edits and the live device tree); vendor U-Boot `renesas-u-boot-cip` `4eebfbaa4e` (C, lines above; `smarc-rzv2l_defconfig` read, no effective `.config` of a vendor build available: Kconfig defaults assumed for options it does not set, A); effective kernel `.config` files in `tests/guests/out/`.
 
 ## For the operator
 
 - **Not written: `u-boot,version`, ` wdt_overflow=0`.** Both would claim a firmware that did not run, and no guest code reads them (C). Listed as gaps.
-- **The EVK's live device tree was not read** (it runs a G2 DTB, where the regulator's phandle is `0x81`). A live check under Linux would need a login; the U-Boot log already shows the edit.
+- **The EVK's live device tree agrees** (O, EVK evidence §7): `vqmmc-supply` names `/regulator-vccq-sdhi0`, `vmmc-supply` keeps `/regulator-3p3v`. The G2 image's own DT patches do not touch SD0 (its kernel layer adds `mmc0`/`mmc1` aliases only).
 
 ## Next blocker
 
