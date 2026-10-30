@@ -11,7 +11,7 @@ Fork branch `unit/M3b-pfc-irqc` from `rzv2l-dev` `2696c12ddf`; project branch of
 | T5 | qtest for both blocks | `7cdc8ea6a8` | 5/5 green | done |
 | T6 | Hello probe: an IRQC read at an unlisted offset must fault | project | probe PASS | done |
 | T7 | Boot loop to the next blocker (no root file system: the shell unit) | — | boot logs below | done |
-| T8 | Review response: OS timer probe checks get lower bounds (the rewritten match no earlier than 10 ms, the n-th interval interrupt no earlier than n periods) and count only OS timer interrupts (a spurious IRQ had been counted); 50 interval interrupts within 250 periods; PFC assumptions labelled (undefined-byte writes, byte split, PIN) | fork comments only | probe PASS; proofs 10-13 | done |
+| T8 | Review response: OS timer probe checks get lower bounds (the rewritten match no earlier than 10 ms, the n-th interval interrupt no earlier than n periods) the first interval interrupt no earlier than one period, and count only OS timer interrupts; 50 interval interrupts within 250 periods; a period short by less than the guest's interrupt latency (about 10 %) is not caught; PFC assumptions labelled (undefined-byte writes, byte split, PIN) | fork comments only | probe PASS; proofs 10-13 | done |
 
 ## Proofs (each mutation: the exact change → the red line)
 
@@ -28,7 +28,7 @@ Fork branch `unit/M3b-pfc-irqc` from `rzv2l-dev` `2696c12ddf`; project branch of
 | 9 | `irqc_read`: an unlisted offset reads 0 instead of a bus error | hello probe: `FAIL IRQC +0x08 (unlisted): read completed without an abort` |
 | 10 | `pfc_read`: an undefined byte reads `0xff` instead of 0 | `rzv2l-pfc-irqc-test.c:179 test_pfc_port`: `0xffffffff == 0x00000000` |
 | 11 | `renesas_rz_ostm.c`: every `(uint64_t)s->reload + 1` → `((uint64_t)s->reload + 1) * 20` (interval period 20 ms) | hello probe: `FAIL OSTM2 interval IRQs within 250 periods >= 50` |
-| 12 | as 11, `/ 2` (interval period 0.5 ms) | hello probe: `FAIL generic timer ticks to the n-th IRQ >= n periods` |
+| 12 | as 11, `/ 2` (interval period 0.5 ms) | hello probe: `FAIL generic timer ticks to the first IRQ >= 1 period` (6 of 6 runs; the n-th check alone was red only when the guest kept up, as merged pulses hide a short period) |
 | 13 | `ostm_freerun_arm`: `m -= 900000` when `cmp > 200000` (rewritten match 9 ms early) | hello probe: `FAIL generic timer ticks to the rewritten match >= 10 ms` |
 
 Each mutation was built with a confirmed relink and run alone; the model was restored and the full test passed after each. Proof 5 was re-run after the table was reformatted for checkpatch. Proofs 11-12 change the period in all five places: changing only the first `timer_mod` delays the first interrupt by 19 ms and stays green, because each interval starts from the previous deadline.

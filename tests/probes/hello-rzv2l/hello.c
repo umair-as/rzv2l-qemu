@@ -100,6 +100,7 @@ static volatile uint64_t ostm_irq_count;
 static volatile uint32_t ostm_cnt_at_irq;
 static volatile int ostm_oneshot;
 static volatile uint64_t cntvct_at_irq;
+static volatile uint64_t cntvct_at_first_irq;
 static int failures;
 
 #define READ_SYSREG(r) ({ uint64_t v_; \
@@ -244,6 +245,9 @@ void irq_handler(void)
     }
     if (intid == OSTM2_INTID) {
         cntvct_at_irq = READ_SYSREG(cntvct_el0);
+        if (!ostm_irq_count) {
+            cntvct_at_first_irq = cntvct_at_irq;
+        }
         ostm_irq_count++;
         ostm_cnt_at_irq = mmio_read32(OSTM2 + OSTM_CNT);
         if (ostm_oneshot) {
@@ -511,8 +515,11 @@ void probe_main(void)
         /*
          * Interval mode as Linux's periodic event (renesas-ostm.c:107-119):
          * CMP = period - 1, an interrupt every period, the timer keeps
-         * running. The n-th interrupt comes no earlier than n periods
-         * after the start, and 50 interrupts come within 250 periods.
+         * running. The first interrupt comes no earlier than one period
+         * after the start, the n-th no earlier than n periods, and 50
+         * come within 250 periods. A guest slower than the period merges
+         * pulses, which hides a short period from the n-th check but not
+         * from the first.
          */
         puts_("-- OSTM2 interval (periodic) interrupts\n");
         {
@@ -535,6 +542,8 @@ void probe_main(void)
             mmio_write8(OSTM2 + OSTM_TT, 1);
             check("OSTM2 interval IRQs within 250 periods >= 50",
                   n_irq >= 50, 1, 0);
+            check("generic timer ticks to the first IRQ >= 1 period",
+                  cntvct_at_first_irq - t0 >= min_ticks - 1, 1, 0);
             check("generic timer ticks to the n-th IRQ >= n periods",
                   t_last - t0 >= n_irq * min_ticks - 1, 1, 0);
             check("OSTM2 interval IRQ INTID", irq_intid, OSTM2_INTID, 1);
