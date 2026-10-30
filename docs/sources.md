@@ -21,6 +21,12 @@ Pinned firmware sources studied so far: see `research/boot-chain-firmware.md` (T
 
 **Still missing:** standalone board schematics.
 
+## Pinned guest user space
+
+| Tier | Source | Revision |
+|---|---|---|
+| G0 initramfs | https://busybox.net/downloads/busybox-1.36.1.tar.bz2 | 1.36.1, SHA-256 `b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314` (busybox.net's own); built static by `tests/guests/g0/build-initramfs.sh` with the host's `aarch64-linux-gnu-` toolchain |
+
 ## Pinned guest kernels (2026-10-08)
 
 | Tier | Source | Revision |

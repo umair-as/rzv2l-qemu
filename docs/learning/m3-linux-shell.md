@@ -142,13 +142,13 @@ The run passes no `-append`. The kernel uses the `bootargs` of the DTB (`ignore_
 
 ### 4.2 The acceptance run
 
-`tests/acceptance/m3/shell.py` connects SCIF0 to a socket and talks to the shell. It sends `echo <marker>-$((6*7))` with a random marker and waits for `<marker>-42`. The command line does not contain `42`, so only a working shell can print it. The script also reads `/proc/uptime` before and after `sleep 3`, and compares the guest time with the host time. `run.sh` runs M2 acceptance (which runs M1), boots twice from cold, and checks that the `-d` log has only accesses to windows the device map classes UNIMP.
+`tests/acceptance/m3/shell.py` connects SCIF0 to a socket and talks to the shell. It sends `echo <marker>-$((6*7))` with a random marker and waits for `<marker>-42`. The command line does not contain `42`, so only a working shell can print it. The script checks in sysfs that the clock controller, the pin controller and SCIF0 are bound to their drivers. It reads `/proc/uptime` before and after `sleep 10`, and notes the host time when each line arrives, so the command overhead cancels out. `run.sh` runs M2 acceptance (which runs M1), boots twice from cold, and checks that the `-d` log is not empty and has only accesses to the stub windows the device map records.
 
-Four mutations each turn one check red ([tasks](../units/M3b-shell/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). For example, a CPU 1 affinity of `0x1` instead of `0x100` leaves `/sys/devices/system/cpu/online` at `0`: PSCI `CPU_ON` for `cpu@100` finds no core.
+Six mutations each turn one check red ([tasks](../units/M3b-shell/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). For example, a CPU 1 affinity of `0x1` instead of `0x100` leaves `/sys/devices/system/cpu/online` at `0`: PSCI `CPU_ON` for `cpu@100` finds no core.
 
 ### 4.3 What the run showed
 
-- **Guest time runs about 1.6 % fast.** QEMU ticks the generic counter every 41 ns, the truncated period of 24 MHz (`qemu/target/arm/cpu.c:1430`). The counter runs at 24.39 MHz, but `CNTFRQ` says 24 MHz. In the first run, `sleep 3` took 2.99 s of host time. The device map lists it as gap 18.
+- **Guest time runs about 1.6 % fast.** QEMU ticks the generic counter every 41 ns, the truncated period of 24 MHz (`qemu/target/arm/cpu.c:1430`). The counter runs at 24.39 MHz, but `CNTFRQ` says 24 MHz. The acceptance run measures guest time / host time = 1.0165. The device map lists it as gap 18.
 - **The eMMC controller retries for about 4.5 minutes.** SDHI0 is the eMMC (`non-removable`), so the MMC core keeps trying to start it. With a read-as-zero stub, each try waits for a timeout. In a 600 s run, a message appeared every 5 s until 268 s. The device map class stays UNIMP until the SD unit (M5).
 
 ## 5. Pitfalls
@@ -170,7 +170,7 @@ Four mutations each turn one check red ([tasks](../units/M3b-shell/tasks.md#proo
 - **Undefined offsets behave differently per block.** The PFC reads an undefined offset as 0 (EVK R71); the SYSC faults on its secure-only registers (R04, R05). Decide per block from evidence, not from one rule.
 - **A register map extracted from 3000 pages needs spot checks.** The PFC map came from a research pass over chapter 41. Its IEN list and IOLH resets were checked against the manual before the model used it, and the IOLH reset depends on a pin group column in another table (§41.3.7 Note 1).
 - **Read the driver variants.** The IRQC driver defines IMSK and TMSK at `0x10010` and `0x10020`, but only the RZ/Five paths use them; RZ/V2L never does (`irq-renesas-rzg2l.c:146-176`).
-- **In QEMU, the generic timer runs at 10^9 / period, with the period in whole nanoseconds.** For 24 MHz the period truncates from 41.67 ns to 41 ns, so guest time runs 1.6 % fast. QEMU does this on purpose to keep its timer scale exact. A test that requires a guest `sleep 3` to take 3 s of host time fails; compare rates instead (`qemu/target/arm/cpu.c:1430`).
+- **In QEMU, the generic timer runs at 10^9 / period, with the period in whole nanoseconds.** For 24 MHz the period truncates from 41.67 ns to 41 ns, so guest time runs 1.6 % fast. QEMU does this on purpose to keep its timer scale exact. A test that requires a guest `sleep 3` to take 3 s of host time fails. Compare rates instead, timed from when each reading arrives: over `sleep 3` with the command overhead included, the 1.6 % is lost in the noise (`qemu/target/arm/cpu.c:1430`).
 - **Serial output arrives in pieces.** A pattern that matches `online (\S+)` can match `0` before `-1` arrives. Match up to the line end (tasks, note under the proofs).
 - **A `non-removable` card costs minutes of retries.** The MMC core keeps trying to start an eMMC. Against a read-as-zero SD stub, each command waits for a 5 s timeout, so the retries ran until 268 s and printed 186 messages (`rzg2l-smarc-som.dtsi:369-378`).
 - **A driver that never binds can look like a missing console.** `sh-sci` defers until the pin controller binds, which waits for the IRQC. Without either model the serial console never takes over, with no error (`pinctrl.md` §6).

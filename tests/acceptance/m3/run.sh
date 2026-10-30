@@ -29,13 +29,17 @@ for boot in 1 2; do
     result $?
 done
 
-# 5. Log gate: every -d line is an access to a window classed UNIMP
+# 5. Log gate: every -d line is an access to a stub window the device map
+#    records (UNIMP, or a write-retaining stub); an empty log fails
 step "log gate"
 for boot in 1 2; do
+    if [ ! -s "$OUT/boot$boot/qemu.log" ]; then
+        echo "FAIL boot $boot log: missing or empty"; result 1; continue
+    fi
     bad=$(grep -v -E -f <(grep -v -e '^#' -e '^$' "$HERE/expected/log-allow.txt") \
           "$OUT/boot$boot/qemu.log" | sort -u)
     if [ -z "$bad" ]; then
-        echo "PASS boot $boot log: only accesses to UNIMP windows"
+        echo "PASS boot $boot log: only accesses to the recorded stub windows"
     else
         echo "FAIL boot $boot log: lines outside the allow list:"
         echo "$bad" | head -10 | sed 's/^/    /'

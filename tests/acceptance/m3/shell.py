@@ -9,10 +9,14 @@ direct mode, with SCIF0 on a socket. Checks, on the serial line:
     line) and /init reports both CPUs online (0-1)
   - a per-run command gets its response: the shell computes a value the
     command line does not contain, tagged with a random marker
-  - guest time advances: `sleep 3` moves /proc/uptime by 3 s or more, and
-    guest time runs at the host's rate within 5 %. It runs about 1.6 %
-    fast: QEMU truncates the 24 MHz counter period to 41 ns
-    (target/arm/cpu.c gt_cntfrq_period_ns; device map section 4)
+  - the clock controller, the pin controller and SCIF0 are bound to their
+    drivers (rzg2l-cpg, pinctrl-rzg2l, sh-sci), and SCIF0's runtime PM
+    status is "active": its CPG power domain attached
+  - guest time advances: `sleep 10` moves /proc/uptime by 10 s or more, and
+    guest time / host time is 0.99-1.03, timed from the arrival of each
+    uptime line. QEMU truncates the 24 MHz counter period to 41 ns, so the
+    expected value is about 1.016 (target/arm/cpu.c gt_cntfrq_period_ns;
+    device map section 4, gap 18)
 Writes OUTDIR/serial.log (the whole serial line) and OUTDIR/qemu.log (the
 -d log). Exit 0 only if every check passes. QEMU binary: $QEMU.
 """
@@ -55,7 +59,7 @@ class Serial:
     def wait(self, pattern, timeout, start=0):
         """Wait for a regex in the text read since offset start."""
         end = time.monotonic() + timeout
-        rx = re.compile(pattern)
+        rx = re.compile(pattern, re.M)
         while True:
             m = rx.search(self.buf, start)
             if m:
@@ -124,24 +128,45 @@ def main():
             check(s.wait(re.escape(mark) + r"-42\b", 30, pos) is not None,
                   "the shell answers a per-run command (%s)" % mark)
 
+            # Each driver is bound; the shell computes the tag (42)
             pos = len(s.buf)
-            t0 = time.monotonic()
-            s.send("cat /proc/uptime; sleep 3; cat /proc/uptime; "
-                   "echo %s-$((1+1))" % mark)
-            done = s.wait(re.escape(mark) + r"-2\b", 60, pos)
-            host = time.monotonic() - t0
-            ups = [float(u) for u in
-                   re.findall(r"^(\d+\.\d+) \d+\.\d+\r?$",
-                              s.buf[pos:], re.M)]
-            if check(done is not None and len(ups) == 2,
-                     "two /proc/uptime readings around sleep 3"):
-                check(ups[1] - ups[0] >= 3.0,
-                      "guest time advances: uptime +%.2f s over sleep 3"
-                      % (ups[1] - ups[0]))
-                rate = (ups[1] - ups[0]) / host
-                check(0.95 <= rate <= 1.05,
-                      "guest time / host time = %.3f over sleep 3 "
-                      "(0.95-1.05)" % rate)
+            s.send("for d in rzg2l-cpg/11010000.clock-controller "
+                   "pinctrl-rzg2l/11030000.pinctrl sh-sci/1004b800.serial; "
+                   "do [ -e /sys/bus/platform/drivers/$d ] && "
+                   "echo BOUND-$((40+2)) $d; done; echo PM-$((40+2)) "
+                   "$(cat /sys/devices/platform/soc/1004b800.serial/"
+                   "power/runtime_status); echo %s-$((2+2))" % mark)
+            s.wait(re.escape(mark) + r"-4\b", 30, pos)
+            bound = re.findall(r"^BOUND-42 (\S+)\r?$", s.buf[pos:], re.M)
+            for d in ("rzg2l-cpg/11010000.clock-controller",
+                      "pinctrl-rzg2l/11030000.pinctrl",
+                      "sh-sci/1004b800.serial"):
+                check(d in bound, "driver bound: %s" % d)
+            pm = re.search(r"^PM-42 (\S+)\r?$", s.buf[pos:], re.M)
+            check(pm is not None and pm.group(1) == "active",
+                  "SCIF0 runtime PM status: %s (power domain attached)"
+                  % (pm.group(1) if pm else "none"))
+
+            # Rate from the arrival of each uptime line, so the command
+            # overhead cancels out
+            ups = []
+            for cmd in ("cat /proc/uptime", "sleep 10; cat /proc/uptime"):
+                pos = len(s.buf)
+                s.send(cmd)
+                m = s.wait(r"^(\d+\.\d+) \d+\.\d+\r?\n", 60, pos)
+                ups.append((float(m.group(1)), time.monotonic())
+                           if m else None)
+            if check(None not in ups,
+                     "two /proc/uptime readings around sleep 10"):
+                guest = ups[1][0] - ups[0][0]
+                host = ups[1][1] - ups[0][1]
+                check(guest >= 10.0,
+                      "guest time advances: uptime +%.2f s over sleep 10"
+                      % guest)
+                check(0.99 <= guest / host <= 1.03,
+                      "guest time / host time = %.4f over sleep 10 "
+                      "(0.99-1.03; gap 18 predicts about 1.016)"
+                      % (guest / host))
         finally:
             proc.kill()
             proc.wait()
