@@ -29,6 +29,21 @@ dev: renesas-rz-scifa @000000001004c800
   mmio 000000001004c800/0000000000000400
 # CPG: device-map row CPG; direct-boot follows -kernel like SCIF0
 # (M3b-cpg spec).
+# SYC and TZC0-3: device-map rows SYC, TZC-400 (M7-el3-platform)
+dev: coresight-tsgen
+  mmio 0000000011000000/0000000000002000
+dev: arm-tzc400 @0000000011040000
+  num-filters = 1 (0x1)
+  mmio 0000000011040000/0000000000001000
+dev: arm-tzc400 @0000000011050000
+  num-filters = 1 (0x1)
+  mmio 0000000011050000/0000000000001000
+dev: arm-tzc400 @0000000011060000
+  num-filters = 1 (0x1)
+  mmio 0000000011060000/0000000000001000
+dev: arm-tzc400 @0000000011070000
+  num-filters = 4 (0x4)
+  mmio 0000000011070000/0000000000001000
 dev: renesas-rzv2l-cpg
   direct-boot = true
   mmio 0000000011010000/0000000000010000

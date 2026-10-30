@@ -22,6 +22,10 @@
 #   RPC, USB): DSI 0x10850000 (0x20000), VSPD, FCPVD, DU 64 KiB each; SSI0/1, RSPI1, ADC
 #   0x400 each; CAN-FD 32 KiB; USB0 function 64 KiB; RPC registers and write buffer
 #   64 KiB each, flash window 0x20000000, 256 MiB
+#   SRAM MCPU 0x00010000, SRAM ACPU 0x00020000, 64 KiB each; SYC 0x11000000, 8 KiB;
+#   TZC0-3 0x11040000 + n * 0x10000, 4 KiB of registers each (M7-el3-platform)
+0000000000010000-000000000001ffff (prio 0, ram): sram-mcpu
+0000000000020000-000000000002ffff (prio 0, ram): sram-acpu
 0000000010049c00-0000000010049fff (prio -1000, i/o): ssi0
 000000001004a000-000000001004a3ff (prio -1000, i/o): ssi1
 000000001004b000-000000001004b3ff (prio -1000, i/o): rspi1
@@ -42,9 +46,14 @@
 0000000010870000-000000001087ffff (prio -1000, i/o): vspd
 0000000010880000-000000001088ffff (prio -1000, i/o): fcpvd
 0000000010890000-000000001089ffff (prio -1000, i/o): du
+0000000011000000-0000000011001fff (prio 0, i/o): coresight-tsgen
 0000000011010000-000000001101ffff (prio 0, i/o): renesas-rzv2l-cpg
 0000000011020000-000000001102ffff (prio 0, i/o): renesas-rzg2l-sysc
 0000000011030000-000000001103ffff (prio 0, i/o): renesas-rzg2l-pfc
+0000000011040000-0000000011040fff (prio 0, i/o): arm-tzc400
+0000000011050000-0000000011050fff (prio 0, i/o): arm-tzc400
+0000000011060000-0000000011060fff (prio 0, i/o): arm-tzc400
+0000000011070000-0000000011070fff (prio 0, i/o): arm-tzc400
 00000000110a0000-00000000110affff (prio 0, i/o): renesas-rzg2l-irqc
 0000000011820000-000000001182ffff (prio -1000, i/o): rz-dmac
 0000000011830000-000000001183ffff (prio -1000, i/o): rz-dmac-ext
