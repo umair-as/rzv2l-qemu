@@ -176,8 +176,14 @@ function fmtDuration(sec) {
 // "running"; PASS/FAIL replace it once decided.
 function showReadout(s) {
   const r = $("readout");
+  const was = r.dataset.verdict;
   r.dataset.state = s.state;
   r.dataset.verdict = s.verdict === "pass" || s.verdict === "fail" ? s.verdict : "";
+  // A brief flash when the verdict is decided (style.css, reduced motion: none)
+  if (r.dataset.verdict && r.dataset.verdict !== was) {
+    r.dataset.flash = "";
+    setTimeout(() => delete r.dataset.flash, 700);
+  }
 
   const v = $("verdict");
   v.dataset.verdict = s.verdict || "";

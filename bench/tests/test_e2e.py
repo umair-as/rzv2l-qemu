@@ -350,8 +350,8 @@ def test_m1_probe_through_the_bench(server):
 ROWS_JS = """[...document.querySelectorAll('#term .xterm-rows > div')]
     .map((r) => r.textContent.trimEnd()).filter((r) => r)"""
 
-LIGHT_BG, DARK_BG = "rgb(238, 241, 245)", "rgb(13, 17, 23)"          # --bg
-LIGHT_TERM, DARK_TERM = "rgb(246, 248, 250)", "rgb(10, 14, 19)"      # --term-bg
+LIGHT_BG, DARK_BG = "rgb(241, 238, 230)", "rgb(11, 18, 16)"         # --bg
+LIGHT_TERM, DARK_TERM = "rgb(248, 245, 238)", "rgb(7, 12, 10)"       # --term-bg
 
 
 def colours(page):
@@ -730,4 +730,58 @@ def test_map_follows_the_picked_run(server):
         page.get_by_test_id("map-current").click()
         expect(page.get_by_test_id("map-run")).to_contain_text(f"This session: {m1_run}")
         expect(scif0).to_have_attribute("data-status", "modelled")
+        browser.close()
+
+
+# ---- the header readout, driven without QEMU ---------------------------------
+
+def offline_page(browser, server, scheme="dark"):
+    """The page with its live stream closed: setStatus() and the render
+    functions are then the only things that change it."""
+    page = browser.new_context(color_scheme=scheme, viewport={"width": 1440, "height": 900}).new_page()
+    page.goto(server)
+    expect(page.get_by_test_id("profile-select")).to_contain_text("virt")
+    page.wait_for_function("ws && ws.readyState === WebSocket.OPEN")
+    page.evaluate("ws.onclose = null; ws.onmessage = null; ws.close()")
+    return page
+
+
+def rgb(hex_):
+    return "rgb({}, {}, {})".format(*(int(hex_[i:i + 2], 16) for i in (1, 3, 5)))
+
+
+LED_CASES = [  # (status, LED token, verdict text)
+    ({"state": "none"}, "led-off", ""),
+    ({"state": "starting"}, "info", ""),
+    ({"state": "running", "verdict": "running", "expect": ["a"], "expect_missing": ["a"]}, "ok", ""),
+    ({"state": "paused"}, "warn", ""),
+    ({"state": "exited", "exit_code": 0, "started": 1, "ended": 3.5}, "muted", ""),
+    ({"state": "exited", "exit_code": 0, "verdict": "pass", "started": 1, "ended": 3.5}, "ok", "PASS"),
+    ({"state": "exited", "exit_code": 1, "verdict": "fail", "verdict_reasons": ["exit 1"],
+      "started": 1, "ended": 3.5}, "danger", "FAIL"),
+]
+
+
+@pytest.mark.parametrize("scheme", ["dark", "light"])
+def test_readout_led_and_verdict(server, scheme):
+    """The LED takes its state colour from the tokens; PASS/FAIL is the
+    biggest text in the header, with the exit status and the run time."""
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = offline_page(browser, server, scheme)
+        led = page.locator("#readout .led")
+        verdict = page.get_by_test_id("verdict")
+        for status, token, text in LED_CASES:
+            page.evaluate("(s) => setStatus(s)", status)
+            want = rgb(page.evaluate(f"getComputedStyle(document.documentElement).getPropertyValue('--{token}').trim()"))
+            expect(led).to_have_css("background-color", want)
+            if text:
+                expect(verdict).to_be_visible()
+                expect(verdict).to_have_text(text)
+                size = float(verdict.evaluate("(e) => getComputedStyle(e).fontSize")[:-2])
+                assert size >= 18, status
+                expect(page.get_by_test_id("exit-code")).to_have_text(f"exit {status['exit_code']}")
+                expect(page.get_by_test_id("duration")).to_have_text("2.5 s")
+            else:
+                expect(verdict).to_be_hidden()
         browser.close()
