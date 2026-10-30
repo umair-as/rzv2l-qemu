@@ -51,7 +51,7 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | PSCI | Power State Coordination Interface: the firmware call Linux uses to power CPUs on and off (here via the `SMC` instruction). |
 | DT / DTB | Device tree / device tree blob: the hardware description the kernel reads at boot. |
 | DTB-U | The upstream device tree for the board (`r9a07g054l2-smarc.dtb`), built unmodified from the pinned kernel by `tests/guests/g0/build-dtb.sh`. |
-| G0 / G1 / G2 | This project's guest tiers: mainline Linux (G0), the Renesas BSP (G1), downstream products (G2, integration only). |
+| G0 / G1 / G2 | This project's guest tiers, that is, which software runs inside QEMU. **G0**: the plain upstream Linux kernel from kernel.org (v6.12.59, arm64 `defconfig`), the upstream device tree and a BusyBox shell; nothing in it is made for QEMU, and the same files would boot on the EVK. **G1**: Renesas's own software stack for the board (their kernel, TF-A, U-Boot, OP-TEE). **G2**: products built on G1; studied as samples, never a target. |
 
 **QEMU**
 
