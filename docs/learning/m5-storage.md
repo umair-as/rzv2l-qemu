@@ -1,6 +1,6 @@
 # M5: storage
 
-> **Context.** Milestone M5 (spec [§17](../spec/project.md#17-milestones)): an SD card with an ext4 file system, used by the unchanged Linux driver. Unit M5-sdhi: [spec](../units/M5-sdhi/spec.md), [tasks](../units/M5-sdhi/tasks.md), register evidence [`../research/sdhi.md`](../research/sdhi.md). The manual chapter is §40 (SD/MMC host interface). Code lines are at fork commit `bb315aa426`.
+> **Context.** Milestone M5 (spec [§17](../spec/project.md#17-milestones)): an SD card with an ext4 file system, used by the unchanged Linux driver. Unit M5-sdhi: [spec](../units/M5-sdhi/spec.md), [tasks](../units/M5-sdhi/tasks.md), register evidence [`../research/sdhi.md`](../research/sdhi.md). The manual chapter is §40 (SD/MMC host interface). Code lines are at fork commit `a3becc59e3`.
 
 ## 1. The SD/MMC host interface (unit M5-sdhi)
 
@@ -36,4 +36,4 @@ The model is one QEMU device per channel, `renesas-rzg2l-sdhi` (`qemu/hw/sd/rene
 - **Register stride is a property of the SoC, not of the IP.** The same TMIO-family controller has its registers 2 or 4 bytes apart on other Renesas parts and 8 bytes apart here (`bus_shift = 2`, `tmio_mmc.h:211-264`). The driver reads 16-bit halves at `+0` and `+8`, so a model with 32-bit registers at a 4-byte step would answer the wrong offsets (Table 40.2).
 - **"Write 0 to clear" is not "write 1 to clear".** Most QEMU devices clear flags with a 1. Here a 1 keeps the flag. The interrupt handler writes 1s to the flags it still needs, so a write-1-to-clear model would lose them (§40.2.6 p.3271).
 - **The device tree does not say what is in the slot.** The DTB describes SDHI0 as an 8-bit eMMC with HS200. The EVK boots from an SD card in that slot (eSD), and U-Boot only changes the I/O voltage supply. Linux finds whatever card answers, so the model presents an SD card (EVK evidence §8).
-- **Without `mmc` aliases, numbering is a race.** The two hosts probe in parallel, so the card is `mmcblk0` in one boot and `mmcblk1` in the next. The acceptance run looks for `/dev/mmcblk*p1`.
+- **Without `mmc` aliases, numbering is a race.** The two hosts probe in parallel, so the card is `mmcblk0` in one boot and `mmcblk1` in the next. The stock device trees have no such aliases. QEMU's loader therefore adds `mmc0` and `mmc1` when the DTB lacks them (`qemu/hw/arm/rzv2l-smarc.c`, `rzv2l_smarc_add_mmc_aliases`). The board's G2 image adds the same aliases in its own DTS.

@@ -104,6 +104,7 @@ The studied build is the G2 image's U-Boot: the vendor `renesas-u-boot-cip` `4ee
 | `/chosen/bootargs` from env, plus ` wdt_overflow=0` | vendor | `-append` stands for the env; the flag is not appended (no RZ/V2L consumer) |
 | `/chosen/kaslr-seed` from the OP-TEE RNG, `/firmware/optee`, `u-boot,bootconf`, `edge,boot-source` | G2 patches (their `ft_board_setup()`, U-Boot control DT and FIT boot); the vendor `ft_board_setup()` adds no seed | none |
 | `local-mac-address` | vendor, no-op without `ethaddr` | none |
+| `/aliases` `mmc0`, `mmc1` | neither U-Boot; the G2 image's DTS has them | QEMU adds them when the DTB has none, so the SD cards keep their names across boots |
 
 ## 5. Open items
 

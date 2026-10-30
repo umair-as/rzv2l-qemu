@@ -1,7 +1,6 @@
-# EVK measurement requests: post-firmware register state (M1-M3b)
+# EVK register reads: questions and answers
 
-**Date:** 2026-10-08. **Status:** section 1 measured 2026-10-29 (results: `EVK-2026-10-29-post-firmware.md`); section 2 open.
-**Purpose:** fix the direct-mode start state (spec §9) and the ID registers M1 asserts (spec §17). Each row states its question before measuring (spec §14). Rows collect the "Questions for the EVK" in `docs/research/` that a read-only session can answer; `docs/device-map.md` §3 refers to these IDs.
+The list of every register read made on the physical board (the EVK), and of the reads still to make. Each row asks one question about the hardware before the read: what we expect and why it matters to the model. Its Result column records the answer, or names the evidence file that holds the full capture (`EVK-*.md` in this folder). The model uses the answers as the state firmware leaves a block in, for a kernel QEMU starts directly (spec §9), and to check the reset and ID values the qtests assert. `docs/device-map.md` §3 cites the row IDs (EVK-Rnn: a U-Boot read; EVK-Lnn: a read at the Linux shell).
 
 **Session rules**
 - **Board:** RZ/V2L SMARC EVK, 2 GB. Record the TF-A, U-Boot and OP-TEE build IDs (the BL2/U-Boot banners) and the boot-mode switch setting in the capture.
