@@ -95,7 +95,7 @@ The interrupt follows the same split. Free-running mode requests one when the co
 
 ### 2.3 The proof
 
-`rzv2l-ostm-test.c` checks reset values, both modes, the CTL rules and the CMP = 0 level. The interrupts are checked on a real CPU, in the hello probe: a one-shot, a compare value rewritten while free-running, and a periodic interval run. qtest cannot count a pulse. With no kernel loaded, the GIC also keeps its interrupts secure, out of qtest's reach. The probe arms OSTM2 the way Linux arms a one-shot event. It then checks that the interrupt arrives as INTID 80, no earlier than CMP + 1 counts, and only once. Twelve mutations each turn one check red ([tasks](../units/M3b-ostm/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+`rzv2l-ostm-test.c` checks reset values, both modes, the CTL rules and the CMP = 0 level. The interrupts are checked on a real CPU, in the hello probe: a one-shot, a compare value rewritten while free-running, and a periodic interval run. qtest cannot count a pulse. With no kernel loaded, the GIC also keeps its interrupts secure, out of qtest's reach. The probe arms OSTM2 the way Linux arms a one-shot event. It then checks that the interrupt arrives as INTID 80, no earlier than CMP + 1 counts, and only once. The rewrite and interval checks also have lower bounds, measured on the generic timer from before the start; they do not depend on host load. Twelve mutations each turn one check red ([tasks](../units/M3b-ostm/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 
 ## 3. The pin controller and the interrupt control unit (unit M3b-pfc-irqc)
 
@@ -105,7 +105,7 @@ The pin controller (PFC) chooses each pin's function. Linux's serial driver appl
 
 ### 3.2 How the models are shaped
 
-`qemu/hw/gpio/renesas_rzg2l_pfc.c` is a table of 592 registers, one row per port and register family, with the manual's reset values and implemented bits. Every access is split into bytes. A byte with no register reads 0, because the EVK does the same at an undefined offset. `qemu/hw/intc/renesas_rzg2l_irqc.c` keeps the IRQC's selection registers. Its status registers read 0, because no interrupt input is modelled.
+`qemu/hw/gpio/renesas_rzg2l_pfc.c` is a table of 592 registers, one row per port and register family, with the manual's reset values and implemented bits. Every access is split into bytes. A byte with no register reads 0, because the EVK does the same at an undefined offset. That such a byte ignores writes is an assumption. `qemu/hw/intc/renesas_rzg2l_irqc.c` keeps the IRQC's selection registers. Its status registers read 0, because no interrupt input is modelled.
 
 **Worked example: setting SCIF0's pin function (P38, port index `0x36`).** Linux does this per pin (`pinctrl-rzg2l.c:451-482`); the table merges the two pins and starts from the reset values. `test_pfc_pwpr` checks the same rules on port P48.
 
@@ -120,7 +120,7 @@ The pin controller (PFC) chooses each pin's function. Linux's serial driver appl
 
 ### 3.3 The proof
 
-`rzv2l-pfc-irqc-test.c` checks reset and post-firmware values, the PWPR gate, port masks, PIN and the IRQC registers. The hello probe checks that an unlisted IRQC offset faults. Nine mutations each turn one check red ([tasks](../units/M3b-pfc-irqc/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+`rzv2l-pfc-irqc-test.c` checks reset and post-firmware values, the PWPR gate, port masks, PIN and the IRQC registers. The hello probe checks that an unlisted IRQC offset faults. Thirteen mutations each turn one check red ([tasks](../units/M3b-pfc-irqc/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 
 With the console working, Linux probes Ethernet, I2C, USB and SD next. Each is a logged stub for now and fails within a bound. The boot then ends at "No working init found", because there is no root file system: that is the next unit.
 
@@ -139,6 +139,7 @@ With the console working, Linux probes Ethernet, I2C, USB and SD next. Each is a
 - **CMP = 0 in interval mode is not a 10 ns periodic timer.** The manual holds the request high while the counter runs (§20.3.5.2), so the model raises the line and arms no timer. Whether MD0 = 0 suppresses it is unclear in the manual; the model holds it either way (an inference).
 - **In QEMU, qtest cannot see an edge.** An interrupt that is a pulse leaves no trace in qtest's interrupt intercept, and the GIC's pending state is out of reach with no kernel loaded. Test pulses from a guest probe on a real CPU.
 - **The manual's access width and real drivers can disagree.** The manual gives PWPR as an 8-bit register, but Linux and TF-A write it with 32-bit stores, and silicon accepts them. A model that faults on the 32-bit store breaks every pin change (§41.2.10 p.3379; `pinctrl-rzg2l.c:3014-3027`).
+- **A timer check with only an upper bound proves little.** Under host load the bound must be wide, so a period 20 times too long still passes. QEMU never runs a timer callback early, so a lower bound taken on the guest's generic timer is exact and load-proof. Count only the timer's own interrupts: the probe's handler also counted a spurious one.
 - **Undefined offsets behave differently per block.** The PFC reads an undefined offset as 0 (EVK R71); the SYSC faults on its secure-only registers (R04, R05). Decide per block from evidence, not from one rule.
 - **A register map extracted from 3000 pages needs spot checks.** The PFC map came from a research pass over chapter 41. Its IEN list and IOLH resets were checked against the manual before the model used it, and the IOLH reset depends on a pin group column in another table (§41.3.7 Note 1).
 - **Read the driver variants.** The IRQC driver defines IMSK and TMSK at `0x10010` and `0x10020`, but only the RZ/Five paths use them; RZ/V2L never does (`irq-renesas-rzg2l.c:146-176`).

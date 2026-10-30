@@ -96,6 +96,7 @@ static volatile int expect_abort;
 static volatile uint64_t abort_esr;
 static volatile uint64_t irq_intid = SPURIOUS_INTID;
 static volatile uint64_t irq_count;
+static volatile uint64_t ostm_irq_count;
 static volatile uint32_t ostm_cnt_at_irq;
 static volatile int ostm_oneshot;
 static volatile uint64_t cntvct_at_irq;
@@ -243,6 +244,7 @@ void irq_handler(void)
     }
     if (intid == OSTM2_INTID) {
         cntvct_at_irq = READ_SYSREG(cntvct_el0);
+        ostm_irq_count++;
         ostm_cnt_at_irq = mmio_read32(OSTM2 + OSTM_CNT);
         if (ostm_oneshot) {
             /* As Linux ends a one-shot event: stop the counter */
@@ -483,44 +485,60 @@ void probe_main(void)
          * A compare value rewritten while free-running takes effect at
          * once (Table 20.5 rows c, d): start with a match 43 s away,
          * then move it 10 ms past the current count; the interrupt must
-         * come within 500 ms. The margin keeps a stalled host from moving
+         * come no earlier than 10 ms after the count was read, and
+         * within 500 ms. The margin keeps a stalled host from moving
          * the count past the new value first (row d would then wait for
-         * the counter to wrap). The waiting windows below are wide: on a
+         * the counter to wrap). The upper bounds below are wide: on a
          * loaded host QEMU's timer callbacks can run late while the
-         * guest's generic counter keeps advancing.
+         * guest's generic counter keeps advancing. Callbacks never run
+         * early, so the lower bounds are exact (less one generic timer
+         * tick for rounding).
          */
         puts_("-- OSTM2 compare rewritten while free-running\n");
         irq_count = 0;
         mmio_write32(OSTM2 + OSTM_CMP, 0xfffffff0);
         mmio_write8(OSTM2 + OSTM_TS, 1);
+        t0 = READ_SYSREG(cntvct_el0);
         mmio_write32(OSTM2 + OSTM_CMP,
                      mmio_read32(OSTM2 + OSTM_CNT) + 10 * (OSTM_ONESHOT_CMP + 1));
-        t0 = READ_SYSREG(cntvct_el0);
         while (!irq_count && READ_SYSREG(cntvct_el0) - t0 < 500 * min_ticks) {
             __asm__ volatile("yield");
         }
         check("OSTM2 IRQ after the rewrite", irq_count, 1, 1);
+        check("generic timer ticks to the rewritten match >= 10 ms",
+              cntvct_at_irq - t0 >= 10 * min_ticks - 1, 1, 0);
 
         /*
          * Interval mode as Linux's periodic event (renesas-ostm.c:107-119):
          * CMP = period - 1, an interrupt every period, the timer keeps
-         * running. Expect at least 3 interrupts (within 200 periods).
+         * running. The n-th interrupt comes no earlier than n periods
+         * after the start, and 50 interrupts come within 250 periods.
          */
         puts_("-- OSTM2 interval (periodic) interrupts\n");
-        ostm_oneshot = 0;
-        irq_count = 0;
-        mmio_write8(OSTM2 + OSTM_TT, 1);
-        mmio_write32(OSTM2 + OSTM_CMP, OSTM_ONESHOT_CMP);
-        mmio_write8(OSTM2 + OSTM_CTL, 0);
-        mmio_write8(OSTM2 + OSTM_TS, 1);
-        t0 = READ_SYSREG(cntvct_el0);
-        while (irq_count < 3 &&
-               READ_SYSREG(cntvct_el0) - t0 < 200 * min_ticks) {
-            __asm__ volatile("yield");
+        {
+            uint64_t n_irq, t_last;
+
+            ostm_oneshot = 0;
+            ostm_irq_count = 0;
+            mmio_write8(OSTM2 + OSTM_TT, 1);
+            mmio_write32(OSTM2 + OSTM_CMP, OSTM_ONESHOT_CMP);
+            mmio_write8(OSTM2 + OSTM_CTL, 0);
+            t0 = READ_SYSREG(cntvct_el0);
+            mmio_write8(OSTM2 + OSTM_TS, 1);
+            while (ostm_irq_count < 50 &&
+                   READ_SYSREG(cntvct_el0) - t0 < 250 * min_ticks) {
+                __asm__ volatile("yield");
+            }
+            /* Count first: the handler stores the tick before counting */
+            n_irq = ostm_irq_count;
+            t_last = cntvct_at_irq;
+            mmio_write8(OSTM2 + OSTM_TT, 1);
+            check("OSTM2 interval IRQs within 250 periods >= 50",
+                  n_irq >= 50, 1, 0);
+            check("generic timer ticks to the n-th IRQ >= n periods",
+                  t_last - t0 >= n_irq * min_ticks - 1, 1, 0);
+            check("OSTM2 interval IRQ INTID", irq_intid, OSTM2_INTID, 1);
         }
-        mmio_write8(OSTM2 + OSTM_TT, 1);
-        check("OSTM2 interval IRQs >= 3", irq_count >= 3, 1, 0);
-        check("OSTM2 interval IRQ INTID", irq_intid, OSTM2_INTID, 1);
     }
 
     /* Each OSTM register takes only its own access size (20.2.1) */

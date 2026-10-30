@@ -11,6 +11,7 @@ Fork branch `unit/M3b-pfc-irqc` from `rzv2l-dev` `2696c12ddf`; project branch of
 | T5 | qtest for both blocks | `7cdc8ea6a8` | 5/5 green | done |
 | T6 | Hello probe: an IRQC read at an unlisted offset must fault | project | probe PASS | done |
 | T7 | Boot loop to the next blocker (no root file system: the shell unit) | — | boot logs below | done |
+| T8 | Review response: OS timer probe checks get lower bounds (the rewritten match no earlier than 10 ms, the n-th interval interrupt no earlier than n periods) and count only OS timer interrupts (a spurious IRQ had been counted); 50 interval interrupts within 250 periods; PFC assumptions labelled (undefined-byte writes, byte split, PIN) | fork comments only | probe PASS; proofs 10-13 | done |
 
 ## Proofs (each mutation: the exact change → the red line)
 
@@ -19,14 +20,18 @@ Fork branch `unit/M3b-pfc-irqc` from `rzv2l-dev` `2696c12ddf`; project branch of
 | 1 | `pfc_write_reg`: drop the PWPR.PFCWE gate on PFC registers | `rzv2l-pfc-irqc-test.c:119 test_pfc_pwpr`: `0x11111 == 0x0` |
 | 2 | `pfc_write_reg`: PFCWE writable while B0WI is 1 | `rzv2l-pfc-irqc-test.c:125`: `PWPR 0xc0 == 0x80` |
 | 3 | `pfc_write_reg`: `m = r->mask & bytes` → `m = bytes` (implemented bits ignored) | `rzv2l-pfc-irqc-test.c:133`: `0xffffffff == 0x77777` |
-| 4 | `pfc_pin_value`: PIN follows Pn for any non-zero PMn | `rzv2l-pfc-irqc-test.c:160 test_pfc_port`: `0x7 == 0x5` |
+| 4 | `pfc_pin_value`: PIN follows Pn for any non-zero PMn | `rzv2l-pfc-irqc-test.c:162 test_pfc_port`: `0x7 == 0x5` |
 | 5 | table: IOLH06 reset `0x20202` → `0x10101` (group B pins as group A) | `rzv2l-pfc-irqc-test.c:70 test_pfc_reset`: `0x10101 == 0x20202` |
 | 6 | overlay: PFC36 `0x11` → `0x01` | `rzv2l-pfc-irqc-test.c:91 test_pfc_direct_boot`: `0x1 == 0x11` |
-| 7 | `irqc_write`: status registers store the written value | `rzv2l-pfc-irqc-test.c:204 test_irqc`: `NSCR 0xffffffff == 0x0` |
-| 8 | table: IITSR writable mask `0xffff` → `0xffffffff` | `rzv2l-pfc-irqc-test.c:196`: `0xffffffff == 0xffff` |
+| 7 | `irqc_write`: status registers store the written value | `rzv2l-pfc-irqc-test.c:209 test_irqc`: `NSCR 0xffffffff == 0x0` |
+| 8 | table: IITSR writable mask `0xffff` → `0xffffffff` | `rzv2l-pfc-irqc-test.c:201`: `0xffffffff == 0xffff` |
 | 9 | `irqc_read`: an unlisted offset reads 0 instead of a bus error | hello probe: `FAIL IRQC +0x08 (unlisted): read completed without an abort` |
+| 10 | `pfc_read`: an undefined byte reads `0xff` instead of 0 | `rzv2l-pfc-irqc-test.c:179 test_pfc_port`: `0xffffffff == 0x00000000` |
+| 11 | `renesas_rz_ostm.c`: every `(uint64_t)s->reload + 1` → `((uint64_t)s->reload + 1) * 20` (interval period 20 ms) | hello probe: `FAIL OSTM2 interval IRQs within 250 periods >= 50` |
+| 12 | as 11, `/ 2` (interval period 0.5 ms) | hello probe: `FAIL generic timer ticks to the n-th IRQ >= n periods` |
+| 13 | `ostm_freerun_arm`: `m -= 900000` when `cmp > 200000` (rewritten match 9 ms early) | hello probe: `FAIL generic timer ticks to the rewritten match >= 10 ms` |
 
-Each mutation was built with a confirmed relink and run alone; the model was restored and the full test passed after each. Proof 5 was re-run after the table was reformatted for checkpatch.
+Each mutation was built with a confirmed relink and run alone; the model was restored and the full test passed after each. Proof 5 was re-run after the table was reformatted for checkpatch. Proofs 11-12 change the period in all five places: changing only the first `timer_mod` delays the first interrupt by 19 ms and stays green, because each interval starts from the previous deadline.
 
 ## Boot evidence (2026-10-29, fork `7cdc8ea6a8`)
 
