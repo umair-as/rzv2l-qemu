@@ -743,6 +743,11 @@ def offline_page(browser, server, scheme="dark"):
     expect(page.get_by_test_id("profile-select")).to_contain_text("virt")
     page.wait_for_function("ws && ws.readyState === WebSocket.OPEN")
     page.evaluate("ws.onclose = null; ws.onmessage = null; ws.close()")
+    # An earlier test's session may have arrived first: let its fetches land,
+    # then forget it
+    page.wait_for_load_state("networkidle")
+    page.evaluate("""resetViews(); viewRun = null; mapRows = []; devTree = [];
+        renderMap(); renderDevices()""")
     return page
 
 
