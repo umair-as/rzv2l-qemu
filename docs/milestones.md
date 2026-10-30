@@ -70,6 +70,22 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 - QEMU's built-in PSCI replaces TF-A until M7; no OP-TEE until then.
 - The stubbed eMMC makes the kernel retry for about 4.5 minutes after boot (until M5).
 
+## Side track: the bench
+
+[`bench/`](../bench/) is a web front end for one emulated board: the serial console, start/pause/reset/stop, the `-d` log, the coverage list, the memory map against [`device-map.md`](device-map.md), QEMU's device tree, and a history of runs with a PASS/FAIL verdict. It uses stock QEMU interfaces only, so the fork does not know it exists. It is not an acceptance gate.
+
+**Who it is for:** an embedded developer who has the real board and wants to see what the model does differently, and a team that has no board yet but must run and inspect the board's software.
+
+| | What | State |
+|---|---|---|
+| ✅ | Runs: profiles, live console, controls, coverage and CSV, Map, Devices, Runs history, gdbstub | merged |
+| ✅ | Look and use: instrument look in dark and light (contrast-tested), resizable panels, an address strip over the Map, search in logs, failed-run filter, a [guide with screenshots](../bench/GUIDE.md) | merged |
+| ⏸️ | Further bench work | on hold: no milestone needs it |
+
+**On hold, and why:** checked against the specification, the next bench ideas (importing runs made outside the bench, comparing runs, attaching to an external QEMU, an agent interface) serve no milestone or verification gate yet. The bench sees only the QEMU it starts. The tooling that does serve the gates (a coverage check shared by the acceptance runs, the boot loop and the bench, as DR-0004 planned, and diffs of the model against the EVK) belongs to the milestone work.
+
+**What would reopen it:** a milestone that needs it, or a concrete use. The first one in view: following a QEMU's state in the browser away from the terminal.
+
 ## What comes next
 
 1. ⏭️ **v1.0 closure:** traceability and requirement statuses, then the `rzv2l-v1.0` tag in both repositories.
