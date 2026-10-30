@@ -103,6 +103,18 @@ These rows deliberately touch addresses whose read behaviour is **not documented
 | EVK-R70 | `md.w 0x1004b818 1` | SCIF0 undefined offset | Zero, bus error or alias? Decides the model's undefined-offset behaviour | `0x0000` or abort | unknown | scif.md Q4 | `0x0000`; no abort |
 | EVK-R71 | `md.l 0x11033100 1` | PFC undefined offset | Same question for the PFC | `0x00000000` or abort | unknown | pinctrl.md Q4 | `0x00000000`; no abort |
 
+### 1.8 SD/MMC host interface, SDHI0/1 (`0x11C00000`, `0x11C10000`; M5)
+
+Open: needs a session at the U-Boot prompt (operator). Registers sit 8 bytes apart (the low word of each 8-byte slot), so the `md.l` counts below cover pairs. None reads `SD_BUF0` (`+0xC0`, the data port) or `SDIO_INFO1`; reading `SD_INFO1/2` does not clear them (flags clear on a 0 write, §40.2.6-40.2.7 p.3271-3274).
+
+| ID | Command | Register / meaning | Question it answers | Expected / predicted | Read effect | Source note | Result |
+|---|---|---|---|---|---|---|---|
+| EVK-R74 | `md.l 0x11c00388 1; md.l 0x11c10388 1` | VERSION (§40.2.21) | Does each channel report `0xCC10`, the value the Linux driver keys its Gen3 paths on? | `0x0000cc10` | none | M5-sdhi spec | |
+| EVK-R75 | `md.l 0x11c00070 8; md.l 0x11c00090 6; md.l 0x11c00360 1; md.l 0x11c00380 8; md.l 0x11c003c8 1` | SD_INFO1/2 and masks, SD_CLK_CTRL, SD_SIZE, SD_OPTION, CC_EXT_MODE, SOFT_RST, VERSION, HOST_MODE, SDIF_MODE, SD_STATUS | SDHI0 as U-Boot leaves it (the direct-mode start state); CC_EXT_MODE bits 12 and 4 read 1? | manual reset values except what U-Boot's PIO driver set (clock, option, HOST_MODE) | none | M5-sdhi spec | |
+| EVK-R76 | `md.l 0x11c00820 0x1a` | DM_CM_* and DM_DTRAN_ADDR (§40.2.25-40.2.32) | The internal DMAC after U-Boot (PIO only): reset values? | `0x30`, 0, `0xffffffff`, 0, `0xffffffff`, 0, `0xffffffff`, 0 | none | M5-sdhi spec | |
+| EVK-R77 | `md.l 0x11c01000 0x10` | SCC block (§40.6-40.7) | TAPNUM = 8 at reset (`DTCNTL` `0x00080000`), DT2FF `0x300` | as manual | none | M5-sdhi spec | |
+| EVK-R78 | `md.l 0x11c10070 4; md.l 0x11c10388 1` | SDHI1 SD_INFO1/2, VERSION | SDHI1 with no card: card-detect bit 5 reads 0? | INFO5 = 0 | none | M5-sdhi spec | |
+
 ## 2. Optional: Linux side (post-Linux, read-only)
 
 **Boot stage:** post-Linux. These values are neither the reset state nor the post-firmware state. Record the image and kernel build ID. A downstream image carries its own DT, so DT-level answers apply to that image only. Rows marked `/dev/mem` need a project-owned G1 debug image with `devmem`.
