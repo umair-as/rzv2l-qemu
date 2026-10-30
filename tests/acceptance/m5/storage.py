@@ -4,7 +4,8 @@
 Usage: storage.py OUTDIR --tier g0|g1
 
 On a fresh copy of tests/guests/out/sd/sd.img (OUTDIR/sd.img), with the
-kernel and DTB of the tier and the BusyBox initramfs:
+kernel and DTB of the tier and the BusyBox initramfs, on the card's data
+partition (p1; p2 holds the root file system of rootfs.py):
   boot 1: the SD card on SDHI0 is found as mmc0 (the loader's mmc0/mmc1
           aliases), no request timeout, SDHI1 has no card; mount the ext4 partition, check the image's README,
           write four files whose sizes cross block and request
@@ -19,6 +20,7 @@ Writes OUTDIR/boot{1,2}/serial.log and qemu.log. Exit 0 only if every
 check passes. QEMU binary: $QEMU.
 """
 import hashlib
+import json
 import os
 import re
 import secrets
@@ -34,7 +36,6 @@ from shell import Serial, BOOT_TIMEOUT  # noqa: E402
 OUT = os.path.join(HERE, "..", "..", "guests", "out")
 INITRD = os.path.join(OUT, "g0", "initramfs.cpio.gz")
 IMAGE = os.path.join(OUT, "sd", "sd.img")
-PART_START = 2048 * 512
 FILES = [("one.bin", 1), ("b513.bin", 513), ("p4097.bin", 4097),
          ("big.bin", 1024 * 1024 + 7)]
 
@@ -131,10 +132,13 @@ def main():
 
     # Host: the image itself, read by e2fsprogs
     with tempfile.TemporaryDirectory() as tmp:
+        p1 = json.loads(subprocess.run(
+            ["sfdisk", "-J", img], capture_output=True, text=True,
+            check=True).stdout)["partitiontable"]["partitions"][0]
         part = os.path.join(tmp, "p1.img")
         with open(img, "rb") as f, open(part, "wb") as p:
-            f.seek(PART_START)
-            shutil.copyfileobj(f, p)
+            f.seek(p1["start"] * 512)
+            p.write(f.read(p1["size"] * 512))
         fsck = subprocess.run(["e2fsck", "-fn", part], capture_output=True,
                               text=True)
         check(fsck.returncode == 0, "host: e2fsck -fn finds the file system "

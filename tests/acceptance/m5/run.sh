@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # M5 acceptance for rzv2l-smarc: an ext4 file system on an SD card behind
-# the SD/MMC host interface (docs/units/M5-sdhi/spec.md), with the
-# mainline (G0) and the Renesas (G1) kernel; M4 acceptance first.
+# the SD/MMC host interface (docs/units/M5-sdhi/spec.md), and user space
+# from an ext4 root file system on the card, without an initramfs
+# (docs/units/M5-sd-rootfs/spec.md), with the mainline (G0) and the
+# Renesas (G1) kernel; M4 acceptance first.
 # Exit 0 only if every check passes.
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
 set -uo pipefail
@@ -34,11 +36,17 @@ for tier in g0 g1; do
     result $?
 done
 
+for tier in g0 g1; do
+    step "root file system on the card, $tier"
+    python3 -I "$HERE/rootfs.py" "$OUT/root-$tier" --tier "$tier"
+    result $?
+done
+
 # Log gate: every -d line is a recorded stub window or a listed line
 step "log gate"
 allow=$(cat "$HERE/../m4/expected/log-allow.txt" "$HERE/expected/log-allow.txt" |
         grep -v -e '^#' -e '^$')
-for log in "$OUT"/g[01]/boot[12]/qemu.log; do
+for log in "$OUT"/g[01]/boot[12]/qemu.log "$OUT"/root-g[01]/boot[12]/qemu.log; do
     name=${log#"$OUT"/}
     if [ ! -s "$log" ]; then
         echo "FAIL $name: missing or empty"; result 1; continue
