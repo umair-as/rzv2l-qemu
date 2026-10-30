@@ -78,7 +78,7 @@ The MAC has a checksum engine (TOE). Linux turns it on and then leaves the IPv4,
 - **Synchronous work**: a transmit request runs the ring at once; a received frame is stored when QEMU delivers it. So the "busy" bits Linux polls (`TSRQ0`, `CSR.TPO`, `CSR.RPO`) read 0 whenever Linux looks, as on an idle MAC.
 - **A separate PHY device** (`ksz9131-phy`), on the board, not in the SoC: it sits on the SMARC module. Its `INT_N` is a GPIO into the IRQC's `irq` input 2; its "link" output goes back to the MAC, which reports it in `CXR2B` and in the `LINKI` interrupt the vendor kernel enables.
 - **The MAC address**: on the board, U-Boot writes it into the device tree (`local-mac-address`) before it starts Linux. QEMU's loader does the same with the NIC's address, so `-nic ...,mac=` sets the address Linux uses.
-- **User networking** (`-nic user`) gives the guest a private network with a DHCP server and the host as `10.0.2.2`. It needs no root and no host interface, so the acceptance test runs anywhere.
+- **User networking** (`-nic user`) gives the guest a private network with a DHCP server and the host as `10.0.2.2`. It needs no root and no host interface, so the acceptance test runs anywhere. `scripts/run.sh` and the earlier milestones' boots put ETH0 on it by default: the board's boot arguments include `ip=on`, and without a cable Linux waits two minutes for one, as a real board would.
 
 ## 7. Try it
 

@@ -11,7 +11,8 @@ The words used here: **M1, M2, …** are the milestones ([milestones page](miles
 ```bash
 sudo apt install git build-essential ninja-build python3-venv pkg-config \
     libglib2.0-dev libpixman-1-dev flex bison bc libssl-dev cpio \
-    gcc-aarch64-linux-gnu device-tree-compiler e2fsprogs fdisk fakeroot
+    gcc-aarch64-linux-gnu device-tree-compiler e2fsprogs fdisk fakeroot \
+    libslirp-dev
 ```
 
 **QEMU** (the fork is the `qemu/` submodule; a few minutes):
@@ -20,7 +21,7 @@ sudo apt install git build-essential ninja-build python3-venv pkg-config \
 git clone --recurse-submodules https://github.com/umair-as/rzv2l-qemu.git
 cd rzv2l-qemu
 mkdir -p build/qemu && cd build/qemu
-../../qemu/configure --target-list=aarch64-softmmu --disable-docs
+../../qemu/configure --target-list=aarch64-softmmu --disable-docs   # says "slirp support : YES"
 ninja qemu-system-aarch64
 cd ../..
 ```
@@ -175,19 +176,12 @@ e2fsck -fn build/p2.img
 
 ## M6: Ethernet
 
-Networking needs QEMU built with user-mode networking (slirp): a private network inside QEMU, with a DHCP server and the host reachable as `10.0.2.2`. It touches no host interface and needs no root. Install the library and configure QEMU again (a few minutes):
+`scripts/run.sh` puts ETH0 on QEMU's user-mode network (slirp, from `libslirp-dev` in step 0): a private network inside QEMU, with a DHCP server and the host reachable as `10.0.2.2`. It touches no host interface and needs no root. It is the cable on the board's ETH0; without it (`--no-net`), the board's boot arguments (`ip=on`) make Linux wait two minutes for a link at every boot. A `build/qemu` configured before `libslirp-dev` was installed has no user networking (QEMU stops with "network backend 'user' is not compiled"): run step 0's `configure` and `ninja` again.
+
+In a second terminal, serve a file from the host: `python3 -m http.server -b 127.0.0.1 8000 -d docs`. Then boot:
 
 ```bash
-sudo apt install libslirp-dev
-cd build/qemu && ../../qemu/configure --target-list=aarch64-softmmu --disable-docs \
-    | grep 'slirp support'                                   # slirp support : YES
-ninja qemu-system-aarch64 && cd ../..
-```
-
-In a second terminal, serve a file from the host: `python3 -m http.server -b 127.0.0.1 8000 -d docs`. Then boot with ETH0 on the user network (the first `-nic` is ETH0):
-
-```bash
-scripts/run.sh -t g0 -- -nic user,id=net0         # or -t g1
+scripts/run.sh -t g0         # or -t g1
 ```
 
 At the shell:
@@ -207,7 +201,7 @@ The hash matches `sha256sum docs/walkthrough.md` on the host. To pull the cable,
 tests/acceptance/m6/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn and ends with `M6 ACCEPTANCE: PASS`; M6 needs the slirp build above. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn and ends with `M6 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 ## Options of `scripts/run.sh`
 
@@ -215,6 +209,7 @@ It runs the acceptance checks of M1 to M6 in turn and ends with `M6 ACCEPTANCE: 
 |---|---|
 | `-t g0` / `-t g1` | mainline or Renesas kernel (default `g1`) |
 | `--sd IMAGE` | an SD card in the module slot (`/dev/mmcblk0`) |
+| `--no-net` | no network on ETH0 (by default ETH0 is on QEMU user networking, `net0`) |
 | `-b N` | boot mode pins 0-5 (0: SD card, the default; 1: eMMC) |
 | `-a "ARGS"` | kernel command line instead of the device tree's |
 | `--dumpdtb` | write the device tree QEMU gives Linux, then stop |

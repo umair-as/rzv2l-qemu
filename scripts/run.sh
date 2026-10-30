@@ -10,6 +10,9 @@
 #   -b, --boot-mode N    MD_BOOT pins 0-5 (default 0, eSD); 1 = eMMC
 #   -a, --append "ARGS"  kernel command line (default: the DTB's own bootargs)
 #   -n, --no-initrd      boot without the BusyBox initramfs
+#       --no-net         no network backend on ETH0: no cable, and the
+#                        stock bootargs' ip=on then waits 120 s for one
+#                        (default: ETH0 on QEMU user networking, "net0")
 #   -s, --sd IMAGE       raw SD card image in the module slot (SDHI0, mmc0);
 #                        the guest writes to it, so pass a copy you can lose
 #                        (tests/guests/sd/build-image.sh builds one)
@@ -35,6 +38,7 @@ tier=g1
 boot_mode=0
 append=""
 initrd=1
+net=1
 sd=""
 debug="unimp,guest_errors,invalid_mem"
 out=""
@@ -52,6 +56,7 @@ while [ $# -gt 0 ]; do
         -b|--boot-mode) boot_mode="${2:?}"; shift 2 ;;
         -a|--append) append="${2?}"; shift 2 ;;
         -n|--no-initrd) initrd=0; shift ;;
+        --no-net) net=0; shift ;;
         -s|--sd) sd="${2:?}"; shift 2 ;;
         -d|--debug) debug="${2:?}"; shift 2 ;;
         -o|--out) out="${2:?}"; shift 2 ;;
@@ -90,6 +95,8 @@ cmd=("$QEMU" -M "$machine" -kernel "$KERNEL" -dtb "$DTB"
 [ "$initrd" -eq 0 ] || cmd+=(-initrd "$INITRD")
 [ -z "$append" ] || cmd+=(-append "$append")
 [ -z "$sd" ] || cmd+=(-drive "if=sd,index=0,format=raw,file=$sd")
+# A cable on ETH0, as on the EVK's cabled port: user networking (slirp)
+[ "$net" -eq 0 ] || cmd+=(-nic user,id=net0)
 [ "$debug" = none ] || cmd+=(-d "$debug" -D "$out/qemu.log")
 [ "$gdb" -eq 0 ] || cmd+=(-s -S)
 cmd+=("${extra[@]}")

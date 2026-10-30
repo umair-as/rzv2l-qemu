@@ -38,7 +38,8 @@ Manual §30 (p.2077-2315), §8.6 (p.552-553), Table 8.2; SoM UM Table 4.1 p.19, 
 
 ## For the operator
 
-- **Network backend:** user networking (slirp), isolated, no root, no LAN. The host side of each transfer is a server on 127.0.0.1, which the guest reaches as `10.0.2.2`. QEMU must be configured with slirp: the walkthrough adds `libslirp-dev` to the host packages (the existing `build/qemu` has no slirp).
+- **Network backend:** user networking (slirp), isolated, no root, no LAN. The host side of each transfer is a server on 127.0.0.1, which the guest reaches as `10.0.2.2`. QEMU must be configured with slirp: the walkthrough adds `libslirp-dev` to the host packages (a `build/qemu` configured before has no slirp).
+- **A cable on ETH0 by default (operator's decision):** with Ethernet working, the stock boot arguments' `ip=on` waits up to 120 s for a carrier when no channel has one, as on an uncabled board; the M3 and M4 boots then missed their boot timeout. The model keeps "no backend = no cable"; `scripts/run.sh` and the M3-M5 acceptance boots with the stock arguments add `-nic user,id=net0`, like the EVK's cabled port (`--no-net` turns it off).
 - **MAC address:** taken from the DT (U-Boot's edit, applied by the loader), not preloaded into `CXR24/CXR25`: Linux would read those only without a DT address. The QEMU NIC's MAC (`-nic …,mac=`) is the address Linux uses.
 - **PHY wiring:** the PHY interrupt goes straight to the IRQC input; the PFC pin function of P1_0/P1_1 (IRQ2/IRQ3) is not checked. The PHY revision nibble (`PHYID2` bits 3:0) and the vendor registers' reset values are not measured (A); Linux does not read them. An EVK U-Boot `mii read 7 <reg>` session would settle them.
 - **Conflicts recorded:** `CXR23.MM` modelled read/write (the manual says read 0; the driver needs read-back); `CSR2.RTCP4` "read as 0" line taken as misplaced; `RCPT = 1` without the TOE RX path stores the CRC (A).
