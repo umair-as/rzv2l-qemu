@@ -22,6 +22,9 @@ PAIRS = (
     + [("ok", "ok-soft"), ("danger", "danger-soft"), ("warn", "warn-soft"), ("info", "info-soft"),
        ("accent", "accent-soft")]
     + [("accent-ink", "accent"), ("panel", "danger"), ("term-ink", "term-bg"), ("term-ink", "term-sel")]
+    # selected rows (Runs, found Map rows) and the current search match
+    + [(fg, "accent-soft") for fg in ["ok", "danger", "warn", "info", "muted"]]
+    + [("panel", "warn")]
 )
 
 

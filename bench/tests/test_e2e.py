@@ -815,6 +815,9 @@ def test_splitter_shares_the_width_and_is_kept(server):
         expect(page.get_by_test_id("splitter")).to_have_attribute("aria-valuenow", "50")
         page.get_by_test_id("splitter").dblclick()
         expect(page.get_by_test_id("splitter")).to_have_attribute("aria-valuenow", "60")
+        page.set_viewport_size({"width": 760, "height": 900})       # stacked: no splitter
+        # (a zero-height grid row would pass to_be_hidden while its grip still draws)
+        expect(page.get_by_test_id("splitter")).to_have_css("display", "none")
         browser.close()
 
 
@@ -884,6 +887,17 @@ def test_log_search_highlights_without_touching_the_text(server):
         assert page.get_by_test_id("log-lines").text_content() == before
         page.evaluate("(l) => appendPre('log', l)", lines[3])   # a new line is found too
         expect(count).to_have_text("1/3")
+        # While lines stream in faster than the refresh interval, the count
+        # still moves (a debounce would hold it at 1/3 until they stop)
+        seen = page.evaluate("""async () => {
+            const out = [];
+            for (let i = 0; i < 20; i++) {
+                appendPre('log', 'unimp: streamed ' + i);
+                await new Promise((r) => setTimeout(r, 50));
+                out.push(document.querySelector('[data-testid=log-search-count]').textContent);
+            }
+            return out; }""")
+        assert any(c not in ("1/3", "1/23") for c in seen[:15]), seen
         page.get_by_test_id("log-search").fill("nothing-like-this")
         expect(count).to_have_text("no match")
         browser.close()

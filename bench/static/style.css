@@ -473,7 +473,8 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, tran
   .readout[data-verdict="pass"][data-flash], .readout[data-verdict="fail"][data-flash] { animation: flash .6s ease-out; }
 }
 @keyframes led { 50% { opacity: .5; } }
-@keyframes flash { from { background: color-mix(in srgb, var(--led, var(--accent)) 30%, var(--face)); } }
+/* A glow around the readout, not behind its text: contrast stays AA */
+@keyframes flash { from { box-shadow: var(--bezel), 0 0 0 4px color-mix(in srgb, var(--led, var(--accent)) 45%, transparent); } }
 .readout[data-verdict="pass"] { --led: var(--ok); }
 .readout[data-verdict="fail"] { --led: var(--danger); }
 

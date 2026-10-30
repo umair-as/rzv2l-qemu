@@ -316,10 +316,11 @@ function makeSearch(name, pane) {
   // Text changed under the search (new log lines, another file): find again
   let timer;
   return {
+    // A throttle, not a debounce: while lines stream in, the count still
+    // moves every 150 ms (each append replaces the pane's text node)
     refresh(keep) {
-      if (!input.value) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => find(keep), 150);
+      if (!input.value || timer) return;
+      timer = setTimeout(() => { timer = null; find(keep); }, 150);
     },
   };
 }
@@ -568,9 +569,11 @@ function renderStrip(shown) {
     bar.append(seg);
   }
   strip.querySelector(".lo").textContent = mapRows[0].base;
-  const last = mapRows[mapRows.length - 1];
-  strip.querySelector(".hi").textContent =
-    "0x" + (BigInt(last.base) + BigInt(last.size) - 1n).toString(16).padStart(8, "0");
+  const end = mapRows.reduce((m, r) => {      // the largest end, should windows overlap
+    const e = BigInt(r.base) + BigInt(r.size) - 1n;
+    return e > m ? e : m;
+  }, 0n);
+  strip.querySelector(".hi").textContent = "0x" + end.toString(16).padStart(8, "0");
 }
 
 function findMapRow(base) {
