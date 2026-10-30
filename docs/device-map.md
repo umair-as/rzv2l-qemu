@@ -33,9 +33,9 @@
 | SCIF2 | `0x1004C000` | `0x400` | SPI 390-394, same pattern | `CLK_ON 0x584 b2`; `RST 0x884 b2` | DTB-U enables it (alias serial1, `uart-has-rtscts`, P48 pins) | M2 (wired at reset; the `sh-sci` probe of it is M3b) | NEW (same model) | FUNCTIONAL / faithful; modem lines stored only | scif §1, §9; pinctrl §4 |
 | SCIF1, SCIF3, SCIF4 | `0x1004BC00`, `0x1004C400`, `0x1004C800` | `0x400` each | SPI 385-389, 395-399, 400-404 | `CLK_ON 0x584 b1/b3/b4`; `RST 0x884 b1/b3/b4` | disabled in DTB-U | M2 (wired at reset, no guest use) | NEW (same model) | FUNCTIONAL / faithful | scif §1, §9 |
 | OSTM0-2 (GTM) | `0x12801000`, `0x12801400`, `0x12801800` | `0x400` each | SPI 46, 47, 48 edge-rising | `CLK_ON 0x534 b0-2` (reset 0x1); `RST 0x834 b0-2` (reset 0x1) | Linux `renesas-ostm` (ostm1/2 enabled; one-shot probe; first one becomes `sched_clock` at 100 MHz, O) | M3b | NEW: counter at P0, TE/TS/TT (TE clears on TT) | FUNCTIONAL / faithful (RAZ would be silent-wrong) | cpu-gic §3; boot-dependency-graph §4; Manual §20.1.1 Table 20.2 p.1224, §20.2.2.3-5 p.1229-1230 |
-| WDT0 (CA55 core0) | `0x12800800` | `0x400` | SPI 49 wdt, 50 perrout; level-high | `CLK_ON 0x548 b0-1` (reset 0xC3: on); `RST 0x848 b0` (reset 0x9: released) | Linux `rzg2l_wdt` (no register read at probe); U-Boot autostart (60 s); BL31 `SYSTEM_RESET` writes `PEEN_0` @ `0x12800814` | M3b map; M4 FUNCTIONAL | UNIMP at M3b (listed); NEW at M4 | STUB at M3b: never started in G0 direct mode. M4: FUNCTIONAL (overflow, parity-force reset) | boot-chain-firmware §2; boot-dependency-graph §4; Manual §21.2 Table 21.3 p.1245, Table 21.4 p.1246 |
-| WDT1 (CA55 core1) | `0x12800C00` | `0x400` | SPI 51 wdt, 52 perrout | `CLK_ON 0x548 b2-3`; `RST 0x848 b1` | Linux `rzg2l_wdt` (enabled) | M3b map; M4 | as WDT0 | as WDT0 | as WDT0; dtsi:1264-1277 |
-| WDT2 (CM33) | `0x12800400` | `0x400` | not in DTB-U | `CLK_ON 0x548` (Manual §7.2.4.44 p.308); no Linux clock | none (M33 side) | later | UNIMP | UNSUPPORTED placeholder (RAZ/WI, logged). Honesty **not established**: no known consumer is a low risk, not a guest-visible failure. Reclassify at the M3b per-window review (REQ-MAP-001) | Manual Table 21.3 p.1245 |
+| WDT0 (CA55 core0) | `0x12800800` | `0x400` | SPI 49 wdt, 50 perrout; level-high | `CLK_ON 0x548 b0-1` (reset 0xC3: on); `RST 0x848 b0` (reset 0x9: released) drives the channel's PRESETN | Linux `rzg2l_wdt` (no register read at probe; start/ping/stop/restart, stop by the CPG reset); U-Boot autostart (60 s, EVK-R40); BL31 `SYSTEM_RESET` writes `PEEN_0` @ `0x12800814` | M4 | NEW | FUNCTIONAL: counter at 24 MHz, first overflow WDTINT, second WDTRSTB; PEEN forced WDTRSTB/PERROUT; WDTRSTB resets the system through CPG_WDTRST_SEL and records CPG_WDTOVF_RST. Parity error inputs stored only | Manual §21 Tables 21.3-21.5 p.1245-1262; §7.2.4.182-183 p.459-461; qtest `rzv2l-wdt-test`; M4 acceptance |
+| WDT1 (CA55 core1) | `0x12800C00` | `0x400` | SPI 51 wdt, 52 perrout | `CLK_ON 0x548 b2-3`; `RST 0x848 b1` | Linux `rzg2l_wdt` (enabled) | M4 | NEW | as WDT0 | as WDT0; dtsi:1264-1277 |
+| WDT2 (CM33) | `0x12800400` | `0x400` | SPI 53 wdt, 54 perrout (Table 8.2 p.536); not in DTB-U | `CLK_ON 0x548`; `RST 0x848 b2` | none (M33 side) | M4 | NEW | as WDT0 (same IP; no Linux consumer) | Manual Table 21.3 p.1245 |
 
 ### 1.2 Other windows enabled in DTB-U (must be mapped by M3b)
 
@@ -119,7 +119,8 @@ Values Linux or the console path can observe. "Code" = derived from the pinned f
 | SYSC RVAL1/RVAH1 `0x860/0x864` | `0x00020000` / `0` | unchanged before any CPU_ON (I) | — | Y (EVK-R02) |
 | SYSC DEVID / PRR / LSI_MODE | latched | `0x18447447` / `0` / boot switches | O (BL2) | N (re-read in EVK-R01) |
 | SYC CNTCR / CNTFID0 (`+0x020`, I) | TRM | EN=1 / `0x016E3600` | I | Y (EVK-R50) |
-| WDT0 WDTCNT `0x12800800` | `0` | `1` if U-Boot started it; **G0 direct mode default: not running** | boot-chain-firmware §1 vs boot-dependency-graph §4 | Y (EVK-R40) |
+| WDT0 WDTCNT `0x12800800` | `0` | `1`: U-Boot autostarts it (EVK-R40: WDTCNT 1, WDTSET `0x2AE00000`, a 30 s cycle, reset after 60 s); **direct mode: not running** (gap 16) | EVK-R40 | Y (EVK-R40) |
+| CPG_WDTRST_SEL `0x11010B14` | `0x88` (WDT system reset masked) | `0x8F`: TF-A `cpg_setup` sets bits 2:0 | TF-A `cpg.c` (code-derived) | N (not read on the EVK) |
 | CNTFRQ_EL0 | — | 24 MHz | O | N |
 | GIC | — | all SPIs Group 1 NS, DS=0 (QEMU `irq_reset_nonsecure`) | O (DS=0) + cpu-gic §6 D2 | Y (EVK-R60…R66) |
 
@@ -142,7 +143,7 @@ Values Linux or the console path can observe. "Code" = derived from the pinned f
 | 13 | SCIF baud rate | divisor programmed | stored; used for character timing only | documented | scif §10 |
 | 14 | `ID_AA64PFR0_EL1.EL2` | A55 implements EL2 (A) | `has_el2=false` in Stage A reads EL2 = 0 | FIDELITY GAP (A; not yet measured) | cpu-gic §5, §6 D2 |
 | 15 | IRQC external/TINT interrupt delivery | routes IRQ0-7, TINT | STUB at M3b: never asserted | gap until M6 | boot-dependency-graph §4 |
-| 16 | WDT0 in direct mode | running if U-Boot autostarted it | not running unless the U-Boot path is mimicked | documented choice (spec §9) | boot-chain-firmware §1; boot-dependency-graph §4 |
+| 16 | WDT0 in direct mode | running: U-Boot autostarts it with a 60 s timeout (EVK-R40) | not running, so a kernel without a watchdog daemon is not reset after 60 s | documented choice (spec §9) | EVK-R40; boot-chain-firmware §1 |
 | 17 | Windows left unmapped over working silicon | every DTB-U block works | each window not modelled yet (all but DDR, GIC, SYSC, SCIF0-4) is unmapped: an access aborts | recorded gap under DR-0005: no M2 guest touches one (the M2 acceptance log gate allows only the probe's two deliberate lines), and each window is reviewed at M3b (REQ-MAP-001) | DR-0005; `tests/acceptance/m2/` |
 | 18 | Generic timer rate | `CNTFRQ` 24 MHz (O: EVK boot log, `arch_timer` line) | `CNTFRQ` reads 24 MHz, but QEMU ticks the counter every 41 ns, the truncated 10^9 / 24·10^6 (`qemu/target/arm/cpu.c` `gt_cntfrq_period_ns`, deliberate upstream): it counts at 24.39 MHz, so guest time runs about 1.6 % fast against host time | FIDELITY GAP, guest-visible (time) | M3b-shell spec |
 
