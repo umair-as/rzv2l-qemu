@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""M3 acceptance: boot G0 to the BusyBox shell on ttySC0 and talk to it.
+"""Boot a kernel to the BusyBox shell on ttySC0 and talk to it (M3, M4).
 
-Usage: shell.py OUTDIR [extra QEMU args...]
+Usage: shell.py OUTDIR [--tier g0|g1] [--watchdog] [extra QEMU args...]
 
-Boots the stock G0 kernel, DTB-U and the G0 initramfs on rzv2l-smarc in
-direct mode, with SCIF0 on a socket. Checks, on the serial line:
+Boots the stock kernel and device tree of the tier (G0: mainline and
+DTB-U; G1: the Renesas vendor kernel and its DTB-V) with the G0 initramfs
+on rzv2l-smarc in direct mode, with SCIF0 on a socket. Checks, on the
+serial line:
   - the sh-sci console takes over (the "legacy console [ttySC0] enabled"
     line) and /init reports both CPUs online (0-1)
   - a per-run command gets its response: the shell computes a value the
@@ -17,6 +19,12 @@ direct mode, with SCIF0 on a socket. Checks, on the serial line:
     uptime line. QEMU truncates the 24 MHz counter period to 41 ns, so the
     expected value is about 1.016 (target/arm/cpu.c gt_cntfrq_period_ns;
     device map section 4, gap 18)
+With --watchdog, on /dev/watchdog (WDT0) with BusyBox `watchdog`:
+  - pinged every second with a 3 s timeout, the board does not reset in
+    8 s; stopped with the daemon (magic close), it does not reset in 8 s
+  - started and then not pinged, it resets the board within 20 s (3 s,
+    then the boot back to the console), and after the new boot
+    CPG_WDTOVF_RST reads 1: WDT0 caused the reset
 Writes OUTDIR/serial.log (the whole serial line) and OUTDIR/qemu.log (the
 -d log). Exit 0 only if every check passes. QEMU binary: $QEMU.
 """
@@ -29,10 +37,9 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-G0 = os.path.join(HERE, "..", "..", "guests", "out", "g0")
-KERNEL = os.path.join(G0, "linux", "arch", "arm64", "boot", "Image")
-DTB_U = os.path.join(G0, "r9a07g054l2-smarc.dtb")
-INITRD = os.path.join(G0, "initramfs.cpio.gz")
+OUT = os.path.join(HERE, "..", "..", "guests", "out")
+INITRD = os.path.join(OUT, "g0", "initramfs.cpio.gz")
+CPG_WDTOVF_RST = 0x11010B10
 BOOT_TIMEOUT = 180  # s; the stubbed SD probes alone take about 17 s
 
 
@@ -78,9 +85,60 @@ class Serial:
             self.log.flush()
 
 
+def check_watchdog(s, mark, check):
+    """The WDT0 checks of --watchdog (docstring above)."""
+    boot = re.compile(r"Booting Linux on physical CPU")
+    booted = len(boot.findall(s.buf))
+
+    pos = len(s.buf)
+    s.send("watchdog -T 3 -t 1 /dev/watchdog; sleep 8; echo %s-$((3+4))"
+           % mark)
+    ok = s.wait(re.escape(mark) + r"-7\b", 30, pos) is not None
+    check(ok and len(boot.findall(s.buf)) == booted,
+          "WDT0 pinged every 1 s (timeout 3 s): no reset in 8 s")
+
+    pos = len(s.buf)
+    s.send("killall watchdog; sleep 8; echo %s-$((4+4))" % mark)
+    ok = s.wait(re.escape(mark) + r"-8\b", 30, pos) is not None
+    check(ok and len(boot.findall(s.buf)) == booted,
+          "WDT0 stopped by the daemon (magic close): no reset in 8 s")
+
+    pos = len(s.buf)
+    t0 = time.monotonic()
+    s.send("watchdog -T 3 -t 1000 /dev/watchdog")
+    # 3 s, then the boot back to the console: a 60 s default timeout
+    # left in place (the timeout change did not apply) fails here
+    m = s.wait(boot.pattern, 20, pos)
+    if not check(m is not None, "WDT0 not pinged (timeout 3 s): the board "
+                 "resets within 20 s (new boot after %.1f s)"
+                 % (time.monotonic() - t0)):
+        return
+    pos = m.end()
+    if not check(s.wait(r"G0-INIT: ready, cpus online (\S+)\r?\n",
+                        BOOT_TIMEOUT, pos) is not None,
+                 "the shell comes back after the reset"):
+        return
+    pos = len(s.buf)
+    s.send("devmem 0x%08X; echo %s-$((5+4))" % (CPG_WDTOVF_RST, mark))
+    s.wait(re.escape(mark) + r"-9\b", 30, pos)
+    v = re.search(r"^0x([0-9A-Fa-f]{8})\r?$", s.buf[pos:], re.M)
+    check(v is not None and int(v.group(1), 16) == 1,
+          "CPG_WDTOVF_RST after the reset: %s (WDT0 = 0x00000001)"
+          % (v.group(0).strip() if v else "none"))
+
+
 def main():
     out = sys.argv[1]
     extra = sys.argv[2:]
+    tier = "g0"
+    if extra[:1] == ["--tier"]:
+        tier, extra = extra[1], extra[2:]
+    watchdog = extra[:1] == ["--watchdog"]
+    if watchdog:
+        extra = extra[1:]
+    KERNEL = os.path.join(OUT, tier, "linux", "arch", "arm64", "boot",
+                          "Image")
+    DTB_U = os.path.join(OUT, tier, "r9a07g054l2-smarc.dtb")
     qemu = os.environ["QEMU"]
     os.makedirs(out, exist_ok=True)
     sock = os.path.join(out, "serial.sock")
@@ -167,6 +225,8 @@ def main():
                       "guest time / host time = %.4f over sleep 10 "
                       "(0.99-1.03; gap 18 predicts about 1.016)"
                       % (guest / host))
+            if watchdog:
+                check_watchdog(s, mark, check)
         finally:
             proc.kill()
             proc.wait()
