@@ -1,7 +1,7 @@
 # M1-machine-skeleton — spec
 
 **Milestone:** M1
-**Status:** REVIEWED (2026-10-09): operator review and independent review (findings dispositioned)
+**Status:** REVIEWED: operator review and independent review (findings dispositioned)
 **Requirements:** REQ-GUEST-004 (loader fixups listed), REQ-MACH-001, REQ-MACH-002, REQ-MACH-003, REQ-MACH-004 (configured only), REQ-MACH-006, REQ-MACH-007, REQ-MACH-008 (M1 windows), REQ-SYSC-001, REQ-SYSC-002 (implemented; accepted at M7), REQ-MAP-001 (initial classification only), REQ-TEST-002
 
 ## Goal
@@ -64,7 +64,7 @@
 - EVK values: `../../evidence/EVK-2026-10-08-boot-log.md` (MIDR, redistributor bases, 480 SPIs, DEVID, PRR); GIC identity from `../../evidence/requests.md` EVK-R60–R66 (not yet captured).
 - Decisions: DR-0003 (GIC identity, option A).
 
-## Decisions (operator review, 2026-10-09)
+## Decisions (operator review)
 
 1. `MPIDR_EL1.MT`: 0 in M1, recorded as a gap (above); revisit at M7, where real TF-A replaces QEMU's PSCI and the value can first be measured.
 2. `SYS_LSI_MODE`: implemented in M1 from board properties `boot-mode` (manual modes 0–5, default 0 = eSD, the operator's usual boot source) and `debugen` (AC12b); REQ-SYSC-002 is accepted at M7.

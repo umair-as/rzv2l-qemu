@@ -1,6 +1,6 @@
 # M1-machine-skeleton — design
 
-**Status:** DRAFT (2026-10-09); implementation may start, operator reviews as tasks land
+**Status:** DRAFT; implementation may start, operator reviews as tasks land
 **Implements:** `spec.md` (REVIEWED). QEMU citations are qemu v11.1.2.
 
 ## Structure

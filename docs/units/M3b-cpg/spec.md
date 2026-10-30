@@ -1,6 +1,6 @@
 # M3b-cpg — spec
 
-**Milestone:** M3 (unit M3b-1). **Requirement:** REQ-CPG-001. **Status:** written 2026-10-29. The operator lifted the stop after this page: they review by booting the model, so implementation follows straight on.
+**Milestone:** M3 (unit M3b-1). **Requirement:** REQ-CPG-001.
 
 ## Scope
 
@@ -16,7 +16,7 @@ A new device `renesas-rzv2l-cpg` at `0x11010000` (64 KiB, 32-bit accesses only),
 
 ## What the guest needs
 
-G0 = linux v6.12.59 `drivers/clk/renesas/rzg2l-cpg.c`, with the tables in `r9a07g044-cpg.c` (`r9a07g054_cpg_info`, `has_clk_mon_regs = true` at :500). `CONFIG_CLK_R9A07G054=y`. Every line below was checked on 2026-10-29.
+G0 = linux v6.12.59 `drivers/clk/renesas/rzg2l-cpg.c`, with the tables in `r9a07g044-cpg.c` (`r9a07g054_cpg_info`, `has_clk_mon_regs = true` at :500). `CONFIG_CLK_R9A07G054=y`. Every line below was checked against the pinned source.
 
 | Access (guest `file:line`) | Register | Reset (manual) | Direct mode (EVK) |
 |---|---|---|---|
@@ -31,7 +31,7 @@ G0 = linux v6.12.59 `drivers/clk/renesas/rzg2l-cpg.c`, with the tables in `r9a07
 
 The direct-mode overlay is the 23 words where the EVK differs from Table 7.5. It is taken from the raw dumps of 2026-10-29 (`../../evidence/EVK-2026-10-29-post-firmware.md`). Registers no dump covers (SIPLL5_STBY, PL5_SDIV) start at the manual value (A); G0 never reads them.
 
-## Questions the operator delegated (settled from the manual and the EVK, 2026-10-29)
+## Questions the operator delegated (settled from the manual and the EVK)
 
 1. **WDT CLK_MON bits 7:6.** The manual gives CLK_MON_WDT a reset value of `0xC3`, with bits 7:6 reserved as 1 (Table 7.5 p.248, §7.2.4.83). The EVK reads CLK_ON `0xFF` and CLK_MON `0x3F` (R16, X01). Silicon is the authority for behaviour, so the model reads them as 0. Elsewhere the monitor keeps the manual's reserved 1s, because the EVK confirms them there: CLK_MON_MBUS reads `0x7FF`, as the manual says. **Conflict recorded:** in firmware mode the model's CLK_MON_WDT reads `0x03`, not the Table's `0xC3`.
 2. **PL1_DDIV reset value.** Table 7.5 p.246 writes `H'0000 000x`. The bit table in §7.2.4.16 p.274 gives 00b, and the EVK reads 0 (R11). Settled: 0.
@@ -59,7 +59,7 @@ The terminal stays empty; see `../../learning/building-and-testing.md` §8 for t
 
 `../../research/cpg-reset.md` §2, §5, §7 and its EVK results; EVK rows R10-R19, R72, X01, X02 and the raw `md.l` dumps; HW manual Rev 1.50 Table 7.5 and §7.2.4.1-209 (masks extracted from every bit table and cross-checked against Table 7.5); `../M2-first-character/first-blocker.md`.
 
-## Next blocker (2026-10-29, fork `4ae1d307eb`)
+## Next blocker (fork `4ae1d307eb`)
 
 From the diagnostic run (`keep_bootcon`); a later run differs only in the timestamps.
 
@@ -79,7 +79,7 @@ From the diagnostic run (`keep_bootcon`); a later run differs only in the timest
 | Log lines | Window (device map) | Class | Status |
 |---|---|---|---|
 | `rz-dmac: unimplemented device write` × 18 (CHCTRL of channels 0-15, DCTRL of both groups) | DMAC `0x11820000` | write-retaining STUB | mapped this unit |
-| `usbphy-ctrl: unimplemented device read/write` at `+0x0` | USB PHY control `0x11C40000` | write-retaining STUB (operator decision after review, 2026-10-29; was UNIMP) | mapped this unit |
+| `usbphy-ctrl: unimplemented device read/write` at `+0x0` | USB PHY control `0x11C40000` | write-retaining STUB (operator decision after review) | mapped this unit |
 | `tsu: unimplemented device read/write` (a bounded poll of TSU_SS; 15 lines on an idle host, fewer under load); guest prints `Failed to start TSU`, probe -110 | TSU `0x10059400` | UNIMP (honest bounded failure, as the device map predicts) | mapped this unit |
 | `Invalid read at addr 0x12801410, size 1` | OSTM1 `0x12801400` | FUNCTIONAL, needs a model | next unit |
 
@@ -88,5 +88,5 @@ No CPG line appears: every CPG access the kernel makes is to a modelled register
 ### Listed for the operator
 
 - **CPG offsets Table 7.5 does not list** (question 4 above) answer with a bus error, while silicon reads live values at 60 of them. No guest touches them yet.
-- **USB PHY control (decided 2026-10-29):** the driver sets and clears reset bits in its RESET register (`+0x0`) with read-modify-writes and reads it back for the reset status (linux v6.12.59 `drivers/reset/reset-rzg2l-usbphy-ctrl.c:54-58`, `:73-77`, `:91`, `:156-158`). Read-as-zero would lose those bits, so the operator chose a write-retaining stub, as for the DMAC.
+- **USB PHY control:** the driver sets and clears reset bits in its RESET register (`+0x0`) with read-modify-writes and reads it back for the reset status (linux v6.12.59 `drivers/reset/reset-rzg2l-usbphy-ctrl.c:54-58`, `:73-77`, `:91`, `:156-158`). Read-as-zero would lose those bits, so the operator chose a write-retaining stub, as for the DMAC.
 - **DMAC:** the stub keeps written values with a reset to 0. That is the device map's class; at probe the driver only writes, so read-as-zero would behave the same until a client starts a transfer.

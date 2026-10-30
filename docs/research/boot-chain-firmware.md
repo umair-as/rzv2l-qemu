@@ -1,7 +1,5 @@
 # RZ/V2L boot chain: what QEMU must provide
 
-**Date:** 2026-10-08
-
 **Method:** source reading and binary inspection of a Yocto build of the Renesas RZ/V2L BSP (`MACHINE=smarc-rzv2l`), plus serial console logs from the physical EVK. Paths below are relative to each upstream repository.
 
 **Sources:**

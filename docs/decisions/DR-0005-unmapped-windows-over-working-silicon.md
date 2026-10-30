@@ -1,6 +1,6 @@
 # DR-0005: Unmapped windows over working silicon
 
-- **Status:** Accepted (operator, 2026-10-29)
+- **Status:** Accepted by the operator
 - **Date:** 2026-10-29
 
 ## Context

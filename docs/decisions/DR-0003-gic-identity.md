@@ -1,6 +1,6 @@
 # DR-0003: GIC identity registers
 
-- **Status:** Accepted (operator, 2026-10-08): option A
+- **Status:** Accepted by the operator: option A
 - **Date:** 2026-10-08
 
 ## Context

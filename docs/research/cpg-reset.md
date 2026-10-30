@@ -1,6 +1,6 @@
 # CPG (clock, reset, MSTOP, PM domain): what the G0 kernel needs
 
-**Date:** 2026-10-08 (M0 research; re-based 2026-10-08 onto the pinned guest kernels, see `docs/sources.md` "Pinned guest kernels")
+Based on the pinned guest kernels (`docs/sources.md` "Pinned guest kernels").
 
 **Method:** source reading of linux v6.12.59 (G0 reference), rz_linux-cip `212f6e88b7` (branch `rz-6.12-cip14`, G1 reference) and the RZ/V2L HW manual Rev 1.50. Firmware facts come from `boot-chain-firmware.md` and are not re-derived here. The first draft of this note was written against linux v6.18.55; where that kernel behaves differently, the difference is kept in "Newer mainline (v6.18.55)" near the end.
 
@@ -234,14 +234,14 @@ All are read-only `md.l` reads at the **U-Boot prompt before `bootm`** (post-fir
 5. `md.l 0x11010b60 0xC`: MSTOP values left by firmware.
 6. Repeat 3-5 **post-Linux** from the G1 image (with `/dev/mem`, or via `debugfs` `clk_summary`). This records what the unused-clock sweep changed and whether MSTOP is untouched by Linux, as G0/G1 source predicts. Label it post-Linux: it is neither the reset nor the post-firmware state. (The `mstop` debugfs file exists only in v6.18-era kernels.)
 
-## Verification (main session, 2026-10-08)
+## Verification
 
 | Claim | Result | Evidence |
 |---|---|---|
 | RSTMON is the inverse of RST | **Confirmed** | linux v6.12.59 `drivers/clk/renesas/rzg2l-cpg.c:1454-1482` `rzg2l_cpg_deassert`: writes the bit as 1, then polls until the RSTMON bit is 0 (same in G1 and in v6.18.55 `__rzg2l_cpg_assert`). TF-A `f59ed5a31` `plat/renesas/rz/common/plat_pm.c:56-62` polls the same way for `RST_CA55`. `docs/research/boot-chain-firmware.md` is corrected. |
 | CLK_MON polled for 10 µs with no delay | **Confirmed** | linux v6.12.59 `rzg2l-cpg.c:1239-1240` `readl_poll_timeout_atomic(..., 0, 10)` in the module clock enable path (same in G1 and v6.18.55) |
 | PCHMON semantics (PACCEPT/PDENY, not "0x08") | **Confirmed; the earlier doc was wrong** | TF-A `f59ed5a31` `plat_pm.c:30-70`: PSTATE `0x08` is written to PCHCTL[23:16] together with PREQ; PCHMON bit 0 (PACCEPT) follows PREQ in a four-phase handshake |
-| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7`. Behaviour changes: no MSTOP writes on V2L in G0/G1 (§2.4), no reset-timeout revert (§2.3), DRP_A/PL3C_SDIV and DRP module clocks are G1-only (§2.6, §3). v6.18.55 behaviour kept under "Newer mainline". |
+| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7`. Behaviour changes: no MSTOP writes on V2L in G0/G1 (§2.4), no reset-timeout revert (§2.3), DRP_A/PL3C_SDIV and DRP module clocks are G1-only (§2.6, §3). v6.18.55 behaviour kept under "Newer mainline". |
 
 ## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
 

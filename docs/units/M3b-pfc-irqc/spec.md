@@ -1,6 +1,6 @@
 # M3b-pfc-irqc — spec
 
-**Milestone:** M3 (third unit, after the OS timer). **Requirements:** REQ-PFC-001, REQ-IRQC-001. **Status:** written 2026-10-29; implementation follows straight on.
+**Milestone:** M3 (third unit, after the OS timer). **Requirements:** REQ-PFC-001, REQ-IRQC-001.
 
 ## Scope
 
@@ -15,7 +15,7 @@
 
 **Interrupt control unit** (IA55, §8.5-8.6, `0x110A0000`, 64 KiB): `renesas-rzg2l-irqc`, a register-file STUB as the device map classes it.
 
-- The 19 registers of Table 8.3 (p.549), 32-bit, reset 0. Selection registers (NITSR, IITSR, TITSR0/1, TSSR0-7) keep their implemented bits. Status registers (NSCR, ISCR, TSCR, BEISR0/1, EREISR0/1) can only be cleared (§8.6); with no input modelled they read 0. Other offsets and widths are a bus error (a design choice; the manual says only "prohibit to write undefined area"). The PFC reads its holes as 0 because the EVK does (R71); no IRQC hole has been read on the EVK, so the IRQC keeps the visible failure (operator, 2026-10-30).
+- The 19 registers of Table 8.3 (p.549), 32-bit, reset 0. Selection registers (NITSR, IITSR, TITSR0/1, TSSR0-7) keep their implemented bits. Status registers (NSCR, ISCR, TSCR, BEISR0/1, EREISR0/1) can only be cleared (§8.6); with no input modelled they read 0. Other offsets and widths are a bus error (a design choice; the manual says only "prohibit to write undefined area"). The PFC reads its holes as 0 because the EVK does (R71); no IRQC hole has been read on the EVK, so the IRQC keeps the visible failure.
 - **Not modelled:** the NMI, IRQ0-7 and TINT0-31 inputs and their routing to the GIC; NSCR.NSMON (NMI pin level) reads 0 (A).
 
 ## What the guest needs
@@ -33,7 +33,7 @@ The G0 boot passes the pin controller probe and the `sh-sci` console takeover, a
 
 HW manual Rev 1.50 §41 (p.3368-3421), §8.5-8.6 (Table 8.3 p.549); `../../research/pinctrl.md`; EVK R30-R36, R71 (`../../evidence/EVK-2026-10-29-post-firmware.md`); the extracted register map (working area, spot-checked as above).
 
-## Next blocker (2026-10-29, fork `7cdc8ea6a8`)
+## Next blocker (fork `7cdc8ea6a8`)
 
 The kernel now boots to the end of its init:
 

@@ -31,7 +31,7 @@ Fork branch `unit/M3b-cpg` from `rzv2l-dev` `1c74716c64`; project branch of the 
 
 Each mutation was built with a confirmed relink and run alone; the model was restored and the full test passed after each.
 
-## Boot evidence (2026-10-29, fork `4ae1d307eb`)
+## Boot evidence (fork `4ae1d307eb`)
 
 ```
 qemu-system-aarch64 -M rzv2l-smarc -kernel Image -dtb r9a07g054l2-smarc.dtb \

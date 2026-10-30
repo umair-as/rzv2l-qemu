@@ -63,7 +63,7 @@ renesas_rzv2l_cpg_read RSTMON_GTM (0x9b4) -> 0x4
 
 The value `0x20002` sets bit 1 and its enable bit 17. That releases the OSTM1 reset. RSTMON_GTM then reads `0x4`: only OSTM2 is still held in reset.
 
-After the CPG, three more blocks were probed before the next blocker: the DMA controller, the USB PHY control and the thermal sensor. Each one is mapped with the class the device map gives it, as a logged stub. The kernel then stops in the OS timer (OSTM), which needs a model of its own ([spec, Next blocker](../units/M3b-cpg/spec.md#next-blocker-2026-10-29-fork-4ae1d307eb)).
+After the CPG, three more blocks were probed before the next blocker: the DMA controller, the USB PHY control and the thermal sensor. Each one is mapped with the class the device map gives it, as a logged stub. The kernel then stops in the OS timer (OSTM), which needs a model of its own ([spec, Next blocker](../units/M3b-cpg/spec.md#next-blocker-fork-4ae1d307eb)).
 
 ### 1.4 The proof
 

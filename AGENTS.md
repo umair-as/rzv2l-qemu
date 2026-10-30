@@ -150,7 +150,7 @@ Debugging:
 - **Batch** small edits into one commit at a natural review point; a task that cannot be tested yet goes with the task that makes it testable.
 - **No AI attribution** in either repo: no `Assisted-by:`, no `Co-Authored-By:`, no tool footers.
 - `scripts/lint.py` before every commit: 0 errors; warnings are read.
-- **Commits, pushes, PRs and submodule bumps** are the agent's normal cycle (operator, 2026-10-28). Merges happen on the operator's word. Destructive remote actions (force-push, deleting branches or tags) are confirmed first.
+- **Commits, pushes, PRs and submodule bumps** are the agent's normal cycle. Merges happen on the operator's word. Destructive remote actions (force-push, deleting branches or tags) are confirmed first.
 
 ## Branches and PRs
 

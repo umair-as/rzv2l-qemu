@@ -1,6 +1,6 @@
 # qemu-rzv2l — Engineering Specification v0.3
 
-**Status:** v0.3, accepted with the M0 exit review (2026-10-08). §22 lists the changes from v0.1 and v0.2.
+**Status:** v0.3, accepted with the M0 exit review. §22 lists the changes from v0.1 and v0.2.
 **Target:** Renesas RZ/V2L SMARC EVK (SoC R9A07G054L2)
 **Date:** 2026-10-08
 

@@ -33,7 +33,7 @@ Fork branch `unit/M3b-pfc-irqc` from `rzv2l-dev` `2696c12ddf`; project branch of
 
 Each mutation was built with a confirmed relink and run alone; the model was restored and the full test passed after each. Proof 5 was re-run after the table was reformatted for checkpatch. Proofs 11-12 change the period in all five places: changing only the first `timer_mod` delays the first interrupt by 19 ms and stays green, because each interval starts from the previous deadline.
 
-## Boot evidence (2026-10-29, fork `7cdc8ea6a8`)
+## Boot evidence (fork `7cdc8ea6a8`)
 
 ```
 build/qemu/qemu-system-aarch64 -M rzv2l-smarc \

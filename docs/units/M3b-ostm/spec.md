@@ -1,6 +1,6 @@
 # M3b-ostm — spec
 
-**Milestone:** M3 (second unit, after the clock controller). **Requirement:** REQ-OSTM-001. **Status:** written 2026-10-29; implementation follows straight on (operator's standing instruction).
+**Milestone:** M3 (second unit, after the clock controller). **Requirement:** REQ-OSTM-001.
 
 ## Scope
 
@@ -44,7 +44,7 @@ HW manual Rev 1.50 §20 p.1224-1240; EVK R11, R15 (`../../evidence/EVK-2026-10-2
 - **CMP = 0 in interval mode with MD0 = 0:** the model asserts the request (see Scope). The other reading would assert it only with MD0 = 1. No guest uses it.
 - **Bus error on a wrong-size or unlisted access:** kept as the project's honest-fault class; the manual is silent.
 
-## Next blocker (2026-10-29, fork `afe1e5b71b`)
+## Next blocker (fork `afe1e5b71b`)
 
 From the diagnostic run (`keep_bootcon`):
 

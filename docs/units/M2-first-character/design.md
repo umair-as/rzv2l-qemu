@@ -15,7 +15,7 @@ Labels: (F) documented fact, (O) hardware observation, (I) code-derived inferenc
 | Acceptance | project `tests/acceptance/m2/run.sh`, `expected/` | the hello run, mtree/qtree against expected files, log gate, earlycon run |
 | Eval harness | project `tests/eval/m2/checks.yaml`, `tests/eval/m2/mutations/*.patch`, `scripts/eval.py` | §8 |
 
-## 2. Consumer evidence (register-evidence, 2026-10-29)
+## 2. Consumer evidence (register-evidence)
 
 **Consumers at M2/M3a.** Each `file:line` below was checked at the pin.
 1. The hello image, which copies TF-A's putc/flush.
@@ -126,7 +126,7 @@ SCIF*n* uses SPIs 380 + 5*n* .. 384 + 5*n*, in the same order (device map; DTB-U
 | noise filter (NFEN), DIR (LSB-first) | stored, no effect | gap (A) |
 | DMAC requests (RXI/TXI as DREQ) | none | UNSUPPORTED; no DT node has `dmas` (`scif.md` §8) |
 | pin mux | the chardev is wired whatever PFC selects | documented decision (device map §4 row 12) |
-| TE cleared mid-frame; TEND after TFRST with TE = 0 | the frame in flight finishes (the manual says clearing TE initializes TSR, p.1276); with TE = 0, an empty FIFO after TFRST and an idle shift register, TEND stays 0 until a transmission completes (the manual gives no setting condition for this case) | gap (recheck N3, 2026-10-29): code reading, not tested; none of the pinned firmware or sh-sci sequences clears TE mid-transmission; an EVK measurement would be needed to model it honestly (`requests.md`) |
+| TE cleared mid-frame; TEND after TFRST with TE = 0 | the frame in flight finishes (the manual says clearing TE initializes TSR, p.1276); with TE = 0, an empty FIFO after TFRST and an idle shift register, TEND stays 0 until a transmission completes (the manual gives no setting condition for this case) | gap (recheck N3): code reading, not tested; none of the pinned firmware or sh-sci sequences clears TE mid-transmission; an EVK measurement would be needed to model it honestly (`requests.md`) |
 
 ## 8. Checks and the eval harness
 

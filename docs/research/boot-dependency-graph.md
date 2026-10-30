@@ -1,6 +1,6 @@
 # Boot dependency graph: G0 kernel entry → earlycon → `sh-sci` console
 
-**Date:** 2026-10-08 (M0 research; re-based 2026-10-08 onto the pinned guest kernels, see `docs/sources.md` "Pinned guest kernels"). **Status:** M0 research note. It answers the acceptance question in spec §20.
+Based on the pinned guest kernels (`docs/sources.md` "Pinned guest kernels"). **Status:** M0 research note. It answers the acceptance question in spec §20.
 
 **Guest (G0):** linux v6.12.59, `arm64 defconfig` Image, upstream `r9a07g054l2-smarc.dtb` (unmodified), BusyBox initramfs. **Mode:** direct (QEMU loads Image, DTB and initrd; Stage A, QEMU PSCI over SMC).
 
@@ -378,7 +378,7 @@ All are read-only.
 - **Q-B5** (U-Boot): CPG `CLK_ON`/`CLK_MON` for SCIF0, GPIO, IA55, OSTM1/2 and WDT0, and `RST`/`RSTMON` for the same modules, plus MSTOP. Shared with `cpg-reset.md` questions 3-5.
 - **Q-B6** (post-Linux, remainder): `cat /proc/cmdline` and `zcat /proc/config.gz | grep -E 'CONFIG_ACPI=|SPCR'` on the EVK image, to record the exact boot arguments and which earlycon path that kernel takes.
 
-## Verification (main session, 2026-10-08)
+## Verification
 
 | Claim | Result | Evidence |
 |---|---|---|
@@ -388,4 +388,4 @@ All are read-only.
 | SCIF defers forever without pinctrl | **Confirmed** (see pinctrl.md verification) | linux v6.12.59 `drivers/pinctrl/devicetree.c:123-136` with `CONFIG_MODULES=y` (`arch/arm64/configs/defconfig:120`) |
 | QEMU GIC identity is hard-coded | **Confirmed** | qemu v11.1.2 `hw/intc/gicv3_internal.h:749-757` `gicv3_iidr()` returns `0x43b`. The M1 "GIC ID equals EVK" check needs a new property or a recorded gap. |
 | SYSC DEVID is read at early_initcall and matches on silicon | **Confirmed**; **OBSERVED** | linux v6.12.59 `drivers/soc/renesas/renesas-soc.c:497-551, 572`; EVK boot log `Detected Renesas RZ/V2L r9a07g054 Rev 1`, BL2 `SYS_LSI_DEVID = 0x18447447` |
-| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (same DT apart from QSPI partitions; driver-core, earlycon, OSTM, IRQC files identical; one-line `sh-sci.c` and 5-line `rzg2l-cpg.c` deltas without effect; G1 defconfig has no ACPI and builds many more drivers in). Corrections against the first draft: no MSTOP in the CPG requirement; RSTMON stated as the inverted mirror and CLK_MON as the same-polarity mirror; `pinctrl_bind_pins` runs before the genpd attach; the OSTM `time_init` attempt defers silently and its platform probe is one-shot; SCIF0 has six interrupt entries; RIIC fails fast on bus-busy; `ARCH_R9A07G054` comes from the defconfig. EVK boot-log evidence folded into §1, §3, §4, §5 and §6; claims 3 and 5 and Q-B2/Q-B3 moved to "Answered". v6.18.55 differences kept under "Newer mainline". |
+| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (same DT apart from QSPI partitions; driver-core, earlycon, OSTM, IRQC files identical; one-line `sh-sci.c` and 5-line `rzg2l-cpg.c` deltas without effect; G1 defconfig has no ACPI and builds many more drivers in). Corrections against the first draft: no MSTOP in the CPG requirement; RSTMON stated as the inverted mirror and CLK_MON as the same-polarity mirror; `pinctrl_bind_pins` runs before the genpd attach; the OSTM `time_init` attempt defers silently and its platform probe is one-shot; SCIF0 has six interrupt entries; RIIC fails fast on bus-busy; `ARCH_R9A07G054` comes from the defconfig. EVK boot-log evidence folded into §1, §3, §4, §5 and §6; claims 3 and 5 and Q-B2/Q-B3 moved to "Answered". v6.18.55 differences kept under "Newer mainline". |

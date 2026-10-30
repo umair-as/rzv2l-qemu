@@ -1,6 +1,6 @@
 # M3b-shell — spec
 
-**Milestone:** M3 (last unit; it closes M3). **Requirements:** REQ-GUEST-001, REQ-GUEST-002, REQ-GUEST-004, REQ-MACH-003, REQ-MACH-004. **Status:** written 2026-10-30; implementation follows.
+**Milestone:** M3 (last unit; it closes M3). **Requirements:** REQ-GUEST-001, REQ-GUEST-002, REQ-GUEST-004, REQ-MACH-003, REQ-MACH-004.
 
 ## Scope
 
@@ -29,10 +29,10 @@
 
 ## Evidence
 
-Trial runs, 2026-10-30, fork `01168f7f3e`: `/init` runs at 18 s; checks 1-4 pass with the stock bootargs; the `-d` log names only the twelve UNIMP windows of the device map (ETH0/1, RIIC0/1/3, USB0/1 host, SDHI0/1, DMAC, TSU, USB PHY control). Pinned sources: `../../sources.md` (BusyBox included).
+Trial runs at fork `01168f7f3e`: `/init` runs at 18 s; checks 1-4 pass with the stock bootargs; the `-d` log names only the twelve UNIMP windows of the device map (ETH0/1, RIIC0/1/3, USB0/1 host, SDHI0/1, DMAC, TSU, USB PHY control). Pinned sources: `../../sources.md` (BusyBox included).
 
 ## For the operator
 
 - **Guest time runs about 1.6 % fast** (device map gap 18). QEMU ticks the generic counter every 41 ns, the truncated period of 24 MHz (`qemu/target/arm/cpu.c` `gt_cntfrq_period_ns`), so it counts at 24.39 MHz while `CNTFRQ` says 24 MHz. Fact from the QEMU source; measured as guest time / host time = 1.0165 and 1.0170 over `sleep 10` (M3 acceptance, two boots). It is generic QEMU code, deliberate upstream, not this project's model, so this unit records it and does not change it.
 
-- **SDHI0 (eMMC, `non-removable`, `rzg2l-smarc-som.dtsi:369-378`) retries for about 4.5 minutes.** Every command to the read-as-zero stub waits out a 5 s timeout, and the MMC core keeps retrying: a message every 5 s until 268 s, 186 in all (a 600 s boot, 2026-10-30). Before `/init` the SD probes cost about 17 s. The class stays UNIMP, as the device map records; whether a read-as-zero SDHI is honest enough until M5 is your call.
+- **SDHI0 (eMMC, `non-removable`, `rzg2l-smarc-som.dtsi:369-378`) retries for about 4.5 minutes.** Every command to the read-as-zero stub waits out a 5 s timeout, and the MMC core keeps retrying: a message every 5 s until 268 s, 186 in all (a 600 s boot). Before `/init` the SD probes cost about 17 s. The class stays UNIMP, as the device map records; whether a read-as-zero SDHI is honest enough until M5 is your call.

@@ -1,6 +1,6 @@
 # DR-0001: Repository and QEMU fork shape
 
-- **Status:** Accepted (operator, 2026-10-08)
+- **Status:** Accepted by the operator
 - **Date:** 2026-10-08
 
 ## Context

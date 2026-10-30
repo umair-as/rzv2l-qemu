@@ -1,6 +1,6 @@
 # M2-first-character: first blocker after earlycon (M2-T11, L03)
 
-**Date:** 2026-10-29. **Model:** fork `unit/M2-first-character` (SCIFA T01-T04). **Guest:** G0 = mainline v6.12.59 (`d5dc97879a97`) arm64 `defconfig` `Image`, unmodified, built by `tests/guests/g0/build-kernel.sh` (SHA-256 `fbe05a8d578683e28f0441191bc3c62bc80688f48e0aa717961bf680dbb551f4`); DTB-U unmodified (`tests/guests/g0/build-dtb.sh`, SHA-256 `4c339906…e85620`).
+**Model:** fork `unit/M2-first-character` (SCIFA T01-T04). **Guest:** G0 = mainline v6.12.59 (`d5dc97879a97`) arm64 `defconfig` `Image`, unmodified, built by `tests/guests/g0/build-kernel.sh` (SHA-256 `fbe05a8d578683e28f0441191bc3c62bc80688f48e0aa717961bf680dbb551f4`); DTB-U unmodified (`tests/guests/g0/build-dtb.sh`, SHA-256 `4c339906…e85620`).
 
 **Effective configuration (L01, `.config` of that build):** `CONFIG_SERIAL_SH_SCI=y`, `CONFIG_SERIAL_SH_SCI_CONSOLE=y`, `CONFIG_SERIAL_SH_SCI_EARLYCON=y`, `CONFIG_ACPI=y`, `CONFIG_ACPI_SPCR_TABLE=y`. This settles `scif.md` claim 6 for G0. With ACPI built in, a bare `earlycon` takes the SPCR path that falls back to the DT `stdout-path` (`scif.md` §5).
 

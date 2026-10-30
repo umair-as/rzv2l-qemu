@@ -312,7 +312,7 @@ Note: The M1 requirements went from P to D or V directly. The operator had alrea
 
 A requirement can be built in one milestone and accepted in a later one. The traceability table shows both: the column "Implemented in" and the column "Accepted in". For example, M1 enters the kernel at EL1 (`has_el2=false`, SMC conduit). But only a Linux boot in M3 proves that EL1 entry and PSCI work for a real guest (REQ-MACH-004). Until then the status is D, not V.
 
-### 5.3 Example: the M1 closure (2026-10-28)
+### 5.3 Example: the M1 closure
 
 The M1 closure set 13 requirements. Their acceptance column decided each status:
 

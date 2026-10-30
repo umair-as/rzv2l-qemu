@@ -1,6 +1,6 @@
 # DR-0004: Agent workflow tooling (skills, agents, hooks)
 
-- **Status:** Accepted (operator, 2026-10-27)
+- **Status:** Accepted by the operator
 - **Date:** 2026-10-27
 
 ## Context
@@ -40,17 +40,17 @@ The workflow procedures become committed skills, agents and hooks, shared by bot
 The skills are split in two layers. The procedure in each lives in one place.
 
 - **Technical skills** do one piece of modelling or testing work and can be used at any time: `register-evidence`, `device-model`, `soc-wiring`, `qtest-golden`, `guest-probe`, `mutation-check`, `guest-bringup`, `learning-docs`. They draw on this repo's M1 work and on the method of the qemu-imx95 and qemu-imxrt1180 ports (method only, no RZ/V2L facts).
-- **Process skills are not built** (operator, 2026-10-28): the agent harness's own review, plan and commit flow is good enough, and effort goes to the model. The rules for review and commits stay in AGENTS.md.
+- **Process skills are not built**: the agent harness's own review, plan and commit flow is good enough, and effort goes to the model. The rules for review and commits stay in AGENTS.md.
 - `/debug` is replaced by `guest-bringup`. `/qemu-cov` becomes one coverage parser shared by `guest-bringup`, the acceptance log gate and the bench.
 - Verification is unchanged: each skill is replayed on past work before it is relied on. The technical skills were not replayed yet.
 - The Claude Code hook keeps only the build deny inside `qemu/`. Commits, pushes, PRs and submodule bumps are the agent's normal cycle; the push/PR/bump asks are removed. The git hooks (fork sign-off, `rzv2l-base`, lint) stay.
 
 ## Amendment (2026-10-29): record each proof once
 
-After unit M2 the operator judged where the hours went: not the model (about twenty lines of fixes after review) but the recording of each proof in five places (patch file, eval entry, learning-doc table, task table, PR body), the full eval rerun after every fix round, the three-file unit paperwork, and three review rounds on one device. Decision (operator, 2026-10-29), rules in AGENTS.md "How work flows":
+After unit M2 the operator judged where the hours went: not the model (about twenty lines of fixes after review) but the recording of each proof in five places (patch file, eval entry, learning-doc table, task table, PR body), the full eval rerun after every fix round, the three-file unit paperwork, and three review rounds on one device. Decision, rules in AGENTS.md "How work flows":
 
 - The qtest is the record; its mutation is one line in the unit's `tasks.md`. `scripts/eval.py` and `tests/eval/m2/` stay as M2's regression suite and are not extended.
-- Unit paperwork is one page: `spec.md` (scope, guest needs, exit criterion, evidence) and a short `tasks.md`; no `design.md`. One learning page per unit at its end. Traceability and statuses once at v1.0. (Bench freeze lifted by the operator, 2026-10-30.)
+- Unit paperwork is one page: `spec.md` (scope, guest needs, exit criterion, evidence) and a short `tasks.md`; no `design.md`. One learning page per unit at its end. Traceability and statuses once at v1.0.
 - Review: one round plus one recheck limited to the fixes; doc-only findings need no round; the report stays local, a short Dispositions section goes into the PR body. The implementer prepares the review build (worktree at the PR head, `build/review-<sha>/`); the reviewer verifies it is current, reads code against manual and evidence, runs the existing qtests, and makes about three mutations of its own. The implementer's boot log is the boot evidence. A non-forked Sonnet subagent on the review prompt alone is an accepted reviewer when Codex quota is short.
 - Quiet commands: outputs to files, tails read; no full logs in context.
 - Units are cut by what the guest blocks on; a window mapped with its recorded device-map class needs no stop, a window needing a different class is listed for the operator at the unit's end.
@@ -61,6 +61,6 @@ The `qtest-golden` and `mutation-check` skills record accordingly; spec §15 car
 ## Consequences
 
 - One copy of each procedure serves both agents, versioned and reviewed.
-- The branch and sign-off rules are enforced by code for every committer, and the build rule (no builds inside `qemu/`) for Claude Code. Pushes are not gated (2026-10-28).
+- The branch and sign-off rules are enforced by code for every committer, and the build rule (no builds inside `qemu/`) for Claude Code. Pushes are not gated.
 - The tree shows the agent tooling; private paths and the working area stay out of it.
 - Skills point to the rules in AGENTS.md instead of restating them, so the two do not drift.

@@ -1,7 +1,7 @@
 # M2-first-character — spec
 
 **Milestone:** M2, plus M3a (earlycon output)
-**Status:** REVIEWED (2026-10-29): operator spec review; decisions (a)-(d) taken; design revised after the Codex design review
+**Status:** REVIEWED: operator spec review; decisions (a)-(d) taken; design revised after the Codex design review
 **Requirements:** REQ-SCIF-001, REQ-TEST-001, REQ-GUEST-001 (stock DTB for the M3a run), REQ-GUEST-004 (the earlycon boot argument), REQ-TEST-002 (mutation-checked tests), REQ-MAP-001 (new windows, unmapped-window gaps)
 
 ## Goal
@@ -64,7 +64,7 @@ Check IDs (S, A, L) are the eval-harness IDs from `design.md` §8.
 - Earlycon path and DTB-U `/chosen`: `../../research/scif.md` §5; DTB-U built by `tests/guests/g0/build-dtb.sh` (SHA-256 `4c339906…`).
 - Unmapped windows: DR-0005.
 
-## Decisions (operator, 2026-10-29)
+## Decisions
 
 The operator chose the recommended option in each case, in agreement with the Codex design review: **(a) A**, **(b)** as proposed, **(c) B**, **(d) A**. The options stay below for the record.
 

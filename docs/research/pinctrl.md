@@ -1,6 +1,6 @@
 # PFC / pinctrl research: what QEMU must provide for SCIF0 to bind
 
-**Date:** 2026-10-08 (M0 research; re-based 2026-10-08 onto the pinned guest kernels, see `docs/sources.md` "Pinned guest kernels")
+Based on the pinned guest kernels (`docs/sources.md` "Pinned guest kernels").
 **Scope:** the GPIO/PFC block at `0x11030000` as used by Linux `pinctrl-rzg2l`, TF-A and U-Boot, up to the point where `sh-sci` binds SCIF0. Answers the pinctrl part of spec §20 (b).
 
 **Method:** source reading of linux v6.12.59 (G0 reference), rz_linux-cip `212f6e88b7` (branch `rz-6.12-cip14`, G1 reference), the firmware sources below and the RZ/V2L HW manual Rev 1.50, plus the passive EVK boot log `docs/evidence/EVK-2026-10-08-boot-log.md`. The first draft of this note was written against linux v6.18.55; where that kernel differs, the difference is kept in "Newer mainline (v6.18.55)" near the end.
@@ -216,13 +216,13 @@ Kept for the later v6.18 LTS regression target (`docs/sources.md`). Citations ar
 4. **U-Boot:** read one undefined offset (for example `md.l 0x11033100 1`): zero, abort, or something else.
 5. **Post-Linux (G1 debug image):** `cat /sys/kernel/debug/pinctrl/11030000.pinctrl-pinctrl-rzg2l/pinmux-pins | grep -E 'P38|P48'`, the boot log order of `pinctrl-rzg2l` vs `rzg2l-irqc` vs `sh-sci` (the 2026-10-08 capture records the ttySC0 probe at 0.594 s but not the pinctrl and IRQC lines), and whether that image's `scif0` node has `pinctrl-0` (`/proc/device-tree/soc/serial@1004b800/pinctrl-0`). Record it as post-Linux.
 
-## Verification (main session, 2026-10-08)
+## Verification
 
 | Claim | Result | Evidence |
 |---|---|---|
 | "sh-sci eventually probes without pinctrl after the deferred-probe timeout" | **Refuted for the G0 kernel.** The spec's "defers forever" holds. | linux v6.12.59 `drivers/pinctrl/devicetree.c:123-136`: when no registered pin controller is found up the tree, the result is `-ENODEV`, which is turned into `-EPROBE_DEFER` whenever `CONFIG_MODULES` is enabled and the node lacks `pinctrl-use-default`. That path does not consult `driver_deferred_probe_check_state()`, so the deferred-probe timeout in `drivers/base/dd.c:288-301` does not rescue it. arm64 `defconfig:120` sets `CONFIG_MODULES=y`. Same file in G1. **The PFC model must therefore let `rzg2l-pinctrl` probe.** |
 | `PINCTRL_RZG2L` built in | **Confirmed (select)** | linux v6.12.59 `drivers/pinctrl/renesas/Kconfig:42` selects it for `ARCH_RZG2L`; it is a hidden bool (`Kconfig:192-193`); `PINCTRL_RENESAS` defaults to y under `ARCH_RENESAS` (`Kconfig:8-10`; `defconfig:64`) |
-| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (§10: no V2L register-level change). Additions against the first draft: the ETH MII/RGMII register at 0x3018 (§2), the PUPD suspend quirk (conflict 6), the IRQC probe details for v6.12.59 (§6). v6.18.55 differences kept under "Newer mainline". EVK boot-log evidence folded into §5.3 and §6 (indirect only: the log has no pinctrl lines). |
+| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (§10: no V2L register-level change). Additions against the first draft: the ETH MII/RGMII register at 0x3018 (§2), the PUPD suspend quirk (conflict 6), the IRQC probe details for v6.12.59 (§6). v6.18.55 differences kept under "Newer mainline". EVK boot-log evidence folded into §5.3 and §6 (indirect only: the log has no pinctrl lines). |
 
 ## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
 

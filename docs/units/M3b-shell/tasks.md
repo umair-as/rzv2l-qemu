@@ -22,7 +22,7 @@ Project branch `unit/M3b-shell` from `main` `98c3970`. No fork change: the machi
 
 Proofs 1-2 were built with a confirmed relink, run alone, restored and rebuilt. Proofs 3-6 change only the test inputs: the run arguments, the allow list, the expected device, the log. The first draft of `shell.py` matched the CPU line before its last characters arrived and read `0`; the pattern now needs the line end.
 
-## Boot evidence (2026-10-30, fork `01168f7f3e`)
+## Boot evidence (fork `01168f7f3e`)
 
 ```
 build/qemu/qemu-system-aarch64 -M rzv2l-smarc \

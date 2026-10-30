@@ -1,6 +1,6 @@
 # DR-0002: Secure-world staging
 
-- **Status:** Accepted (operator, 2026-10-08). The Stage A technical question was answered by EXP-001.
+- **Status:** Accepted by the operator. The Stage A technical question was answered by EXP-001.
 - **Date:** 2026-10-08
 
 ## Context

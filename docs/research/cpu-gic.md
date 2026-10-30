@@ -1,6 +1,6 @@
 # CPU, GIC-600, generic timer and PSCI: what the RZ/V2L machine must provide
 
-**Date:** 2026-10-08 (M0 research; re-based 2026-10-08 onto the pinned guest kernels, see `docs/sources.md` "Pinned guest kernels"). **Status:** M0 research note.
+Based on the pinned guest kernels (`docs/sources.md` "Pinned guest kernels"). **Status:** M0 research note.
 
 **Scope:** Cortex-A55 cluster, GIC-600, the architected timer, OSTM, PSCI, and direct-kernel boot under QEMU, for the G0 guest (linux v6.12.59 `arm64 defconfig` Image plus the upstream `r9a07g054l2-smarc.dtb`). It ends with a proposed M1 SoC skeleton.
 
@@ -45,7 +45,7 @@ The DT for the board is assembled from `r9a07g054l2-smarc.dts`. It includes `r9a
 | Silicon core | Cortex-A55 **r2p0**, 1.2 GHz | HW manual Rev 1.50 §2.1, Table 2.1, p.83 | FACT |
 | MIDR on silicon | `0x412FD050` on both CPUs (Cortex-A55 r2p0) | EVK log `Booting Linux on physical CPU 0x0000000000 [0x412fd050]` | OBSERVED |
 
-**cpufreq.** `cpufreq-dt-platdev` (core_initcall) creates a `cpufreq-dt` device when the root compatible is on its allowlist, or when `cpu0` has `operating-points-v2` and the root is not on its blocklist (linux v6.12.59 drivers/cpufreq/cpufreq-dt-platdev.c:212-237). RZ/V2L is on neither list (allowlist :52-67 has only 32-bit Renesas parts; blocklist :105-199), and `CONFIG_CPUFREQ_DT=y` (defconfig:96). **FACT (corrected 2026-10-08):** cpufreq-dt changes CLK_I through a plain generic divider: `DEF_DIV("I", …, DIVPL1A, dtable_1_8)` (linux v6.12.59 drivers/clk/renesas/r9a07g044-cpg.c:167), registered with `clk_hw_register_divider_table` (rzg2l-cpg.c:403-430). That is a single write to the PL1 divider field with **no busy poll**. The `rzg2l_cpg_wait_clk_update_done` poll (rzg2l-cpg.c:169-175) is used only by the SD clock mux (`:211`, `:478`) and the RZ/G3S dividers (`:257`, `:331`). This matches cpg-reset.md.
+**cpufreq.** `cpufreq-dt-platdev` (core_initcall) creates a `cpufreq-dt` device when the root compatible is on its allowlist, or when `cpu0` has `operating-points-v2` and the root is not on its blocklist (linux v6.12.59 drivers/cpufreq/cpufreq-dt-platdev.c:212-237). RZ/V2L is on neither list (allowlist :52-67 has only 32-bit Renesas parts; blocklist :105-199), and `CONFIG_CPUFREQ_DT=y` (defconfig:96). **FACT:** cpufreq-dt changes CLK_I through a plain generic divider: `DEF_DIV("I", …, DIVPL1A, dtable_1_8)` (linux v6.12.59 drivers/clk/renesas/r9a07g044-cpg.c:167), registered with `clk_hw_register_divider_table` (rzg2l-cpg.c:403-430). That is a single write to the PL1 divider field with **no busy poll**. The `rzg2l_cpg_wait_clk_update_done` poll (rzg2l-cpg.c:169-175) is used only by the SD clock mux (`:211`, `:478`) and the RZ/G3S dividers (`:257`, `:331`). This matches cpg-reset.md.
 
 G1 (rz-6.12-cip14) delta: none. Same DT; `CONFIG_CPUFREQ_DT=y` (rz_linux-cip 212f6e88b7 arch/arm64/configs/defconfig:52).
 
@@ -292,7 +292,7 @@ Kept for the later v6.18 LTS regression target (`docs/sources.md`). Citations ar
 
 ## Claims to verify
 
-1. ~~The GIC-600 r1p6 GICD_IIDR is 0x0201643B~~ **Corrected 2026-10-09:** the Arm GIC-600 r1p6 TRM (100336_0106_00) encodes p6 as Revision `0x7` (Table 4-5, p.4-112), so GICD_IIDR = GICR_IIDR = `0x0201743B`, which differs from QEMU's 0x43B. The PIDR/CIDR blocks equal QEMU's (Tables 4-2, 4-21). Original claim: Evidence: qemu v11.1.2 hw/intc/gicv3_internal.h:749-758; silicon via Q1.
+1. The Arm GIC-600 r1p6 TRM (100336_0106_00) encodes p6 as Revision `0x7` (Table 4-5, p.4-112), so GICD_IIDR = GICR_IIDR = `0x0201743B`, which differs from QEMU's 0x43B. The PIDR/CIDR blocks equal QEMU's (Tables 4-2, 4-21). Evidence for the QEMU value: qemu v11.1.2 hw/intc/gicv3_internal.h:749-758; silicon via Q1.
 2. Silicon GICD_TYPER has LPIS = 0 and ESPI = 0, and its IDbits/RSS values are unknown. Evidence: HW manual Rev 1.50 §8.1 p.530 ("LPI: Not supported"); Q1. (ITLinesNumber is consistent with the observed 480 SPIs.)
 3. With `has_el3=true` and GIC security extensions on, a QEMU direct boot gives Linux `GICD_CTRL.DS=0` and `SCR_EL3.FIQ=0` (board: DS=0, FIQ=1). Evidence: qemu v11.1.2 hw/intc/arm_gicv3_common.c:546-551,587-602, target/arm/cpu.c:719-780; irq-gic-v3.c:165-229. To be shown by an M1 run.
 4. The RAZ/WI GICR_PWRR satisfies TF-A's GIC-600 power-on sequence in Stage B. Evidence: qemu v11.1.2 hw/intc/arm_gicv3_redist.c:750-762; the TF-A `drivers/arm/gic/v3/gic600.c` power-on loop (not read here).
@@ -320,7 +320,7 @@ All are read-only.
 - **Q4** (post-Linux, remainder): `cat /sys/devices/system/clocksource/clocksource0/{current,available}_clocksource` and `grep -E 'arch_timer|ostm' /proc/interrupts`. Expect `arch_sys_counter` current (rating 400 beats OSTM's 300).
 - **Q5** (post-Linux, remainder): `dmesg | grep -iE 'trusted os|migrat'` and `cat /sys/devices/system/cpu/vulnerabilities/*`.
 
-## Verification (main session, 2026-10-08)
+## Verification
 
 | Claim | Result | Evidence |
 |---|---|---|
@@ -329,9 +329,9 @@ All are read-only.
 | GIC sizing, redistributor layout and security state on silicon | **Confirmed (OBSERVED)** | EVK boot log: 480 SPIs, 16 PPIs, GICR frames at 0x11940000/0x11960000, `GICD_CTRL.DS=0, SCR_EL3.FIQ=1`; strings from linux v6.12.59 `drivers/irqchip/irq-gic-v3.c:226-228, 1096-1099, 2088` |
 | OSTM1 owns `sched_clock` at 100 MHz; virtual arch timer at 24 MHz | **Confirmed (OBSERVED)** | EVK boot log; linux v6.12.59 `drivers/clocksource/renesas-ostm.c:198-204`, `kernel/time/sched_clock.c:164-172`, `drivers/clocksource/arm_arch_timer.c:1399-1406` |
 | The assumed GIC-600 IIDR value and the cache topology (no L2, 256 KiB L3) | **Open** | needs EVK reads and the HW manual cross-check; listed under Questions for the EVK (Q1, Q2) |
-| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (DT, `irq-gic-v3.c`, `arm_arch_timer.c`, `renesas-ostm.c`, `psci.c`, `irq-renesas-rzg2l.c` identical; DT differs only in QSPI partitions; no reserved memory or DRP-AI nodes; CMA 128 MiB). Corrections against the first draft: the GIC banner reads `GICD_CTRL.DS` in v6.12.59; no SYSTEM_OFF2 probe; the OSTM platform probe is one-shot (`platform_driver_probe`); the OSTM `time_init` attempt fails with a silent `-EPROBE_DEFER`; `ARCH_R9A07G054` comes from the defconfig, not a Kconfig default. EVK boot-log evidence folded into §1-§7; Q3 and Q6 removed as answered, Q4 and Q5 reduced. v6.18.55 differences kept under "Newer mainline". |
+| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (DT, `irq-gic-v3.c`, `arm_arch_timer.c`, `renesas-ostm.c`, `psci.c`, `irq-renesas-rzg2l.c` identical; DT differs only in QSPI partitions; no reserved memory or DRP-AI nodes; CMA 128 MiB). Corrections against the first draft: the GIC banner reads `GICD_CTRL.DS` in v6.12.59; no SYSTEM_OFF2 probe; the OSTM platform probe is one-shot (`platform_driver_probe`); the OSTM `time_init` attempt fails with a silent `-EPROBE_DEFER`; `ARCH_R9A07G054` comes from the defconfig, not a Kconfig default. EVK boot-log evidence folded into §1-§7; Q3 and Q6 removed as answered, Q4 and Q5 reduced. v6.18.55 differences kept under "Newer mainline". |
 
-### Main-session spot verification of the re-base (2026-10-08)
+### Main-session spot verification of the re-base
 
 - HW manual p.530 (GIC-600, 16 PPIs), p.534 (`nCNTVIRQ` = PPI 11 = ID 27, PMU PPI 7, maintenance PPI 9, `nCNTPNSIRQ` PPI 14) and p.83 (Cortex-A55 r2p0, no L2, 256 KB L3) confirmed against the manual text.
 - The QEMU stage A SMCCC gap is confirmed: qemu v11.1.2 `target/arm/tcg/psci.c` has no `SMCCC_VERSION` handling, so the guest falls back to SMCCC v1.0 (board: v1.4).

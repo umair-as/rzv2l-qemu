@@ -1,6 +1,6 @@
 # SCIF (SCIFA) research: what QEMU must provide for the console
 
-**Date:** 2026-10-08 (M0 research; re-based 2026-10-08 onto the pinned guest kernels, see `docs/sources.md` "Pinned guest kernels")
+Based on the pinned guest kernels (`docs/sources.md` "Pinned guest kernels").
 **Scope:** SCIF channel 0 (the EVK debug console), with notes on channels 1 to 4. Answers the SCIF parts of spec §20 (a) and (b).
 
 **Method:** source reading of linux v6.12.59 (G0 reference), rz_linux-cip `212f6e88b7` (branch `rz-6.12-cip14`, G1 reference), the firmware sources below and the RZ/V2L HW manual Rev 1.50, plus the passive EVK boot log `docs/evidence/EVK-2026-10-08-boot-log.md`. The first draft of this note was written against linux v6.18.55; where that kernel differs, the difference is kept in "Newer mainline (v6.18.55)" near the end.
@@ -247,7 +247,7 @@ All reads are 16-bit unless noted. FSR, LSR and FDR reads have no side effect. *
 4. **U-Boot:** read an undefined offset in the SCIF0 window (for example `md.w 0x1004b818 1`): zero, bus error, or alias? This decides the model's behaviour for undefined offsets.
 5. **Post-Linux:** `zcat /proc/config.gz | grep -E 'SERIAL_SH_SCI|ACPI_SPCR'` (if `IKCONFIG_PROC` is on) on the G1 image, to record which earlycon path (§5) the reference kernel takes.
 
-## Verification (main session, 2026-10-08)
+## Verification
 
 | Claim | Result | Evidence |
 |---|---|---|
@@ -256,7 +256,7 @@ All reads are 16-bit unless noted. FSR, LSR and FDR reads have no side effect. *
 | Earlycon match | **Confirmed** | linux v6.12.59 `drivers/tty/serial/sh-sci.c:3775` `OF_EARLYCON_DECLARE(scif, "renesas,scif-r9a07g044", rzscifa_early_console_setup)`; same line in G1. OBSERVED on silicon: EVK boot log `earlycon: scif0 at MMIO 0x000000001004b800 (options '115200n8')` |
 | DTB-U has no `earlycon` in bootargs | **Confirmed** | linux v6.12.59 `rzg2l-smarc-som.dtsi:29` `bootargs = "ignore_loglevel rw root=/dev/nfs ip=on"`; `rz-smarc-common.dtsi:26,32` `serial0 = &scif0`, `stdout-path = "serial0:115200n8"`. M3a needs a bare `earlycon` on the command line, recorded as a REQ-GUEST-004 gap. |
 | `CONFIG_SERIAL_SH_SCI` built in for G0 | **Confirmed (defconfig)** | linux v6.12.59 `arch/arm64/configs/defconfig:488`; the built `.config` is still to be checked (claim 6) |
-| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (one-line `sh-sci.c` delta, no register effect). Corrections against the first draft: the bare-`earlycon` path goes through `earlycon_acpi_spcr_enable` and `acpi_boot_table_init` when `ACPI_SPCR_TABLE` is set (§5); the `fdt.c` matching is now read, not inferred; DMA is skipped by an explicit `dmas` check rather than a failed channel request (§8); the error handler also kicks TX (§4.4). v6.18.55 differences kept under "Newer mainline". EVK boot-log evidence folded into §1, §2, §4.1, §5 and §6.2. |
+| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7` (one-line `sh-sci.c` delta, no register effect). Corrections against the first draft: the bare-`earlycon` path goes through `earlycon_acpi_spcr_enable` and `acpi_boot_table_init` when `ACPI_SPCR_TABLE` is set (§5); the `fdt.c` matching is now read, not inferred; DMA is skipped by an explicit `dmas` check rather than a failed channel request (§8); the error handler also kicks TX (§4.4). v6.18.55 differences kept under "Newer mainline". EVK boot-log evidence folded into §1, §2, §4.1, §5 and §6.2. |
 
 ## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
 
@@ -264,4 +264,4 @@ All reads are 16-bit unless noted. FSR, LSR and FDR reads have no side effect. *
 - **OBSERVED.** Right after U-Boot echoes a command, FSR reads `0x0020` (TEND = 0) and FDR.T = 1. After `sleep 1` it reads `0x0060`. TEND stays 0 while a character is in flight and rises when the line goes idle, as §7 requires (indirect: the read timing is U-Boot's).
 - **OBSERVED.** Q4: the undefined offset `+0x18` reads `0x0000`, no bus error (EVK-R70).
 - Q2: SCIF1 is not clocked after firmware (CLK_MON SCIF = `0x1`), so claim 1 stays unmeasured on silicon (EVK-R27 skipped).
-- **FACT (re-checked at the pins, 2026-10-29).** The consumer `file:line`s in §4.3, §5 and §7 hold at TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b` and linux v6.12.59. Two of the TEND waits have **no timeout**: TF-A `console_rz_flush` (`scifa.S:248-251`) and Linux `serial_console_write` (`sh-sci.c:3141-3143`). After each character TEND reads 0, because the FTDR write clears it (p.1281). Linux then stores `0x009F` blind (`sh-sci.c:771`), which clears the TDFE its poll has just read (`:766-768`) and writes 0 to TEND as well. Only the hardware can set TEND again. The consumer-scoped register table is in `../units/M2-first-character/design.md` §2.
+- **FACT (re-checked at the pins).** The consumer `file:line`s in §4.3, §5 and §7 hold at TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b` and linux v6.12.59. Two of the TEND waits have **no timeout**: TF-A `console_rz_flush` (`scifa.S:248-251`) and Linux `serial_console_write` (`sh-sci.c:3141-3143`). After each character TEND reads 0, because the FTDR write clears it (p.1281). Linux then stores `0x009F` blind (`sh-sci.c:771`), which clears the TDFE its poll has just read (`:766-768`) and writes 0 to TEND as well. Only the hardware can set TEND again. The consumer-scoped register table is in `../units/M2-first-character/design.md` §2.

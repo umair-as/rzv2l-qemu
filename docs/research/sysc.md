@@ -1,6 +1,6 @@
 # SYSC (system controller) and SYC (system counter): what firmware and the G0 kernel need
 
-**Date:** 2026-10-08 (M0 research; re-based 2026-10-08 onto the pinned guest kernels, see `docs/sources.md` "Pinned guest kernels")
+Based on the pinned guest kernels (`docs/sources.md` "Pinned guest kernels").
 
 **Method:** source reading of linux v6.12.59 (G0 reference), rz_linux-cip `212f6e88b7` (branch `rz-6.12-cip14`, G1 reference) and the RZ/V2L HW manual Rev 1.50. Firmware requirements are taken from `boot-chain-firmware.md` (public TF-A/U-Boot repos and SHAs listed there) and are not re-derived. The first draft of this note was written against linux v6.18.55; differences are kept in "Newer mainline (v6.18.55)" near the end.
 
@@ -170,7 +170,7 @@ All are read-only `md.l` reads at the **U-Boot prompt before `bootm`** (post-fir
 6. `md.l 0x11010528 1`, `md.l 0x11010828 1`, `md.l 0x110109a8 1`: CPG CLKON/RST/RSTMON for SYC.
 7. **Post-Linux** (read-only, from the G1 console log): the exact `Detected Renesas RZ/V2L r9a07g054 Rev N` line, or a `SoC mismatch` warning.
 
-## Verification (main session, 2026-10-08)
+## Verification
 
 | Claim | Result | Evidence |
 |---|---|---|
@@ -179,7 +179,7 @@ All are read-only `md.l` reads at the **U-Boot prompt before `bootm`** (post-fir
 | The expected V2L ID is `0x8447447` | **Confirmed** | linux v6.12.59 `renesas-soc.c:189-192` `soc_rz_v2l.id = 0x8447447`; G1 `:171-174` |
 | The manual contradicts itself on DEVID | **Confirmed** | HW manual Rev 1.50 Table 6.1 lists `H'x841_C447` (the RZ/G2L value); §6.3.43 p.208 gives `H'844_7447` for bits [27:0]. Silicon decides; this is an EVK question. |
 | `LP_CTL5` "acknowledge" bit | **Resolved** | TF-A `f59ed5a31` `plat_pm.c:92-98`: CPU_OFF polls `SYS_LP_CTL5` bit (8 + core) after writing `LP_CTL6`/`LP_CTL1` bit (8 + core) |
-| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done (2026-10-08)** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7`. No change to the SYSC register contract: G0 has no RZ SYSC driver; G1's `rz-sysc.c` and its `renesas-soc.c` delta do not touch V2L. v6.18.55 layout kept under "Newer mainline". |
+| Note re-based from v6.18.55 to the pinned G0/G1 kernels | **Done** | All kernel citations moved to linux v6.12.59; G1 checked at rz_linux-cip `212f6e88b7`. No change to the SYSC register contract: G0 has no RZ SYSC driver; G1's `rz-sysc.c` and its `renesas-soc.c` delta do not touch V2L. v6.18.55 layout kept under "Newer mainline". |
 
 ## EVK results (2026-10-29, U-Boot prompt, downstream firmware; `../evidence/EVK-2026-10-29-post-firmware.md`)
 
