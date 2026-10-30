@@ -4,7 +4,6 @@
 # unimplemented-device; rz-dmac and usbphy-ctrl keep written values
 # (write-retaining stubs), the others read 0. The G0 windows, then the
 # blocks the vendor kernel builds in where mainline builds modules.
-^ravb-eth[01]: unimplemented device (read|write) 
 ^riic[013]: unimplemented device (read|write) 
 ^usb[01]-host: unimplemented device (read|write) 
 ^usbphy-ctrl: unimplemented device (read|write) 

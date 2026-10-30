@@ -48,7 +48,8 @@ def check_qtree(captured, expected):
 
     A device type that appears more than once (for example the five SCIF
     channels) is keyed as "<type> @<base>", with the base of its first
-    mmio window, so each instance is checked on its own.
+    mmio window, so each instance is checked on its own; one without an
+    mmio window (the Ethernet PHYs) as "<type> #<n>", in qtree order.
     """
     found = []
     for l in open(captured):
@@ -61,12 +62,15 @@ def check_qtree(captured, expected):
     for dev, _ in found:
         count[dev] = count.get(dev, 0) + 1
     blocks = {}
+    seen = {}
     for dev, lines in found:
         key = dev
         if count[dev] > 1:
             mmio = next((x.split()[1].split("/")[0] for x in lines
                          if x.startswith("mmio ")), None)
-            key = "%s @%s" % (dev, mmio)
+            n = seen.get(dev, 0)
+            seen[dev] = n + 1
+            key = "%s @%s" % (dev, mmio) if mmio else "%s #%d" % (dev, n)
         if key in blocks:
             return fail("qtree: device %s appears twice" % key)
         blocks[key] = lines
@@ -175,6 +179,12 @@ DTB_SD0_VQMMC_REG = "/regulator-vccq-sdhi0"
 # when the DTB has none, so Linux numbers the cards the same in each boot
 DTB_MMC_ALIASES = ['mmc0 = "/soc/mmc@11c00000";',
                    'mmc1 = "/soc/mmc@11c10000";']
+# The vendor U-Boot's fdt_fixup_ethernet() (M6-ravb spec): each ethernetN
+# alias node gets the channel's MAC address, here QEMU's default NIC MACs
+DTB_ETH_MAC = {
+    "/soc/ethernet@11c20000": "local-mac-address = [52 54 00 12 34 56];",
+    "/soc/ethernet@11c30000": "local-mac-address = [52 54 00 12 34 57];",
+}
 
 
 def sd0_edit_ok(got, want):
@@ -214,6 +224,9 @@ def check_dtb(captured, stock):
         elif n == "/aliases" and sorted(got[n]) == sorted(
                 want[n] + DTB_MMC_ALIASES):
             fixed.append("/aliases mmc0, mmc1")
+        elif n in DTB_ETH_MAC and sorted(got[n]) == sorted(
+                want[n] + [DTB_ETH_MAC[n]]):
+            fixed.append(n + " local-mac-address")
         else:
             rc = fail("dtb: %s differs: -%s +%s"
                       % (n, sorted(set(want[n]) - set(got[n])),

@@ -81,14 +81,6 @@ dev: unimplemented-device @0000000010058c00
   name = "riic3"
   retain-writes = false
   mmio 0000000010058c00/0000000000000400
-dev: unimplemented-device @0000000011c20000
-  name = "ravb-eth0"
-  retain-writes = false
-  mmio 0000000011c20000/0000000000010000
-dev: unimplemented-device @0000000011c30000
-  name = "ravb-eth1"
-  retain-writes = false
-  mmio 0000000011c30000/0000000000010000
 dev: unimplemented-device @0000000011c50000
   name = "usb0-host"
   retain-writes = false
@@ -104,6 +96,17 @@ dev: renesas-rzg2l-sdhi @0000000011c00000
 dev: renesas-rzg2l-sdhi @0000000011c10000
   has-sd-status = false
   mmio 0000000011c10000/0000000000010000
+# ETH0-1: device-map row ravb ETH0, ETH1; each with its KSZ9131 PHY at MDIO address 7
+dev: renesas-gbeth @0000000011c20000
+  phy = "/machine/phy0"
+  phy-addr = 7 (0x7)
+  mmio 0000000011c20000/0000000000010000
+dev: renesas-gbeth @0000000011c30000
+  phy = "/machine/phy1"
+  phy-addr = 7 (0x7)
+  mmio 0000000011c30000/0000000000010000
+dev: ksz9131-phy #0
+dev: ksz9131-phy #1
 # WDT0-2: device-map rows WDT0, WDT1, WDT2; counter clock 24 MHz (manual 21.1.1)
 dev: renesas-rzg2l-wdt @0000000012800400
   clock-frequency = 24000000 (0x16e3600)

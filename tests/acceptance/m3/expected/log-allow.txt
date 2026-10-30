@@ -3,7 +3,6 @@
 # docs/device-map.md records, and nothing else. All are QEMU's
 # unimplemented-device; rz-dmac and usbphy-ctrl keep written values
 # (write-retaining stubs), the others read 0.
-^ravb-eth[01]: unimplemented device (read|write) 
 ^riic[013]: unimplemented device (read|write) 
 ^usb[01]-host: unimplemented device (read|write) 
 ^usbphy-ctrl: unimplemented device (read|write) 

@@ -13,9 +13,10 @@
 #   GIC redistributors 0x11940000, 0x40000 (2 frames of 0x20000)
 #   DDR 0x40000000, 2 GiB
 #   PFC 0x11030000 and IRQC 0x110A0000, 64 KiB each (pin and interrupt controller unit)
-#   Stubs (UNIMP, device-map rows RIIC, ravb, USB): RIIC0/1/3 0x10058000 + n * 0x400,
-#   0x400 each; ETH0/1, USB0 and USB1 host, 64 KiB each
+#   Stubs (UNIMP, device-map rows RIIC, USB): RIIC0/1/3 0x10058000 + n * 0x400,
+#   0x400 each; USB0 and USB1 host, 64 KiB each
 #   SDHI0/1 0x11C00000, 0x11C10000, 64 KiB each (row SDHI0, SDHI1; unit M5-sdhi)
+#   ETH0/1 0x11C20000, 0x11C30000, 64 KiB each (row ravb ETH0, ETH1; unit M6-ravb)
 #   WDT0-2 0x12800800, 0x12800C00, 0x12800400, 0x400 each (rows WDT0, WDT1, WDT2)
 #   Stubs for the drivers the vendor kernel builds in (UNIMP; rows display, SSI/RSPI/CAN-FD/ADC,
 #   RPC, USB): DSI 0x10850000 (0x20000), VSPD, FCPVD, DU 64 KiB each; SSI0/1, RSPI1, ADC
@@ -51,8 +52,8 @@
 0000000011940000-000000001197ffff (prio 0, i/o): gicv3_redist_region[0]
 0000000011c00000-0000000011c0ffff (prio 0, i/o): renesas-rzg2l-sdhi
 0000000011c10000-0000000011c1ffff (prio 0, i/o): renesas-rzg2l-sdhi
-0000000011c20000-0000000011c2ffff (prio -1000, i/o): ravb-eth0
-0000000011c30000-0000000011c3ffff (prio -1000, i/o): ravb-eth1
+0000000011c20000-0000000011c2ffff (prio 0, i/o): renesas-gbeth
+0000000011c30000-0000000011c3ffff (prio 0, i/o): renesas-gbeth
 0000000011c40000-0000000011c4ffff (prio -1000, i/o): usbphy-ctrl
 0000000011c50000-0000000011c5ffff (prio -1000, i/o): usb0-host
 0000000011c60000-0000000011c6ffff (prio -1000, i/o): usb0-func
