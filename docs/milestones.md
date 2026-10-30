@@ -44,7 +44,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M3b-shell](units/M3b-shell/spec.md) | M3 | BusyBox initramfs; the M3 acceptance run |
 | ✅ | [M4-vendor-kernel](units/M4-vendor-kernel/spec.md) | M4 | the vendor kernel to a shell; watchdog timers WDT0-2, reset through the CPG |
 | ✅ | [M4-loader-fixups](units/M4-loader-fixups/spec.md) | M4 | U-Boot's device-tree edits: the SD0 supplies in eSD mode applied by QEMU, the others listed as gaps |
-| 🔄 | [M5-sdhi](units/M5-sdhi/spec.md) | M5 | the SD/MMC host interface and its DMA engine; an SD card on SDHI0 with ext4 |
+| 🔄 | [M5-sdhi](units/M5-sdhi/spec.md) | M5 | the SD/MMC host interface and its DMA engine; an SD card on SDHI0 with ext4 (in review) |
 
 ## The SoC blocks
 
@@ -60,9 +60,10 @@ What the model does with each block the guest touches. Classes: [`device-map.md`
 | ✅ | PFC (pins) | register file; pin electrical settings stored only | M3 |
 | 🟡 | IRQC (interrupt control) | register file; no external interrupts | M3 (routing M6) |
 | 🟡 | DMAC, USB PHY control | stubs that keep written values | later |
-| 🟡 | SDHI0/1, Ethernet, I2C, USB host, thermal sensor | stubs: the drivers fail within a bound | M5, M6, later |
+| 🟡 | Ethernet, I2C, USB host, thermal sensor | stubs: the drivers fail within a bound | M6, later |
 | 🟡 | display, CAN-FD, QSPI, USB function, SSI, RSPI, ADC | stubs for the drivers the vendor kernel builds in | later (QSPI: M7) |
 | ✅ | WDT0-2 (watchdog) | modelled; a watchdog reset resets the board through the CPG | M4 |
+| 🔄 | SDHI0/1 (SD/MMC host) | modelled with the built-in DMA engine, for SD cards; bus tuning (SCC) not modelled | M5 |
 | ⏳ | TSIP (closed crypto) | fails visibly; OP-TEE is rebuilt without it | M7 |
 
 🟡 a stub: logged, so every access is visible.
@@ -93,5 +94,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 ## What comes next
 
-1. 🔄 **M5:** storage: the first unit, [M5-sdhi](units/M5-sdhi/spec.md), models the SD/MMC host interface and its DMA engine for an SD card on SDHI0.
+1. 🔄 **M5:** storage: the first unit, [M5-sdhi](units/M5-sdhi/spec.md), models the SD/MMC host interface and its DMA engine; both kernels read and write ext4 on an SD card (in review). Next in M5: a root file system on the card.
 2. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.

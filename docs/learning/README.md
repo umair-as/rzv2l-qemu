@@ -11,6 +11,7 @@ How this project's QEMU model works, explained from real monitor output, code an
 | [`m2-first-character.md`](m2-first-character.md) | M2: reading the EVK registers at the U-Boot prompt; the SCIFA model, its tests, the hello probe, the first Linux lines; what the review found; the SCIFA pitfalls |
 | [`m3-linux-shell.md`](m3-linux-shell.md) | M3: the CPG, OS timer, pin controller and interrupt controller models, the stubbed windows, the next blocker; their pitfalls |
 | [`m4-vendor-kernel.md`](m4-vendor-kernel.md) | M4: the vendor kernel's configuration, the watchdog model (overflows, the CPG reset mask and flag, the reset line), U-Boot's device-tree edits made by QEMU's loader; their pitfalls |
+| [`m5-storage.md`](m5-storage.md) | M5: the SD/MMC host interface and its DMA engine, an SD card with ext4; their pitfalls |
 | [`testing.md`](testing.md) | qtests, the guest probe, the acceptance run, the device-tree check |
 | [`building-and-testing.md`](building-and-testing.md) | the commands: building, running tests, style check, tracing, editor setup |
 | [`glossary.md`](glossary.md) | the terms |

@@ -44,3 +44,9 @@ Manual §40 (p.3259-3347), Table 8.2 (p.537); EVK evidence §8 (O: SD card, 4-bi
 - **SD card on SDHI0, not eMMC.** The DTB describes SDHI0 as an 8-bit eMMC with HS200, but the EVK boots from eSD and runs an SD card at high speed behind that node (evidence §8). The unit models that. An eMMC for boot mode 1 is a separate decision.
 - **Five U-Boot reads** (EVK-R74-R78) would fix the direct-mode start state and confirm `VERSION`, `CC_EXT_MODE` and the SCC reset values; they need a session at the U-Boot prompt. U-Boot also writes an offset the manual does not list (`0x08`); reading it could abort and reboot the board, so it is not in the list. The model accepts writes there and logs them.
 - **No real-time behaviour:** transfers complete at once and the data timeout counter never fires; only "no card" ends in a timeout.
+
+## Unit end
+
+- **Met:** exit criteria 1-4. qtest `rzv2l-sdhi-test` (5 tests, 10 mutations red, `tasks.md`); M5 acceptance on G0 and G1: the card is found, ext4 written and read back across a restart, the image checked by `e2fsck` and `debugfs` on the host; M4 acceptance and the serial-port regression suite pass.
+- **Seen in the run (O, model):** Linux probes SDIO with CMD5 and CMD52; QEMU's SD memory card does not answer them (logged by the card model, allowed in `tests/acceptance/m5/expected/log-allow.txt`). The card is `mmcblk0` or `mmcblk1` from boot to boot: the stock device trees have no `mmc` aliases, so the number depends on probe order (the G2 image adds the aliases for this reason).
+- **Next (M5, layer verified: the Linux block device):** a root file system on the SD card, booting user space from it instead of the initramfs. With no aliases, `root=` needs a partition UUID, given by `-append` (a recorded gap, as the board's U-Boot sets the boot arguments). The eMMC behind SDHI0 in eMMC boot mode (`boot-mode=1`, an `emmc` card model) is a separate decision.
