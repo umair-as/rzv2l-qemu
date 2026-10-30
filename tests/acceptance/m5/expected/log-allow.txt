@@ -1,0 +1,6 @@
+# Lines allowed in the -d log of a storage boot, besides the G1 stub
+# windows of ../../m4/expected/log-allow.txt. Linux probes for an SDIO
+# card with CMD5 and CMD52; QEMU's SD memory card does not answer them,
+# as a memory card does not, and the host reports a response timeout.
+^SD: Optional CMD5 not implemented$
+^SD: Optional CMD52 not implemented$

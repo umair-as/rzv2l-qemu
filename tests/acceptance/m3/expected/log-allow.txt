@@ -7,6 +7,5 @@
 ^riic[013]: unimplemented device (read|write) 
 ^usb[01]-host: unimplemented device (read|write) 
 ^usbphy-ctrl: unimplemented device (read|write) 
-^sdhi[01]: unimplemented device (read|write) 
 ^rz-dmac: unimplemented device (read|write) 
 ^tsu: unimplemented device (read|write) 
