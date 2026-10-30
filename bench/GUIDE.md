@@ -1,6 +1,6 @@
 # Using the bench
 
-A guide to the bench screen: what each part shows, what the buttons do, and what the bench can't see. The reference for profiles, the API and the verdict rules is [`README.md`](README.md).
+A guide to the bench screen, with screenshots from a real run: what each part shows, what the buttons do, and what the bench can't see. The reference for profiles, the API and the verdict rules is [`README.md`](README.md).
 
 ## What the bench is
 
@@ -12,20 +12,14 @@ Start it with `uv run bench/server.py` and open `http://127.0.0.1:8090`.
 
 ## The screen
 
-```
-┌ header ──────────────────────────────────────────────────────────────────────┐
-│ ▣ rzv2l bench │ profile ▾  ready │ ▶ Start  Start paused  ☐ gdbstub │ ⏸ ↻ ■ │ ● RUNNING  PASS · exit 0 · 2.5 s │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ profile description · FAIL reasons · gdb connection line (when they apply)    │
-├ console ────────────────────────────────┬┬ side panel ──────────────────────────┤
-│                                         ││ LOG  COVERAGE  MAP  DEVICES          │
-│  the board's serial port                ││ MONITOR  EVENTS  RUNS                │
-│  (what /dev/ttyUSB0 shows on the EVK)   ││                                      │
-│                                         ││                                      │
-└─────────────────────────────────────────┴┴──────────────────────────────────────┘
-│ run <directory> · machine · pid                                  System Light Dark │
-└ status bar ──────────────────────────────────────────────────────────────────────┘
-```
+![The bench after an M1 probe run, dark theme, Map tab open](guide/overview-dark.png)
+
+What you see, top to bottom:
+- **Header:** the logo, the profile picker and its readiness chip, the run buttons, and the readout on the right (LED, state, verdict, exit status, run time).
+- **Notes line:** the profile's description; FAIL reasons and the gdb connection line, when they apply.
+- **Console** (left): the board's serial port, what `/dev/ttyUSB0` shows on the real EVK.
+- **Side panel** (right): the tabs Log, Coverage, Map, Devices, Monitor, Events, Runs.
+- **Status bar** (bottom): the run directory, the machine, QEMU's pid while it runs, and the theme switch (System / Light / Dark).
 
 The double bar between the console and the side panel is the **splitter**. Drag it, or focus it and use the arrow keys, to share the width. Double-click it for the default. On narrow screens the two panels stack and the splitter goes away.
 
@@ -56,6 +50,8 @@ The chip next to the dropdown says whether the profile can run:
 Hover the chip for the list of files.
 
 ## The buttons
+
+![The header: profile, run buttons, and the readout showing EXITED PASS, exit 0, 0.4 s](guide/header.png)
 
 | Button | What happens to QEMU |
 |---|---|
@@ -94,6 +90,10 @@ The console is the emulated board's **serial port**. Click it to type. The line 
 | **Monitor** | read-only QEMU inspection commands (`info mtree`, `info qtree`, `info registers`, `info pic`, …). Anything that changes state is refused | a CPU's registers, the live memory tree |
 | **Events** | what QEMU reports as it happens: STOP, RESUME, RESET, SHUTDOWN | following what the buttons and the guest did |
 | **Runs** | every run kept in `build/bench/`, newest first, with its verdict stripe; pick one to read its console, log, stderr and command line. Filters: hide test runs, only FAIL or lost | comparing with an earlier run; finding failures |
+
+![Coverage after the M1 probe: an invalid_mem read of 0x10000000 and an unimp read of SYSC, one each](guide/coverage.png)
+
+![Runs in the light theme: verdict stripes, the filters, and a picked run's console](guide/runs-light.png)
 
 Map and Devices show the **live session** by default. When you pick a run in Runs, they show that run instead, banded **PAST RUN**, until you click "Show the current session".
 
