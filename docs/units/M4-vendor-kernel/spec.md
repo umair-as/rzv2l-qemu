@@ -48,4 +48,4 @@ No unmapped access, no guest error from a modelled block.
 ## For the operator
 
 - **Direct mode starts with the watchdog stopped** (gap 16). The EVK's U-Boot leaves it running with 60 s; mimicking that would reset any guest without a watchdog daemon.
-- **A `reboot` on the EVK is likely a WDT0 reset (I).** TF-A's PSCI `SYSTEM_RESET` forces a WDT0 parity error, and the EVK read `CPG_WDTOVF_RST` = 1 after a Linux `reboot` (EVK-R73); how the last reset before the read was made is being confirmed. In direct mode QEMU's built-in PSCI resets the machine itself, so the flag stays 0 until a real BL31 runs (M7).
+- **A `reboot` on the EVK is a WDT0 reset (O).** After a Linux `reboot`, stopped at the U-Boot prompt, the EVK reads `CPG_WDTOVF_RST` = 1 (EVK-R73). The mechanism is TF-A's PSCI `SYSTEM_RESET`, which forces a WDT0 parity error (code-derived). In direct mode QEMU's built-in PSCI resets the machine itself, so the flag stays 0 until a real BL31 runs (M7).
