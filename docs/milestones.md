@@ -8,12 +8,12 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Traceability and requirement statuses are updated: 20 of 27 requirements verified, the rest planned for M4-M7 or noted ([traceability](spec/traceability.md)). **Tagged `rzv2l-v1.0`** (QEMU fork `rzv2l-dev` `aa1764973d`); the tag message lists the scope and the open requirements.
 
-**M4 is under way: Renesas's own kernel boots to the same shell, and the watchdog resets the board** (first unit merged). QEMU's loader now makes the vendor U-Boot's device-tree edit for an SD-card boot and lists the edits it does not make (second unit, in review).
+**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). Next: M5, storage.
 
 | | Release | Milestones | State |
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ tagged `rzv2l-v1.0` |
-| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 M4 |
+| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 M4 ✅, M5 next |
 
 ## Milestones
 
@@ -23,7 +23,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M1 | Machine skeleton | `-M rzv2l-smarc`: 2× Cortex-A55, GIC-600, DDR, timer, SYSC ID registers | bare-metal probe |
 | ✅ | M2 | First character | the serial port (SCIFA) model; `Hello from RZ/V2L` on SCIF0 | bare-metal probe |
 | ✅ | M3 | Linux to a shell | clock controller, OS timer, pin and interrupt controllers; mainline Linux to a BusyBox shell, both CPUs | G0 |
-| 🔄 | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
+| ✅ | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
 | ⏳ | M5 | Storage | the SD/eMMC controller with the real driver; ext4 root file system (real user space) | G0, G1 |
 | ⏳ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP | G0, G1 |
 | ⏳ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
@@ -43,7 +43,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M3b-pfc-irqc](units/M3b-pfc-irqc/spec.md) | M3 | pin controller and interrupt control unit; the real serial driver takes over the console |
 | ✅ | [M3b-shell](units/M3b-shell/spec.md) | M3 | BusyBox initramfs; the M3 acceptance run |
 | ✅ | [M4-vendor-kernel](units/M4-vendor-kernel/spec.md) | M4 | the vendor kernel to a shell; watchdog timers WDT0-2, reset through the CPG |
-| 🔄 | [M4-loader-fixups](units/M4-loader-fixups/spec.md) | M4 | U-Boot's device-tree edits: the SD0 supplies in eSD mode applied by QEMU, the others listed as gaps |
+| ✅ | [M4-loader-fixups](units/M4-loader-fixups/spec.md) | M4 | U-Boot's device-tree edits: the SD0 supplies in eSD mode applied by QEMU, the others listed as gaps |
 
 ## The SoC blocks
 
@@ -92,6 +92,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 ## What comes next
 
-1. 🔄 **M4:** the loader fixups unit is in review; its merge completes M4.
-2. ⏭️ **M5:** storage: the SD/eMMC controller (SDHI) with the real driver; its first unit spec follows the M4 merge.
-3. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.
+1. ⏭️ **M5:** storage: the SD/eMMC controller (SDHI) with the real driver; its first unit spec is next.
+2. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.

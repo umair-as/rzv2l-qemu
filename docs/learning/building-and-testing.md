@@ -318,6 +318,6 @@ Checks to try at the prompt:
 | Command | Expected | What it shows |
 |---|---|---|
 | `cat /sys/devices/system/cpu/online` | `0-1` | both CPUs started through PSCI |
-| `hexdump -C /proc/device-tree/soc/mmc@11c00000/vqmmc-supply` | `00 00 00 74` (eSD); `00 00 00 18` with `-b 1` | the loader's U-Boot edit for an SD-card boot (unit M4-loader-fixups) |
+| `hexdump -C /proc/device-tree/soc/mmc@11c00000/vqmmc-supply` | `00 00 00 74` (eSD); `00 00 00 18` with `-b 1` | the loader's U-Boot edit for an SD-card boot ([M4-loader-fixups](../units/M4-loader-fixups/spec.md)) |
 | `devmem 0x11020a00` | `0x00010000` in eSD mode; bits 2:0 are the boot mode (`-b`) | `SYS_LSI_MODE`, the boot mode pins. The EVK reads `0x00010200`: its DEBUGEN pin is high (`-M rzv2l-smarc,debugen=on`) |
 | `watchdog -T 3 -t 1000 /dev/watchdog`, then `killall -9 watchdog` | the board resets about 3 s later; after the new boot, `devmem 0x11010b10` reads 1 | WDT0 and the CPG reset flag ([M4-vendor-kernel](../units/M4-vendor-kernel/spec.md)) |
