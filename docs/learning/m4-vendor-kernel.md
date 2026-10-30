@@ -50,7 +50,7 @@ Changing the current FDT in beaf4000.
 The EVK runs a G2 image, so its U-Boot is the vendor U-Boot plus the image's own patches. The first step was to sort each edit by its source. Only the vendor's edits are the contract:
 
 - The SD0 supply edit is vendor code. It applies only if the boot mode pins select eSD (`rzv2l-dev.c:269-292`, U-Boot `4eebfbaa4e`).
-- `kaslr-seed` comes from `ft_board_setup()`. Only the G2 patches enable it. The vendor `defconfig` does not set `OF_BOARD_SETUP`.
+- `kaslr-seed` comes from the G2 patches to `ft_board_setup()`. The vendor `ft_board_setup()` also runs, but it adds no seed (`common.c:243-250`).
 - `u-boot,version` and the bootargs from the U-Boot environment are vendor edits. QEMU does not write them (spec "For the operator").
 
 The full list, with each condition and what QEMU does, is in the [unit spec](../units/M4-loader-fixups/spec.md#scope).
@@ -67,7 +67,7 @@ The hook copies three details of U-Boot's `update_fdt()`:
 
 ### 2.3 The proof
 
-`-machine dumpdtb=<file>` writes the DTB that the loader built, after the hook, and stops QEMU before the guest runs. `tests/acceptance/m4/loader-fixups.sh` uses it for the G0 and G1 DTBs in eSD and eMMC mode. It compares the result with the DTB file. A third case removes the regulator's phandle and expects the next free one. Three mutations turn the check red ([tasks](../units/M4-loader-fixups/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+`-machine dumpdtb=<file>` writes the DTB that the loader built, after the hook, and stops QEMU before the guest runs. `tests/acceptance/m4/loader-fixups.sh` uses it for the G0 and G1 DTBs in each boot mode (0-5). It compares the result with the DTB file. A third case removes the regulator's phandle and expects the next free one. Four mutations turn the check red ([tasks](../units/M4-loader-fixups/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 
 ## 3. Pitfalls
 
@@ -80,5 +80,5 @@ The hook copies three details of U-Boot's `update_fdt()`:
 - **A reset request is a level, not an event.** If WDTRSTB is asserted while the CPG masks it, the request is still held when firmware unmasks it later, and the reset then happens. An edge-only model would lose it.
 - **The real board starts with the watchdog running.** U-Boot autostarts WDT0 with 60 s (EVK-R40). Direct mode starts it stopped on purpose (device map gap 16): a guest without a watchdog daemon would reset after a minute.
 - **A board's firmware edits the device tree, so a DTB file is not what the kernel sees.** In QEMU, the `modify_dtb` hook of `struct arm_boot_info` is the place for such edits, and `-machine dumpdtb` shows the result. On the EVK, U-Boot changes SD0's `vqmmc-supply` in eSD mode (EVK evidence §4).
-- **A log from a product image mixes vendor and product edits.** The EVK's U-Boot prints `kaslr-seed=ok`, but that edit comes from the G2 image's patches, not from the vendor U-Boot. Sort each edit by its source before you model it (`rzv2l-dev.c:269-292` is vendor; `ft_board_setup()` needs `OF_BOARD_SETUP`).
+- **A log from a product image mixes vendor and product edits.** The EVK's U-Boot prints `kaslr-seed=ok`, but that edit comes from the G2 image's patches, not from the vendor U-Boot. Sort each edit by its source before you model it (`rzv2l-dev.c:269-292` is vendor; the vendor `ft_board_setup()` at `common.c:243-250` adds no seed).
 - **U-Boot can name a node that does not exist.** The vendor U-Boot sets `vmmc-supply` to `/regulator-vcc-sdhi0`, which no Linux DTB for the board has, so the property keeps its old value. A loader that writes 0 or fails here would differ from the board (`update_fdt.c:84-85,173-178`).

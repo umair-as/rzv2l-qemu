@@ -102,7 +102,7 @@ The studied build is the G2 image's U-Boot: the vendor `renesas-u-boot-cip` `4ee
 | `/memory` rewritten with the same value | vendor | QEMU writes the same `0x48000000`/`0x78000000` |
 | `/chosen/u-boot,version` | vendor | not written; listed |
 | `/chosen/bootargs` from env, plus ` wdt_overflow=0` | vendor | `-append` stands for the env; the flag is not appended (no RZ/V2L consumer) |
-| `/chosen/kaslr-seed` from the OP-TEE RNG, `/firmware/optee`, `u-boot,bootconf`, `edge,boot-source` | G2 patches (FIT boot, `OF_BOARD_SETUP`) | none |
+| `/chosen/kaslr-seed` from the OP-TEE RNG, `/firmware/optee`, `u-boot,bootconf`, `edge,boot-source` | G2 patches (their `ft_board_setup()`, U-Boot control DT and FIT boot); the vendor `ft_board_setup()` adds no seed | none |
 | `local-mac-address` | vendor, no-op without `ethaddr` | none |
 
 ## 5. Open items

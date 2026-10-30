@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # The device-tree edits QEMU's loader makes in place of the board's
 # U-Boot (docs/units/M4-loader-fixups/spec.md). For the G0 and G1 device
-# trees, in eSD and eMMC boot mode, the DTB handed to the kernel
+# trees, in every boot mode (0-5), the DTB handed to the kernel
 # (-machine dumpdtb) is compared with the DTB file:
-#   eSD:  /soc/mmc@11c00000 vqmmc-supply = phandle of /regulator-vccq-sdhi0,
-#         vmmc-supply unchanged (the DTB has no /regulator-vcc-sdhi0);
-#   eMMC: both supplies unchanged;
-#   both: no other difference than QEMU's own /psci node.
+#   eSD (0):    /soc/mmc@11c00000 vqmmc-supply = phandle of
+#               /regulator-vccq-sdhi0, vmmc-supply unchanged (the DTB has
+#               no /regulator-vcc-sdhi0);
+#   modes 1-5:  both supplies unchanged (eMMC, QSPI, SCIF download);
+#   all:        no other difference than QEMU's own /psci node.
 # A regulator without a phandle gets the next free one (max + 1).
 # Exit 0 only if every check passes.
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
@@ -55,10 +56,13 @@ for tier in g0 g1; do
     check "$tier eSD vmmc-supply" "$(fdtget -t x "$OUT/$tier-esd.dtb" $MMC vmmc-supply)" "$vmmc"
     check "$tier eSD other changes" "$(other_changes "$DTB" "$OUT/$tier-esd.dtb" | wc -l)" 0
 
-    dump "$DTB" 1 "$OUT/$tier-emmc.dtb"
-    check "$tier eMMC vqmmc-supply" "$(fdtget -t x "$OUT/$tier-emmc.dtb" $MMC vqmmc-supply)" "$vqmmc"
-    check "$tier eMMC vmmc-supply" "$(fdtget -t x "$OUT/$tier-emmc.dtb" $MMC vmmc-supply)" "$vmmc"
-    check "$tier eMMC other changes" "$(other_changes "$DTB" "$OUT/$tier-emmc.dtb" | wc -l)" 0
+    for bm in 1 2 3 4 5; do
+        d="$OUT/$tier-mode$bm.dtb"
+        dump "$DTB" $bm "$d"
+        check "$tier boot mode $bm vqmmc-supply" "$(fdtget -t x "$d" $MMC vqmmc-supply)" "$vqmmc"
+        check "$tier boot mode $bm vmmc-supply" "$(fdtget -t x "$d" $MMC vmmc-supply)" "$vmmc"
+        check "$tier boot mode $bm other changes" "$(other_changes "$DTB" "$d" | wc -l)" 0
+    done
 done
 
 # The regulator without a phandle (and nothing pointing at it): U-Boot's
