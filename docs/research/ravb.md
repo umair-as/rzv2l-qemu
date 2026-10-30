@@ -36,17 +36,17 @@ Neither DT has `local-mac-address`. U-Boot's `fdt_fixup_ethernet()` writes `loca
 
 | Rule | Cite |
 |---|---|
-| `CSR.OPS = 1 << CCC.OPC`; entering OPERATION loads `CDARq = DBAT + 8q`; leaving it clears the status flags; CONFIG returns status registers to reset values; `DBAT` writable in CONFIG/OPERATION | F: §30.4.1.1-30.4.1.5 p.2087-2093, §30.5.1.1 p.2235 |
+| `CSR.OPS = 1 << CCC.OPC`; entering OPERATION loads `CDARq = DBAT + 8q`, leaving it sets `CDARq` to 0 and clears the status flags; CONFIG returns status registers to reset values; `DBAT` writable in CONFIG/OPERATION | F: §30.4.1.1-30.4.1.5 p.2087-2093 (CDARq p.2093), §30.5.1.1 p.2235 (CONFIG) |
 | Descriptor word 0: DT[31:28], DIE[27:24], content [23:12] (RX: MSC[23:16], EI b13), DS[11:0]; word 1 DPTR. DT: LEMPTY 2, EEMPTY 3, FMID 4, FSTART 5, FEND 6, FSINGLE 7, LINK 8, LINKFIX 9, EOS 10, FEMPTY 12, FEMPTY_ND 15; others reserved | F: Figure 30.7 p.2242, Table 30.7 p.2241 |
-| TX: Fxxx → FEMPTY, LINK → LEMPTY, EOS → EEMPTY and TSRQ0 = 0; FEMPTY/LEMPTY/EEMPTY stop the queue, refetched on the next TSRQ0 | F: Table 30.14 p.2255, §30.4.1.10 |
-| RX: FEMPTY → FSINGLE or FSTART/FMID/FEND with DS = stored length; a software-owned descriptor = queue full: frame discarded, `RIS2.QFF0` | F: Table 30.12 p.2250, p.2252 |
+| TX: Fxxx → FEMPTY, LINK → LEMPTY, EOS → EEMPTY and TSRQ0 = 0, the next TSRQ0 continuing at the next descriptor; FEMPTY/LEMPTY/EEMPTY stop the queue, refetched on the next TSRQ0 | F: Table 30.14 p.2255, §30.4.1.10 |
+| RX: FEMPTY → FSINGLE or FSTART/FMID/FEND with DS = stored length; a software-owned descriptor = queue full: frame discarded, `RIS2.QFF0`; `EI` = an error while storing (a failed data write: the descriptor is written back with EI and `CDAR` moves on, §30.5.5.4) | F: Table 30.12 p.2250, p.2252 |
 | Reserved DT: CDAR unchanged, frame lost, `EIS.QEF`, `ESR.ET` = 2; ET 0/1/4/5 for descriptor/data read/write errors | F: p.2241, §30.5.5.3 p.2262-2263, §30.4.1.6 p.2094 |
 | `DIS`, `EIS`, `RIS0-3`, `TIS`: write 0 clears, 1 no effect; `CXR21` FCI/LINKI: write 1 clears | F: p.2104-2129, §30.4.2.3 p.2143 |
-| ISS: FRM = RIC0&RIS0 (or RDPF with CIE), FTM = TIC&TIS, EM = EIC&EIS or EIS.QFS, MM = pending MAC interrupt; CIE gates only RDPF/TDPF | F: §30.4.1.43 p.2137, Table 30.20 p.2299; MM = `CXR21 & CXR22` (I) |
+| ISS: FRM = RIC0&RIS0 (or RDPF with CIE), FTM = TIC&TIS, EM = EIC&EIS or EIS.QFS, MM = pending MAC interrupt; CIE gates only RDPF/TDPF in `pif_int_n`, and has no influence on ISS (§30.4.1.42 p.2136) | F: §30.4.1.43 p.2137, Table 30.20 p.2299; MM = `CXR21 & CXR22` (I) |
 | TOE: TX inserts enabled checksums (an IPv4 UDP checksum of 0 stays 0); RX puts IPv4-header and L4 results in place of the CRC (0 = OK, `FFFF` = unsupported), error → MSC b6, unsupported → MSC b5; needs `CXR20.RCPT` | F: §30.5.6 p.2265-2267, Figure 30.25, Table 30.13 p.2251 |
 | `CXR23` bit-bang MDIO: MDC b0, MM b1, MDO b2, MDI b3; clause 22 frame, MDO sampled on MDC rising; MM reads back as written | F: §30.5.14.3 p.2309-2315; **conflict**: MM "read value should be 0" (p.2145) vs the procedure and Linux's read-modify-write (`m:143-176`): model R/W |
 | Frame size limits: TX 1.5 KB, RX 8 KB; `CXR2A.LEN_LMT` ≤ `0x5EE` = 1518 | F: Table 30.1 p.2079, §30.4.2.2 |
-| IRQC IRQn: `IITSR` 00 low level (reset), 01 falling, 10 rising, 11 both; `ISCR.ISTATn` follows the pin in level mode (writes invalid), latched in edge modes (0 clears); IRQn → SPI 1 + n | F: §8.6.3-8.6.4 p.552-553, §8.7.2 p.570, Table 8.2 p.535 |
+| IRQC IRQn: `IITSR` 00 low level (reset), 01 falling, 10 rising, 11 both; `ISCR.ISTATn` latched in edge modes (0 clears), writes invalid in level mode, where the request clears when the source deasserts (F); in level mode it follows the pin (I, from §8.7.2); IRQn → SPI 1 + n | F: §8.6.3-8.6.4 p.552-553, §8.7.2 p.570, Table 8.2 p.535 |
 
 ## 5. The PHY contract (phylib + micrel)
 

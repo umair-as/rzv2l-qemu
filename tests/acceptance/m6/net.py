@@ -3,10 +3,12 @@
 
 Usage: net.py OUTDIR --tier g0|g1
 
-ETH0 is attached to QEMU's user-mode network (slirp: an isolated private
-network, 10.0.2.0/24, no host interface, no physical LAN); the host side
-of each transfer is a server on 127.0.0.1, which the guest reaches as
-10.0.2.2. With the kernel and DTB of the tier and the BusyBox initramfs:
+ETH0 is attached to QEMU's user-mode network (slirp: a private network,
+10.0.2.0/24, with no host interface and no root needed); the host side of
+each transfer is a server on 127.0.0.1, which the guest reaches as
+10.0.2.2. Slirp would forward a connection to any other address through
+the host; the test makes none, so it needs no physical LAN. With the
+kernel and DTB of the tier and the BusyBox initramfs:
   boot:     both MACs and PHYs probe; ETH0's link comes up 1 Gb/s full
             duplex; ETH1 has no cable and stays down
   dhcp:     udhcpc obtains a lease on eth0
@@ -226,11 +228,11 @@ def main():
             check(re.search(r"ravb %s\.ethernet eth%d: Base address at 0x%s"
                             % (base, i, base), s.buf) is not None,
                   "boot: ravb probes ETH%d" % i)
-            check(re.search(r"KSZ9131 Gigabit PHY %s\.ethernet-ffffffff:07: "
-                            r"attached PHY driver" % base, s.buf) is not None
-                  or run(s, "test -e /sys/bus/mdio_bus/devices/"
-                         "%s.ethernet-ffffffff:07 && echo PHY-OK" % base)
-                  is not None, "boot: KSZ9131 PHY at address 7 on ETH%d" % i)
+            o = run(s, "cat /sys/bus/mdio_bus/devices/%s.ethernet-ffffffff:"
+                    "07/phy_id" % base)
+            check(o is not None and "0x00221640" in o,
+                  "boot: KSZ9131 PHY (ID 0x00221640) at address 7 on ETH%d"
+                  % i)
         o = run(s, "ip link set eth0 up; sleep 2; dmesg | grep -i ravb")
         check(o is not None and "eth0: Link is Up - 1Gbps/Full" in o,
               "boot: eth0 link up, 1 Gb/s full duplex")
