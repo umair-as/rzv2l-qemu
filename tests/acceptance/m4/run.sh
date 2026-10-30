@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # M4 acceptance for rzv2l-smarc: the Renesas vendor kernel (G1) and its
 # device tree boot to a BusyBox shell on ttySC0, and the watchdog (WDT0)
-# refreshes, stops and resets the board (docs/units/M4-vendor-kernel/spec.md).
+# refreshes, stops and resets the board (docs/units/M4-vendor-kernel/spec.md);
+# QEMU's loader makes U-Boot's device-tree edits (docs/units/M4-loader-fixups).
 # Exit 0 only if every check passes.
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
 set -uo pipefail
@@ -22,6 +23,15 @@ if [ $? -eq 0 ]; then
     echo "PASS M3 acceptance (full output: out/m3.txt)"
 else
     echo "FAIL M3 acceptance (full output: out/m3.txt)"; result 1
+fi
+
+# The device-tree edits made in place of U-Boot
+step "loader fixups"
+"$HERE/loader-fixups.sh" > "$OUT/loader-fixups.txt" 2>&1
+if [ $? -eq 0 ]; then
+    echo "PASS loader fixups (full output: out/loader-fixups.txt)"
+else
+    echo "FAIL loader fixups (full output: out/loader-fixups.txt)"; result 1
 fi
 
 # G1 to a shell on two cold boots; the watchdog checks on the first
