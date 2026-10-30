@@ -27,8 +27,8 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-IRQC-001 | M3b | M3b | M3b-pfc-irqc | T1, T3 | qtest `rzv2l-pfc-irqc-test` `/irqc/registers`; hello probe (unlisted offset faults); M3 acceptance (pin controller binds after the IRQC) | `../research/boot-dependency-graph.md`; `../evidence/EVK-2026-10-30-linux.md` §2 (routing has a consumer: gap 15) | V |
 | REQ-MAP-001 | M1 (initial classification) → M3b | M3b | M1-machine-skeleton; M3b units | M1-T05, T06; each unit's window task | probe (aborts on unmapped and non-ID SYSC offsets); M3/M4 log gates (only recorded stub windows) | `../device-map.md`; `../evidence/EVK-2026-10-30-linux.md` §1 | V |
 | REQ-WDT-001 | M4 | M4 | M4-vendor-kernel | T2-T6 | qtest `rzv2l-wdt-test` (expiry, PEEN forced reset); M4 acceptance (WDT0 refresh, stop, reset); proofs in `../units/M4-vendor-kernel/tasks.md`. The PSCI reset through a real BL31 waits for M7 | `../research/boot-chain-firmware.md`; `../evidence/EVK-2026-10-30-linux.md` §3, §6 | V |
-| REQ-SDHI-001 | M5 | M5 | M5-sdhi | T1-T4 | — |
-| REQ-SDHI-002 | M5 | M5 | M5-sdhi | T5 | — |
+| REQ-SDHI-001 | M5 | M5 | M5-sdhi | T1-T4, T6 | qtest `rzv2l-sdhi-test`; proofs in `../units/M5-sdhi/tasks.md` (statuses at the release) | `../research/sdhi.md`; `../evidence/EVK-2026-10-30-linux.md` §8 | P |
+| REQ-SDHI-002 | M5 | M5 | M5-sdhi | T5 | M5 acceptance `tests/acceptance/m5/` (statuses at the release) | `../units/M5-sdhi/spec.md` | P |
 | REQ-TSIP-001 | M7 | M7 (Stage N negative test) | — | — | — | `../research/boot-chain-firmware.md` | P |
 | REQ-GUEST-001 | — (process) | M3 | M1-machine-skeleton; M3b-shell | M1-T07; M3b-shell T3 | acceptance `dumpdtb` vs DTB-U (only listed fixups differ); M3/M4 runs use the stock DTB-U / DTB-V and their own bootargs | spec §8 | V |
 | REQ-GUEST-002 | — (process) | M3 | M3b-shell; M4-vendor-kernel | M3b-shell T1; M4-vendor-kernel T1 | `tests/guests/g0/build-kernel.sh`, `tests/guests/g1/build-kernel.sh` refuse a checkout with local changes; G1 uses its own defconfig | spec §8; `../sources.md` | V |

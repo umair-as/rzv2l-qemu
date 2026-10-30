@@ -51,7 +51,7 @@ Start state: the manual reset value in both start states (A for direct mode unti
 
 ## 3. Sequences
 
-- **Request with data, DMA** (F, `renesas_sdhi_internal_dmac.c:404-461`; manual Figures 40.22-40.23 p.3326): `CC_EXT_MODE` and `HOST_MODE` for DMA, `DM_CM_DTRAN_MODE`, `DM_DTRAN_ADDR`, then `SD_STOP.SEC`, `SD_SECCNT`, `SD_SIZE`, `SD_ARG`, `SD_CMD`; on the response end a work item writes `DM_START`. The request completes when both `SD_INFO1.INFO2` and `DM_CM_INFO1.DTRANEND` are seen (`:328-358`). So the card data must wait for `DM_START` (I).
+- **Request with data, DMA** (F, `renesas_sdhi_internal_dmac.c:404-461`; manual Figures 40.22-40.23 p.3326-3327): `CC_EXT_MODE` and `HOST_MODE` for DMA, `DM_CM_DTRAN_MODE`, `DM_DTRAN_ADDR`, then `SD_STOP.SEC`, `SD_SECCNT`, `SD_SIZE`, `SD_ARG`, `SD_CMD`; on the response end a work item writes `DM_START`. The request completes when both `SD_INFO1.INFO2` and `DM_CM_INFO1.DTRANEND` are seen (`:328-358`). So the card data must wait for `DM_START` (I). The manual's flowcharts write `CC_EXT_MODE = 0x1012` only after the response end, so a whole block is then already in SD_BUF (BRE set); the DMAC takes it from there (I, both orders are in the qtest).
 - **PIO fallback** (F, `:389-399`, `:441-442`): only when `dma_map_sg()` fails or the buffer is not 128-byte aligned. Data then goes through `SD_BUF0` block by block on BRE/BWE.
 - **Interrupt handler** (F, `tmio_mmc_core.c:706-727`): reads `SD_INFO1/2`, writes back `TMIO_MASK_IRQ` (keeps the flags it handles, clears the errors), then acks each source with a 0 write.
 - **Write gate** (F, `renesas_sdhi_core.c:836-875`): before writes to `SD_CMD`, `SD_STOP`, `SD_SECCNT`, `SD_SIZE`, `SD_OPTION`, `SDIO_MODE`, `CC_EXT_MODE`, `HOST_MODE` the driver polls `CBSY` = 0; before `SD_CLK_CTRL`, `SCLKDIVEN` = 1; on a timeout it skips the write. Idle must read `CBSY = 0`, `SCLKDIVEN = 1`.
@@ -62,7 +62,7 @@ Start state: the manual reset value in both start states (A for direct mode unti
 - **Untimed bus (A):** a command sequence ends within the register access that starts it; `SCLKDIVEN` reads 1 whenever `CBSY` is 0; the data timeout counter never fires. A card that sends no data ends the sequence with `ERR3`.
 - **SD_BUF0 width (A):** each access moves as many bytes as it is wide, whatever `HOST_MODE` says. The manual does not say what a 64-bit access does while `WMODE` = 1 (the G1 PIO case), and the EVK cannot show it without a write.
 - **Card pins (I):** `INFO5` and `INFO10` read 1 with a card in the slot; `INFO7` reads 1 unless the card is read-only (`TMIO_STAT_WRPROTECT` = writable, `tmio_mmc_core.c:1016`); `DAT0` reads 1.
-- **Normal mode (A):** `SD_CMD[10:8]` = 000 takes the response the card gives and moves data only for CMD17/18/24/25. Linux uses extended mode only; U-Boot (M7) may need more. Logged as unimplemented.
+- **Normal mode (A):** `SD_CMD[10:8]` = 000 takes the response length the card gives (48 or 136 bits); CMD0, CMD4 and CMD15 have no response, every other command times out when the card does not answer. Data moves only for CMD17/18/24/25. Linux uses extended mode only; U-Boot (M7) may need more. Logged as unimplemented.
 - **Not modelled:** SDIO functions, HPI, the read wait state, the `SD_BUF0` byte swap, CRC errors, the SCC (logged, reads 0, so tuning fails visibly).
 
 ## 5. Open (EVK, U-Boot prompt)
