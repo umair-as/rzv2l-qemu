@@ -2,6 +2,8 @@
 
 A web front end for one QEMU session of the board model: a live console, start/pause/reset/stop, the `-d` log, a coverage list of what the guest touched that the model lacks, and read-only monitor views. In the spirit of a board farm, for one emulated board.
 
+New to the bench? Start with [`GUIDE.md`](GUIDE.md): what the screen shows, what each button does to QEMU, and what the bench can't see. This README is the reference.
+
 **Stock QEMU interfaces only:** QMP, a socket chardev for the console, and `-d`/`-D`. Nothing in the fork knows the bench exists, so it never blocks the fork's shape.
 
 ## Run
