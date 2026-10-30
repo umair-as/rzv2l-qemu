@@ -22,7 +22,7 @@ The workflow procedures become committed skills, agents and hooks, shared by bot
   - `/emulate` does one task.
   - `/debug` applies the failure policy.
   - `/review` runs the independent review and the dispositions.
-  - `/qemu-cov` builds the device coverage map in `docs/coverage.md`: device map × fidelity class × the windows G0/G1 guests touch, as measured by `-d unimp`.
+  - `/qemu-cov` would build a device coverage page: device map × fidelity class × the windows G0/G1 guests touch, as measured by `-d unimp` (not built; see the decision below).
   - `/evk-read` does EVK console reads, always in the main session.
   - `learning-docs` already exists.
   - Each skill stops at the existing operator checkpoints. None commits or pushes.

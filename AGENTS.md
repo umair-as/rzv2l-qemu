@@ -1,130 +1,93 @@
 # AGENTS.md
 
-This is the canonical orientation for AI coding agents working in this repo. It is agent-agnostic. Claude-specific extras live in `CLAUDE.md`.
+The orientation for AI coding agents in this repo. Claude-specific mechanics are in `CLAUDE.md`. The project's own words (G0, UNIMP, M3b-…) are explained in `docs/README.md`.
 
 ## What this repo is
 
-`qemu-rzv2l` develops a QEMU machine model of the **Renesas RZ/V2L SMARC EVK** (SoC R9A07G054L2: 2× Cortex-A55, GIC-600, 2 GB DDR4). The aim is to run software built for the real board **without modifying that software**.
+`qemu-rzv2l` is a QEMU machine model of the **Renesas RZ/V2L SMARC EVK** (SoC R9A07G054L2: 2× Cortex-A55, GIC-600, 2 GB DDR4). It aims to run software built for the real board **without modifying that software**.
 
-The specification is `docs/spec/project.md` (v0.3). The requirements are in `docs/spec/requirements.md` (the canonical requirement IDs), and traceability is in `docs/spec/traceability.md`. v0.1 is not tracked; spec §22 summarises the changes. Read the spec before any hardware-facing work.
+The specification is `docs/spec/project.md`, the requirement IDs are in `docs/spec/requirements.md`, and `docs/spec/traceability.md` links them to tests. Read the spec before any hardware-facing work.
 
-The project is **standalone**. Guest artifacts come in three tiers:
+Guest software comes in three tiers:
 
 | Tier | Guest | Role |
 |---|---|---|
-| G0 | mainline Linux + upstream `r9a07g054l2-smarc.dtb` + BusyBox initramfs | primary acceptance |
-| G1 | Renesas vendor BSP (`linux-renesas`, Renesas TF-A / U-Boot, OP-TEE) | acceptance |
-| G2 | downstream products built on the BSP | integration profiles only |
-
-G2 consumers never define acceptance and are never a build dependency. Their build outputs may be *studied* as samples of real vendor firmware.
+| G0 | plain upstream Linux + upstream `r9a07g054l2-smarc.dtb` + BusyBox initramfs | primary acceptance |
+| G1 | Renesas vendor stack (`linux-renesas`, Renesas TF-A / U-Boot, OP-TEE) | acceptance |
+| G2 | products built on G1 | studied as samples only; never acceptance, never a build dependency |
 
 ## Two repositories
 
 ```
-qemu-rzv2l/                 this repo: spec, research, evidence, tests, guest builds, scripts
-└── qemu/                   submodule → github.com/umair-as/qemu (fork of qemu/qemu)
-      rzv2l-base            pinned upstream base (v11.1.2); never commit here
-      rzv2l-dev             the port; `git diff rzv2l-base...rzv2l-dev` is the whole port
+qemu-rzv2l/        this repo: spec, research, evidence, tests, guest builds, scripts
+└── qemu/          submodule → github.com/umair-as/qemu (fork of qemu/qemu)
+      rzv2l-base   pinned upstream base (v11.1.2); never commit here
+      rzv2l-dev    the port; `git diff rzv2l-base...rzv2l-dev` is the whole port
 ```
 
-- The fork contains **only** what upstream QEMU could accept: `hw/`, `include/hw/`, `tests/qtest/`, `docs/system/arm/`, Kconfig/meson wiring. No agent files, specs or evidence.
-- Project tags use the `rzv2l-vX.Y` namespace, never bare `vX.Y`, which collides with QEMU's own tags.
-- Rebasing the base is a deliberate, recorded decision (`docs/decisions/`), not routine.
+- The fork holds only what upstream QEMU could take: `hw/`, `include/hw/`, `tests/qtest/`, `docs/system/arm/`, Kconfig/meson wiring. No agent files, specs or evidence.
+- Project tags are `rzv2l-vX.Y`, never bare `vX.Y` (QEMU's own tags).
+- Moving the base is a recorded decision (`docs/decisions/`).
 
 ## How work flows
 
-| Role | Who | Does | Does not |
-|---|---|---|---|
-| Operator | the human owner | designs and reviews specs, unit specs, decisions; approves EVK actions | write the model code |
-| Implementer | an agent (usually Claude Code) | writes research, unit tasks, model code, tests, per an operator-reviewed unit spec | start a unit before its spec is reviewed |
-| Reviewer | a *different* model (Codex, or another Claude model) | tries to disprove the implementer's claims: checks every manual citation (page, register, bit, reset value) and every guest `file:line` against the source; keeps verified and inferred apart | edit source; review its own work |
-
-- The operator sees only what review cannot settle: source conflicts, inferences, assumptions and design choices. Do not ask the operator to proofread citations.
-- The reviewer works from `docs/units/templates/review-prompt.md`. Its findings are leads too: the implementer re-checks each one before acting on it.
-- The independent reviewer starts from a fresh context with only the filled-in review prompt, on a model different from the implementer's: Codex, or another Claude model. A forked agent, or one on the implementer's model, does not count.
-- Delegate broad source reading (TF-A, U-Boot, kernel drivers, the hardware manual) to research agents. They write findings to a working file and return a summary. Their reports are leads, not evidence: verify surprising claims against the effective build configuration before relaying or recording them.
-- **Record each proof once** (operator, 2026-10-29). The qtest is the record. Its mutation goes in one place: one line in the unit's `tasks.md` (the exact code change → the red line). No patch files, no eval entries, no mutation tables in learning docs, no repeat in the PR body (the PR links `tasks.md`). `scripts/eval.py` and `tests/eval/m2/` stay as M2's regression suite: run once before a PR opens, not after every fix; not extended for later units. A unit that does not touch the serial-port (SCIFA) code runs it with `--no-mutations` (operator, 2026-10-29).
-- **Unit paperwork is one page.** `spec.md`: scope, what the guest needs, exit criterion, the evidence it rests on. No `design.md`. `tasks.md`: a short table. One learning doc per unit, one page, written at the unit's end. Traceability and requirement statuses are updated once at v1.0, not per unit.
-- **Windows found by the boot loop.** A window the guest touches is mapped with the class `docs/device-map.md` records for it, with no stop. If the boot shows a window needs a different class (an UNIMP whose read-as-zero is not honest, an unmapped window the guest touches), the implementer lists it for the operator at the unit's end and does not change the class itself.
-- **Quiet commands** (implementer and reviewer). Build, test and boot commands send their output to a file; read only the tail or the failing lines (`ninja … >log 2>&1; tail -5 log`). Never read a full build or boot log into context. `set -o pipefail` when a check is piped.
-- **Review budget: one round, plus at most one recheck limited to the fixes.** Doc-only findings (counts, wording) are fixed without another round. The review report stays in the operator's working area; only a short **Review fixes** list goes into the PR body.
-- **The implementer prepares the review build** at PR time: a git worktree of the fork at the PR head and a separate build directory `build/review-<short-sha>/`, configured and built once; path and commit go in the review prompt. The reviewer's first commands are `ninja` there (it must report nothing to do) and `git status` in the worktree (clean, at the PR SHA). The reviewer does not clone, configure or build from scratch, does not run `scripts/eval.py` and does not rebuild the G0 kernel. It reads the code against the manual and the evidence, runs the existing qtest binary, and makes about three mutations of its own with incremental `ninja` in the review build, plus follow-ups to any that stays green, reversing each after. The implementer's boot log and command are the boot evidence; the reviewer re-runs a boot only if it doubts that log, and says why. When Codex quota is short, a non-forked Sonnet subagent given only the review prompt is an accepted reviewer. Review prompts are short: commits, review build path, claims to disprove, this budget.
-
-**Session state** (the current handoff and task board) is kept outside the tracked tree, in the operator's local working area. At the start of a session, read the handoff the operator points you to; at the end, update it with the current state and the next step. Durable results are promoted into `docs/`; working material stays out of tracked files. Keep both files short: the handoff about one page, rewritten each session (never appended); the task board current state only. Never delete working-area material (research, reviews, source trees) without operator approval.
-
-**Public terms only.** Tracked files and commit messages describe this project in its own public terms: repo-relative paths, and public upstream sources cited as repository + commit + `file:line`. Committed tooling names the operator's working area only as `$RZV2L_WORKAREA`.
-
-## Workflow (skills, agents, gates)
-
-The procedures above are packaged as skills, so every agent runs them the same way ([DR-0004](docs/decisions/DR-0004-agent-workflow-tooling.md)). Skills hold steps; the rules stay in this file and in the templates.
-
-| Stage | Skill | What it does |
+| Role | Who | Does |
 |---|---|---|
-| Before modelling a block | `register-evidence` | the consumer-scoped register table: offsets, reset values, field classes, start states, cites |
-| Writing the model | `device-model` | register file, field classes, IRQ equations, virtual-time completion, honest faults (patterns in its `reference.md`) |
-| Into the machine | `soc-wiring` | SoC child, memory map, GIC SPI wiring, chardev, Kconfig; acceptance expectations from the device map |
-| Register tests | `qtest-golden` | qtests that assert manual values, by field class |
-| CPU-side tests | `guest-probe` | bare-metal probes for aborts, PSCI, IRQ delivery, firmware access order, console output |
-| Proving a test | `mutation-check` | plausible wrong value, confirmed rebuild, the right red line, restore |
-| Running guests | `guest-bringup` | the rule 5 loop in practice: triage by symptom, hangs, allowed fixes, coverage list |
-| Explanations for the operator | `learning-docs` | writes or rewrites `docs/learning/` per `docs/learning/STYLE.md` |
-| Seeing the model run | `bench-drive` | runs the web bench and drives a session through Playwright MCP or its HTTP API |
+| Operator | the human owner | reviews units and decisions when they choose, approves EVK actions, says when to merge |
+| Implementer | an agent | writes research, unit pages, model code and tests |
+| Reviewer | a *different* model (Codex, or another Claude model in a fresh, non-forked context) | tries to disprove the implementer's claims; never edits source or reviews its own work |
 
-Each skill does one piece of modelling or testing work. Process (review, planning, commits, handoff) follows this file and the agent harness's own flow; no process skills are planned (DR-0004).
+- **What the operator sees:** only what review cannot settle: source conflicts, inferences, assumptions, design choices. Never ask the operator to proofread citations.
+- **Unit paperwork is one page.** A unit is `docs/units/<unit>/spec.md` (scope, what the guest needs, exit criterion, evidence) and `tasks.md` (a short table). Implementation follows the spec page without waiting for a review. One learning page per unit, at its end. Traceability and requirement statuses are updated once per release, not per unit.
+- **Record each proof once.** The test is the record. Its mutation is one line in the unit's `tasks.md`: the exact change → the red line. Not repeated in PR bodies or learning docs. `scripts/eval.py m2` is M2's regression suite: run it once before a PR, with `--no-mutations` unless the serial-port (SCIFA) code changed.
+- **Windows the boot touches** are mapped with the class `docs/device-map.md` gives them, without stopping. A window that needs a different class is listed for the operator at the unit's end.
+- **Review:** one round plus at most one recheck limited to the fixes; doc-only findings are fixed without a round. The implementer re-checks every finding at the source before acting. The report stays in the operator's working area; the PR body gets a short **Review fixes** list. The reviewer works from `docs/units/templates/review-prompt.md`, which has the review build and mutation rules. When a PR changes no QEMU code, there is no review build.
+- **Research agents** may do broad source reading. Their reports are leads: verify surprising claims before recording them.
+- **Quiet commands.** Build, test and boot output goes to a file; read the tail or the failing lines. `set -o pipefail` when a check is piped.
+- **Session state** (handoff and task board) lives in the operator's working area, outside the tracked tree. Read the handoff at the start; rewrite it at the end (about one page). Never delete working-area material without approval.
+- **No stale material.** What was superseded is deleted, not archived; git history is the archive. Stale text is fixed where it is.
+- **No dates in docs.** Git records when text was written. A date stays only where it identifies a fact that can change outside the repo: an EVK measurement, a claim about the "latest" upstream release, the spec changelog, a decision record's acceptance date.
+- **Public terms only.** Tracked files and commit messages use repo-relative paths and public upstream sources (repository + commit + `file:line`). Tooling names the working area only as `$RZV2L_WORKAREA`.
 
-- **Skills** live in `.agents/skills/<name>/SKILL.md`. Codex reads them there; Claude Code reads them through the `.claude/skills` symlink. A skill stops at the operator checkpoints above and never commits or pushes.
-- **Agent briefs** would go in `.claude/agents/*.md` as Claude Code subagents (none planned). Codex reads them as task briefs.
-- **Gates.** What is enforced depends on who runs the command:
-  - **Every committer** (git hooks, wired locally in each clone; see the docstring of `.claude/hooks/git_gate.py`): commits on `rzv2l-base` and fork commits with `Signed-off-by:` are refused; `scripts/lint.py` runs before each project commit.
-  - **Claude Code only** (tool hook): builds inside `qemu/` are refused.
-  - **Codex** follows the build and push rules from this file; nothing enforces them for it.
+## Workflow (skills and gates)
 
-## Upstream provenance: read this before writing QEMU code
+The modelling and testing procedures are skills in `.agents/skills/<name>/SKILL.md` (Claude Code reads them through the `.claude/skills` symlink; DR-0004). Each does one piece of work: `register-evidence`, `device-model`, `soc-wiring`, `qtest-golden`, `guest-probe`, `mutation-check`, `guest-bringup`, `learning-docs`, `bench-drive`. A skill never commits or pushes.
 
-QEMU's policy (`qemu/docs/devel/code-provenance.rst`, section "Use of AI-generated content") is to **decline contributions that include or derive from AI-generated content**. It **allows** AI for research, API/algorithm investigation, static analysis and debugging, provided that output is not included in the contribution.
+Gates:
+- **Every committer** (git hooks, wired per clone; see `.claude/hooks/git_gate.py`): no commits on `rzv2l-base`; no `Signed-off-by:` in fork commits; `scripts/lint.py` before each project commit.
+- **Claude Code** (tool hook): no builds inside `qemu/`.
 
-Consequences for this project:
-- Device-model code an agent writes on `rzv2l-dev` is **not upstreamable as-is**. Agent-written code serves as the working prototype and test oracle. Human authorship would be necessary for any submission but is **not sufficient**: the policy also declines contributions *derived from* AI-generated content. Upstream submission is not a goal (operator, 2026-10-28): the project shows what agent-driven QEMU modelling can do.
-- Agents can contribute freely to the parts upstream never sees: evidence packets, research notes, device maps, test plans, guest build scripts, oracle captures, validation reviews and debugging.
-- Provenance is stated once, project-wide, in the README. Everything on `rzv2l-dev` beyond `rzv2l-base` counts as agent-assisted. A commit the operator writes by hand says so in its message.
+## Upstream provenance
+
+QEMU declines contributions that include or derive from AI-generated content (`qemu/docs/devel/code-provenance.rst`). Everything on `rzv2l-dev` beyond `rzv2l-base` is agent-assisted, so it is not upstreamable, and upstream submission is not a goal: the project shows what agent-driven QEMU modelling can do. Provenance is stated once, in the README. A commit the operator writes by hand says so.
 
 ## Engineering rules (from the spec, non-negotiable)
 
-1. **Evidence before implementation.** Every hardware-facing change cites:
-   - the MMIO range, IRQ, clocks, resets and reset values it implements
-   - the hardware manual section
-   - the guest source path (driver/DTS/firmware, with file:line)
-   - its fidelity class
-   - what it does not support
-   - how it was verified
+1. **Evidence before implementation.** Every hardware-facing change cites its MMIO range, IRQ, clocks, resets and reset values; the manual section; the guest source (`file:line`); its fidelity class; what it does not support; how it was verified. Without evidence it is an experiment (`docs/experiments/`).
+2. **Label every claim:** fact / code-derived inference / hardware observation / assumption.
+3. **Check the effective build configuration** (`.config`, `conf.mk`, compile log), not source defaults, before claiming what firmware or a kernel does.
+4. **Never modify the guest to fit the model.** No DT edits, driver or firmware patches, invented kernel arguments. A needed boot argument or loader fixup is a recorded fidelity gap.
+5. **Failure loop:** observe → first unmet guest expectation → guest code → hardware contract → smallest model change → retest. No arbitrary constants, invented status bits or disabled drivers, except as recorded experiments.
+6. **Never silently wrong.** A model behaves as the hardware does or fails visibly. Classes: FULL / FUNCTIONAL / STUB / UNSUPPORTED, and honest-fault vs silent-wrong (never acceptable).
+7. **Booting is not proof.** qtests assert **manual** values (reset values, ID registers), not the model's own output, and each test is seen red on a mutation.
+8. **Name the layer you verified** before claiming a root cause.
+9. **Two start states:** firmware mode (manual reset values) and direct-kernel mode (the measured post-firmware state). Keep both explicit in each model.
 
-   If it has no evidence, it is an experiment, recorded under `docs/experiments/`.
-2. **Label every claim:** documented fact / code-derived inference / hardware observation / assumption.
-3. **Check the effective build configuration** (compile log, `.config`, `conf.mk`), not just source defaults, before claiming what firmware or a kernel does. Two earlier "findings" failed exactly this check.
-4. **Never modify the guest to fit the model.** No guest DT edits, driver patches, firmware patches or invented kernel arguments. A needed boot argument or loader fixup is recorded as a fidelity gap.
-5. **Failure policy:** observe → find the first unmet guest expectation → trace it to guest code → find the hardware contract → change the smallest model → retest. Arbitrary register constants, invented status bits and disabled drivers are forbidden, except as recorded experiments.
-6. **Never silently wrong.** A model either behaves as the hardware does, or fails honestly in a way the guest can see. Classes:
-   - FULL / FUNCTIONAL / STUB / UNSUPPORTED (how much is modelled)
-   - honest-fault vs silent-wrong (whether it lies). Silent-wrong is never acceptable.
-7. **Booting is not proof of fidelity.** Device behaviour is verified by qtests that assert **hardware-manual** values (reset values, capability/ID registers), not by the model's own prior output. Tests are mutation-checked: break the model and confirm the test goes red.
-8. **Name the layer you verified.** "At layer N the cause is X" — don't claim the root cause until you've shown it.
-9. **Two start states.** Firmware mode: devices start at manual reset values. Direct-kernel mode: devices start at the measured *post-firmware* state, i.e. what TF-A/U-Boot leave behind. Keep both explicit in each model.
+## Board facts already established
 
-## Board facts already established (evidence: `docs/research/boot-chain-firmware.md`, `docs/experiments/`)
-
-- The kernel is entered at **NS-EL1**, not EL2: EVK logs and TF-A `RCAR_BL33_EXECUTION_EL`.
-- PSCI goes over SMC. CPUs are `cpu@0` and `cpu@100`, so set `mp-affinity` = `0x0`, `0x100`.
-- `CNTFRQ` = 24 MHz. TF-A copies it from SYC `CNTFID0`; the DT timer has no `clock-frequency`.
-- BL2 panics unless `SYS_LSI_DEVID[27:0] == 0x8447447`. U-Boot and BL2 read `SYS_LSI_MODE` @ `0x11020A00` for the boot source.
-- CPG monitors: `CLK_MON` = `CLK_ON` (same polarity) for implemented bits; reserved bits can differ (WDT b7:6 read 1 in `CLK_ON`, 0 in `CLK_MON`; EVK-X01). `RSTMON` = `~RST & implemented_mask` (inverted, 1 = in reset). Linux and TF-A poll both; getting either wrong makes drivers time out (U-Boot SDHI, Linux `sh-sci`).
-- The production OP-TEE panics without TSIP, a closed crypto IP. Emulation uses an OP-TEE rebuilt with `CFG_RZ_SCE=n`; TSIP is honest-fault.
+Evidence: `docs/research/boot-chain-firmware.md`, `docs/experiments/`, `docs/evidence/`.
+- Linux is entered at **NS-EL1**; PSCI over SMC; CPUs `cpu@0` / `cpu@100` (`mp-affinity` `0x0`, `0x100`).
+- `CNTFRQ` = 24 MHz, from SYC `CNTFID0`; the DT timer has no `clock-frequency`.
+- BL2 panics unless `SYS_LSI_DEVID[27:0] == 0x8447447`; boot source from `SYS_LSI_MODE` @ `0x11020A00`.
+- CPG: `CLK_MON` = `CLK_ON` for implemented bits (WDT bits 7:6 differ on silicon, EVK X01); `RSTMON` = `~RST & implemented_mask`. Linux and TF-A poll both.
+- The production OP-TEE panics without TSIP (closed crypto). Emulation uses OP-TEE rebuilt with `CFG_RZ_SCE=n`; TSIP is honest-fault.
 
 ## Repo layout
 
-Each directory is described by its purpose, not its contents. `scripts/lint.py` checks this block against the tree: add or remove a line here when a directory is created or removed.
+Lint checks this block against the tree: add or remove a line when a directory is created or removed.
 
 ```
-docs/README.md      index of docs/ and reading order
+docs/README.md      index of docs/, reading order and the project's words
 docs/spec/          specification, requirements, traceability
 docs/units/         work units per milestone, and their templates
 docs/research/      per-block research notes
@@ -136,7 +99,7 @@ docs/device-map.md  MMIO/IRQ/clock/reset map, with evidence per row
 docs/sources.md     source register: manuals, pinned guest and firmware sources
 tests/experiments/  sources and run scripts backing docs/experiments/
 tests/acceptance/   per-milestone acceptance runs and their expected outputs
-tests/eval/         M2's eval checks and mutation patches (regression suite; later units record proofs in tasks.md)
+tests/eval/         M2's eval checks and mutation patches (regression suite)
 tests/probes/       bare-metal guest programs that check a machine from inside
 tests/guests/       scripts that build or fetch guest artifacts (outputs untracked)
 scripts/            repo tooling (lint, build and run helpers)
@@ -149,57 +112,48 @@ qemu/               submodule: the QEMU fork
 
 ## Sources
 
-- Hardware truth: `artifacts/rzv2l/hardware/r01uh0936ej0150-rzv2l.pdf` (HW manual Rev 1.50). The GIC-600 registers are in the Arm GIC-600 r1p6 TRM (100336_0106_00), to which the manual defers (§8.4 p.548). For grep, use the searchable text in `artifacts/rzv2l/text/`. Cite the **PDF** (section/table/page), not the text file.
-- Board: the SMARC module UM (`r01uh0964ej0200`) and carrier UM (`r01uh0966ej0200`).
-- When sources conflict: the manual is authority for intended layout and reset values, silicon for actual behaviour, and guest code for what is actually required. Record the conflict; never silently pick one.
-- The BSP driver manuals (`bsp-drivers/`) describe software usage only. Treat them as leads.
-- Reference QEMU ports: https://github.com/kylefoxaustin/qemu-imx93 and https://github.com/kylefoxaustin/qemu-imx95. Borrow method and structure, never RZ/V2L facts.
+- Hardware truth: the HW manual Rev 1.50 (`artifacts/rzv2l/hardware/r01uh0936ej0150-rzv2l.pdf`); for the GIC-600, the Arm GIC-600 r1p6 TRM, to which the manual defers (§8.4 p.548). Grep the text in `artifacts/rzv2l/text/`; cite the **PDF** (section, table, page).
+- Board: SMARC module UM (`r01uh0964ej0200`) and carrier UM (`r01uh0966ej0200`).
+- Conflicts: the manual rules intended layout and reset values, silicon rules actual behaviour, guest code rules what is required. Record the conflict; never pick silently.
+- The BSP driver manuals and other QEMU machine models are leads only.
 
-## Build and run (provisional; scripts land under `scripts/`)
+## Build and run
 
 ```bash
-git submodule update --init                    # qemu/ at the pinned rzv2l-dev commit
+git submodule update --init
 mkdir -p build/qemu && cd build/qemu
 ../../qemu/configure --target-list=aarch64-softmmu --disable-docs
 ninja qemu-system-aarch64
 ```
 
-Build out-of-tree under `build/` (gitignored). Never build inside `qemu/`.
+Build out of tree under `build/`, never inside `qemu/`. More: `docs/learning/building-and-testing.md`.
 
-Rebuilding, qtests, checkpatch, tracing and editor setup: `docs/learning/building-and-testing.md`.
-
-Useful QEMU debugging (see `docs/imx95/methodology.md` in qemu-imx95):
-- `-d unimp,guest_errors,invalid_mem`: an acceptance run must have every unimplemented access fixed or listed. `invalid_mem` is the only mask that logs accesses to unmapped addresses and refused access sizes (`docs/learning/building-and-testing.md` §5).
+Debugging:
+- `-d unimp,guest_errors,invalid_mem`: an acceptance run has every unimplemented access fixed or listed; `invalid_mem` is the only mask that logs unmapped addresses and refused access sizes.
 - `-d nochain` plus gdb `hbreak` when TCG breakpoints misbehave.
 - `-icount` only to debug races; never in boot tests.
 
 ## Hardware oracle (the physical EVK)
 
-- **Read-only by default.** Writes to CPG, PMIC, WDT, eMMC boot partitions or QSPI need explicit operator approval.
-- Use a project-owned debug image (G1) or U-Boot `md`. Hardened images typically block `/dev/mem`.
-- Record whether a register read has side effects (FIFO pop, write-1-to-clear, read-to-clear).
-- A measurement answers a specific question stated beforehand. Store it under `docs/evidence/`.
-- **Serial console** (the `mcp-serial-rs` tools). The RZ/V2L is normally `/dev/ttyUSB0` @ 115200 8N1; confirm it with `serial_list_ports` instead of assuming. Ask before any command that writes registers, flash or boot media, or reboots the board.
-  - Make the policy server-enforced, not a promise. `write_policy: "deny"` refuses every write, so it suits only passive listening (capturing a boot log). For U-Boot `md` reads, open with `write_policy: "confirm"` plus `deny_patterns` that block state-changing commands (`mw`, `mm`, `nm`, `cp`, `mmc write`, `sf`, `env save`/`saveenv`, `reset`, `boot*`, `go`).
-  - `md` itself can have side effects: follow the per-register notes in `docs/evidence/requests.md` (never read the SCIF FIFO data registers).
-  - The server's journal records metadata only. Copy the console output you need into the evidence file, with board, image and boot stage noted.
-- **Provenance.** Every evidence file names the image or build it came from. When the image was not built by this project, the operator keeps the raw originals and their SHA-256 privately, so an excerpt can always be checked against its source. Over time, prefer re-measuring on G0/G1 images this project builds; such evidence replaces downstream-image evidence.
+- **Read-only by default.** Writes to CPG, PMIC, WDT, eMMC boot partitions or QSPI need the operator's approval.
+- Measure with a project-owned debug image (G1) or U-Boot `md`; hardened images block `/dev/mem`. The serial server's journal keeps metadata only: copy the output you need into the evidence file.
+- A measurement answers a question stated beforehand and is stored under `docs/evidence/`, with board, image and boot stage. Record any read side effect (FIFO pop, write-1-to-clear).
+- **Serial console** (`mcp-serial-rs`): the RZ/V2L is normally `/dev/ttyUSB0` @ 115200 8N1; confirm with `serial_list_ports`. For U-Boot `md` reads, open with `write_policy: "confirm"` and `deny_patterns` for state-changing commands (`mw`, `mm`, `nm`, `cp`, `mmc write`, `sf`, `env save`/`saveenv`, `reset`, `boot*`, `go`). Follow the per-register notes in `docs/evidence/requests.md` (never read the SCIF FIFO data registers). Ask before any command that writes registers, flash or boot media, or reboots.
+- **Provenance:** every evidence file names its image or build. For images this project did not build, the operator keeps the raw originals and their SHA-256. Prefer re-measuring on G0/G1 images this project builds.
 
 ## Commit style
 
-- **Project repo:** Conventional Commits, `<type>(<scope>): <subject>`, imperative mood, ≤72 chars. Scopes: `spec`, `docs`, `learning`, `research`, `evidence`, `tests`, `probe`, `acceptance`, `scripts`, `artifacts`, `qemu` (submodule bumps), `tooling` (skills, agents, hooks). Test changes use the type `test` (e.g. `test(acceptance): …`), not `tests`.
-- **QEMU fork (`rzv2l-dev`):** upstream QEMU style, `<subsystem>: <subject>` (e.g. `hw/arm: add RZ/V2L SoC skeleton`), `scripts/checkpatch.pl --no-signoff` clean, one logical change per commit. No `Signed-off-by:` on agent-written commits: it certifies the DCO, which QEMU holds cannot be given for AI-generated code (`qemu/docs/devel/code-provenance.rst`). The fork's `commit-msg` hook refuses every sign-off; a human-authored submission, if ever prepared, is a separate operator decision.
-- **Commit body: short.** About 5–6 lines in all: the subject, two lines of what and why, and one `Verified:` line (how it was verified; add what was not, if it matters). Do not restate the diff. Test counts and full detail go in the PR body. A test that has never been seen to fail does not count as verification (rule 7).
-- **Subject names the change,** so it still reads well months later in `git log --oneline`. Review dates and finding IDs go in the body, if anywhere.
-- **Write for a reader who knows the hardware but not this project's IDs** (operator, 2026-10-29). Commit and PR subjects name the hardware and the effect, never a milestone or unit ID. A milestone or unit ID appears at most once in a body, as a link. An EVK row ID always comes with its meaning: "the EVK reads CLK_MON_WDT as `0x3F` (X01)". Project terms (G0, `direct-boot`, UNIMP class, device-map row) get a one-line gloss the first time they appear in a PR; the glossary is `docs/learning/glossary.md`.
-- **What goes in one commit** is decided per case. Batch small edits into one commit at a natural review point instead of proposing a commit per edit. Group a task that cannot be tested yet with the task that makes it testable.
-- **No AI attribution lines, both repos:** no `Assisted-by:`, no `Co-Authored-By:`, no tool-generated footers. Provenance is in the README (see Upstream provenance).
-- Run `scripts/lint.py` before every commit; it must report 0 errors. Warnings are reviewed, not ignored.
-- **Commits, pushes, PRs and submodule bumps are the agent's normal cycle** (operator, 2026-10-28): no confirmation needed. Destructive remote actions (force-push, deleting branches or tags) are still confirmed first.
+- **Project repo:** Conventional Commits, `<type>(<scope>): <subject>`, imperative, ≤72 characters. Scopes: `spec`, `docs`, `learning`, `research`, `evidence`, `tests`, `probe`, `acceptance`, `scripts`, `artifacts`, `qemu` (submodule bumps), `tooling`. Test changes use the type `test`.
+- **QEMU fork:** upstream style, `<subsystem>: <subject>` (e.g. `hw/arm: add RZ/V2L SoC skeleton`), `scripts/checkpatch.pl --no-signoff` clean, one logical change per commit, never `Signed-off-by:` (the DCO cannot be given for AI-generated code).
+- **Body:** about 5-6 lines: the subject, two lines of what and why, one `Verified:` line. A test never seen to fail is not verification.
+- **Write for a reader who knows the hardware but not this project:** subjects name the hardware and the effect, never a unit ID. Every project word (G0, UNIMP, an EVK row ID like R71, gap N) gets its plain meaning the first time it appears, in commits, PRs and docs (`docs/README.md`).
+- **Batch** small edits into one commit at a natural review point; a task that cannot be tested yet goes with the task that makes it testable.
+- **No AI attribution** in either repo: no `Assisted-by:`, no `Co-Authored-By:`, no tool footers.
+- `scripts/lint.py` before every commit: 0 errors; warnings are read.
+- **Commits, pushes, PRs and submodule bumps** are the agent's normal cycle (operator, 2026-10-28). Merges happen on the operator's word. Destructive remote actions (force-push, deleting branches or tags) are confirmed first.
 
 ## Branches and PRs
 
-- **Project repo (`main`):** small docs and process changes are committed straight to `main`. Each work unit gets a branch `unit/<unit-id>` (e.g. `unit/M1-machine-skeleton`) and merges to `main` through a PR, after the independent reviewer pass.
-- **QEMU fork:** `rzv2l-dev` is the integration branch; never commit to `rzv2l-base`. Each unit gets a topic branch `unit/<unit-id>`, merged into `rzv2l-dev` through a PR on the fork, with `scripts/checkpatch.pl` clean. PRs target the fork only, never upstream `qemu/qemu`.
-- **Linking the two:** a unit's project-repo PR carries the submodule bump to the merged `rzv2l-dev` commit, so `main` only ever points at reviewed fork code.
-- **PR body: short and to the point** (operator, 2026-10-29). Sections **What** and **Verification**; **Not verified** only when a real gap remains, in a line or two; after review, a short **Review fixes** list (what changed, not who found it). No Scope section (the diff shows it), no reviewer or model names, no provenance line (the README states it once), no tool-generated footers. No PR comments; review dialogue stays in the working area.
+- **Project (`main`):** small docs and process changes go straight to `main`. A work unit gets `unit/<unit-id>` and merges through a PR after the review.
+- **Fork:** `rzv2l-dev` is the integration branch; a unit gets `unit/<unit-id>`, merged by PR on the fork, never to upstream `qemu/qemu`. The project PR carries the submodule bump to the merged `rzv2l-dev` commit.
+- **PR body:** **What** and **Verification**; **Not verified** only for a real gap; after review a short **Review fixes** list. No reviewer or model names, no provenance line, no tool footers, no PR comments.

@@ -15,5 +15,5 @@ The rest of this file covers Claude Code mechanics only.
 ## Skills, agents, hooks
 
 - Skills come from `.claude/skills`, a symlink to `.agents/skills/` (shared with Codex). Add a skill there, never as a separate copy under `.claude/`.
-- Subagents in `.claude/agents/` pin their own `model`. For the independent reviewer, use a non-forked subagent whose `model` differs from this session's.
+- For the independent reviewer, use a non-forked subagent on a model different from this session's.
 - `.claude/hooks/git_gate.py` runs as a PreToolUse hook on Bash (`.claude/settings.json`). It denies builds inside `qemu/`; commits, pushes and PRs pass. A deny is a policy decision: do not rephrase the command around it.

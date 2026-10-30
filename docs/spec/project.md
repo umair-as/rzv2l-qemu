@@ -75,7 +75,7 @@ Sources are ranked by **domain**, not by a single list:
 | Actual behaviour | the physical EVK (silicon) |
 | What is required | guest code: DTS, Linux drivers, TF-A, U-Boot, OP-TEE, **as built** |
 | Emulation mechanisms | upstream QEMU |
-| Leads only | BSP driver manuals, analogous QEMU ports (`qemu-imx93/95`), issues, blogs |
+| Leads only | BSP driver manuals, other QEMU machine models, issues, blogs |
 
 **Conflict rule:** when sources disagree, the disagreement is recorded as evidence. Silicon decides behaviour; the manual decides intended layout. No source is silently overridden.
 

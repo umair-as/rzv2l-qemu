@@ -68,12 +68,12 @@ Check IDs (S, A, L) are the eval-harness IDs from `design.md` §8.
 
 The operator chose the recommended option in each case, in agreement with the Codex design review: **(a) A**, **(b)** as proposed, **(c) B**, **(d) A**. The options stay below for the record.
 
-**(a) Where the hello image lives.** REQ-TEST-001 and spec §17 say `tests/hello-rzv2l`, but that directory is not in the AGENTS.md layout block, which lint checks (lint already warns about the missing path).
+**(a) Where the hello image lives.** REQ-TEST-001 and spec §17 say tests/hello-rzv2l, but that directory is not in the AGENTS.md layout block, which lint checks (lint already warns about the missing path).
 
 | Option | Change |
 |---|---|
 | **A. `tests/probes/hello-rzv2l/` (recommended)** | Errata to REQ-TEST-001 and spec §17. The hello image is a bare-metal guest program that checks the machine from inside, which is what `tests/probes/` is for. It also reuses the M1 probe's build and semihosting exit |
-| B. `tests/hello-rzv2l/` | A new AGENTS.md layout line; no spec change |
+| B. tests/hello-rzv2l/ | A new AGENTS.md layout line; no spec change |
 
 **(b) The earlycon boot argument.** DTB-U `/chosen/bootargs` is `ignore_loglevel rw root=/dev/nfs ip=on`, with no `earlycon` (checked on the built DTB-U). In direct mode `-append` replaces the DTB bootargs entirely. Proposal: `-append "ignore_loglevel rw root=/dev/nfs ip=on earlycon"`, which keeps the stock arguments and adds a bare `earlycon` (never `earlycon=scif,…`, which selects the SH4 layout: `scif.md` §5). It is recorded as a fidelity gap; device-map §4 row 6 already lists it, and REQ-GUEST-004 requires it.
 

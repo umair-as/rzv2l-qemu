@@ -224,11 +224,15 @@ def check_reqs(rep):
 # --- commits ----------------------------------------------------------------
 
 def default_range():
-    try:
-        git("rev-parse", "--verify", "--quiet", "@{upstream}")
-        return "@{upstream}..HEAD"
-    except subprocess.CalledProcessError:
-        return "HEAD"
+    """@{upstream}..HEAD; a branch with no upstream yet: origin/main..HEAD,
+    so a new branch is not judged by the whole history."""
+    for base in ("@{upstream}", "origin/main"):
+        try:
+            git("rev-parse", "--verify", "--quiet", base)
+            return base + "..HEAD"
+        except subprocess.CalledProcessError:
+            continue
+    return "HEAD"
 
 
 def check_commits(rep, rng):
@@ -293,7 +297,7 @@ def main():
                          "(default: all but style)")
     ap.add_argument("--commits", metavar="RANGE",
                     help="commit range for the commits check "
-                         "(default: @{upstream}..HEAD, or HEAD with no upstream)")
+                         "(default: @{upstream}..HEAD, else origin/main..HEAD, else HEAD)")
     args = ap.parse_args()
     selected = args.checks or DEFAULT
     unknown = [c for c in selected if c not in (*CHECKS, "commits")]
