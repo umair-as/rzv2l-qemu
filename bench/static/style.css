@@ -369,7 +369,7 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, tran
 .unplaced { margin: 0 0 8px; padding: 6px 10px 6px 26px; font: 12px var(--mono); color: var(--ink);
   background: var(--warn-soft); border: 1px solid var(--line); border-radius: var(--r-sm); }
 .unplaced li span { color: var(--muted); font-family: var(--sans); }
-#map td.wname span { display: inline-block; max-width: 20ch; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+#map td.wname span { display: inline-block; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 #map td.at .rname { font-size: 11.5px; }
 #map .st {
   white-space: nowrap;
@@ -384,6 +384,40 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, tran
 #map tr[data-hits]:not([data-hits="0"]) td.hits { color: var(--danger); font-weight: 700; }
 #map .rname { color: var(--muted); }
 #map-extra h3 { color: var(--muted); margin: 12px 0 4px; }
+#map tr[data-found] td { background: var(--accent-soft); }
+
+/* The address strip and its legend share the status colours */
+#map-summary .key::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px;
+  background: var(--st); vertical-align: 0;
+}
+.strip { flex: none; margin: 6px 0 10px; }
+.strip[hidden] { display: none; }
+.strip-bar {
+  display: flex; gap: 1px; height: 22px; padding: 3px; border-radius: var(--r-sm);
+  background: var(--face); border: 1px solid var(--line); box-shadow: var(--bezel);
+}
+.seg {
+  flex: 1 1 0; min-width: 2px; position: relative; cursor: pointer; border-radius: 1px;
+  background: var(--st);
+}
+.seg[data-status="missing"] {
+  background: repeating-linear-gradient(135deg, transparent 0 2px, var(--line-strong) 2px 3px);
+}
+.seg[data-partial="true"] { background: linear-gradient(to top, var(--st) 50%, color-mix(in srgb, var(--st) 35%, transparent) 50%); }
+.seg[data-dim] { opacity: .25; }
+.seg:not([data-hits="0"])::after {
+  content: ""; position: absolute; left: 50%; top: -7px; width: 2px; height: 5px; margin-left: -1px;
+  background: var(--danger); border-radius: 1px;
+}
+.seg:hover { outline: 1px solid var(--ink); outline-offset: 1px; z-index: 1; }
+.strip-scale { display: flex; justify-content: space-between; gap: 8px; margin-top: 3px; font: 11px var(--mono); color: var(--muted); }
+.strip-scale .hint { margin: 0; font: 11px var(--sans); text-align: center; }
+[data-status="modelled"] { --st: var(--ok); }
+[data-status="ram"] { --st: var(--info); }
+[data-status="unimp"] { --st: var(--warn); }
+[data-status="covered"] { --st: var(--muted); }
+[data-status="missing"] { --st: var(--line-strong); }
 
 /* Devices: the qtree as nested disclosure rows */
 .tree { white-space: normal; font: 12.5px var(--mono); }

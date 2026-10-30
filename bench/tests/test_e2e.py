@@ -811,3 +811,50 @@ def test_splitter_shares_the_width_and_is_kept(server):
         page.get_by_test_id("splitter").dblclick()
         expect(page.get_by_test_id("splitter")).to_have_attribute("aria-valuenow", "60")
         browser.close()
+
+
+MAP_ROWS = [  # the shape of GET /api/runs/<run>/map "windows"
+    {"name": "SRAM", "base": "0x00010000", "size": "0x10000", "status": "missing", "partial": False,
+     "regions": [], "hits": 0, "milestone": "M7", "plan": "RAM"},
+    {"name": "Probe hole", "base": "0x10000000", "size": "0x49800", "status": "missing", "partial": False,
+     "regions": [], "hits": 1, "milestone": "later", "plan": "UNIMP"},
+    {"name": "SCIF0", "base": "0x1004b800", "size": "0x400", "status": "modelled", "partial": False,
+     "regions": ["renesas-rz-scifa"], "hits": 0, "milestone": "M2", "plan": ""},
+    {"name": "RIIC0", "base": "0x10058000", "size": "0x400", "status": "unimp", "partial": False,
+     "regions": ["riic0"], "hits": 3, "milestone": "M3b", "plan": ""},
+    {"name": "GIC", "base": "0x12400000", "size": "0x20000", "status": "modelled", "partial": True,
+     "regions": ["gicv3_dist"], "hits": 0, "milestone": "M1", "plan": ""},
+    {"name": "DDR", "base": "0x40000000", "size": "0x80000000", "status": "ram", "partial": False,
+     "regions": ["ram"], "hits": 0, "milestone": "M1", "plan": ""},
+]
+
+
+def test_map_strip_draws_every_window(server):
+    """One segment per window in address order, with the row's status, hits
+    and part flag; the scale ends at the last window's last byte; a click on
+    a filtered-out window shows all rows and finds it."""
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = offline_page(browser, server)
+        page.evaluate("(rows) => { mapRows = rows; mapExtra = []; mapUnplaced = []; renderMap(); }", MAP_ROWS)
+        segs = page.get_by_test_id("map-strip-seg")
+        expect(segs).to_have_count(len(MAP_ROWS))
+        got = segs.evaluate_all(
+            "(ss) => ss.map((s) => [s.dataset.base, s.dataset.status, Number(s.dataset.hits), s.dataset.partial])")
+        assert got == [[r["base"], r["status"], r["hits"], str(r["partial"]).lower()] for r in MAP_ROWS]
+        ticks = segs.evaluate_all("(ss) => ss.map((s) => getComputedStyle(s, '::after').content !== 'none')")
+        assert ticks == [r["hits"] > 0 for r in MAP_ROWS]
+        expect(page.locator("#map-strip .lo")).to_have_text("0x00010000")
+        expect(page.locator("#map-strip .hi")).to_have_text("0xbfffffff")
+        expect(page.get_by_test_id("map-summary")).to_have_text(
+            "2 modelled · 1 RAM · 1 UNIMP · 0 covered · 2 missing")
+
+        page.get_by_test_id("tab-map").click()
+        page.get_by_test_id("map-filter-hits").click()
+        expect(page.get_by_test_id("map-row")).to_have_count(2)
+        ddr = page.locator('[data-testid=map-strip-seg][data-base="0x40000000"]')
+        expect(ddr).to_have_attribute("data-dim", "")
+        ddr.click()
+        expect(page.get_by_test_id("map-filter-all")).to_have_attribute("aria-pressed", "true")
+        expect(page.locator('[data-testid=map-row][data-base="0x40000000"]')).to_be_in_viewport()
+        browser.close()

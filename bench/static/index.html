@@ -138,6 +138,10 @@
         <button data-map-filter="hits" data-testid="map-filter-hits" aria-pressed="false">Hit</button>
         <span id="map-summary" class="hint" data-testid="map-summary"></span>
       </div>
+      <div id="map-strip" class="strip" data-testid="map-strip" hidden>
+        <div class="strip-bar" role="list" aria-label="Device-map windows in address order"></div>
+        <div class="strip-scale"><span class="lo"></span><span class="hint">address order, not to scale · click a window</span><span class="hi"></span></div>
+      </div>
       <ul id="map-unplaced" class="unplaced" data-testid="map-unplaced" hidden></ul>
       <p id="map-empty" class="empty" data-testid="map-empty">Start a session: its memory map is read before the guest runs.</p>
       <div class="table-wrap">

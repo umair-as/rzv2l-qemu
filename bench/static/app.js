@@ -415,10 +415,19 @@ function renderMap(error) {
   }
   const counts = { modelled: 0, ram: 0, unimp: 0, covered: 0, missing: 0 };
   mapRows.forEach((r) => { counts[r.status] += 1; });
-  $("map-summary").textContent = mapRows.length
-    ? `${counts.modelled} modelled · ${counts.ram} RAM · ${counts.unimp} UNIMP · `
-      + `${counts.covered} covered · ${counts.missing} missing`
-    : "";
+  const sum = $("map-summary");
+  sum.innerHTML = "";
+  if (mapRows.length) {
+    [["modelled", "modelled"], ["ram", "RAM"], ["unimp", "UNIMP"], ["covered", "covered"], ["missing", "missing"]]
+      .forEach(([st, label], i) => {
+        if (i) sum.append(" · ");
+        const k = document.createElement("span");
+        k.className = "key"; k.dataset.status = st;
+        k.textContent = `${counts[st]} ${label}`;
+        sum.append(k);
+      });
+  }
+  renderStrip(shown);
   // Hits the Map cannot place are listed, never dropped
   const un = $("map-unplaced");
   un.innerHTML = "";
@@ -446,6 +455,51 @@ function renderMap(error) {
     ex.append(tr);
   });
   $("map-extra").hidden = !(extra && extra.length);
+}
+
+// The address strip: every window as one equal segment, in address order,
+// coloured by its status; a tick marks windows the guest hit outside the model.
+// Equal widths, because to scale DDR alone would fill the strip.
+function renderStrip(shown) {
+  const strip = $("map-strip");
+  const bar = strip.querySelector(".strip-bar");
+  bar.innerHTML = "";
+  strip.hidden = mapRows.length === 0;
+  if (!mapRows.length) return;
+  const visible = new Set(shown);
+  for (const r of mapRows) {
+    const seg = document.createElement("span");
+    seg.className = "seg";
+    seg.setAttribute("role", "listitem");
+    seg.setAttribute("data-testid", "map-strip-seg");
+    seg.dataset.status = r.status;
+    seg.dataset.base = r.base;
+    seg.dataset.hits = r.hits;
+    seg.dataset.partial = String(r.partial);
+    if (!visible.has(r)) seg.dataset.dim = "";
+    const label = `${r.base} +${r.size} ${r.name}: ${r.status}${r.partial ? " (part)" : ""}`
+      + (r.hits ? `, ${r.hits} hit${r.hits > 1 ? "s" : ""}` : "");
+    seg.title = label;
+    seg.setAttribute("aria-label", label);
+    seg.onclick = () => findMapRow(r.base);
+    bar.append(seg);
+  }
+  strip.querySelector(".lo").textContent = mapRows[0].base;
+  const last = mapRows[mapRows.length - 1];
+  strip.querySelector(".hi").textContent =
+    "0x" + (BigInt(last.base) + BigInt(last.size) - 1n).toString(16).padStart(8, "0");
+}
+
+function findMapRow(base) {
+  let tr = document.querySelector(`[data-testid=map-row][data-base="${base}"]`);
+  if (!tr) {       // filtered out: show everything, then find it
+    document.querySelector('[data-map-filter="all"]').click();
+    tr = document.querySelector(`[data-testid=map-row][data-base="${base}"]`);
+  }
+  if (!tr) return;
+  tr.scrollIntoView({ block: "center" });
+  tr.dataset.found = "";
+  setTimeout(() => delete tr.dataset.found, 1200);
 }
 
 document.querySelectorAll("[data-map-filter]").forEach((b) => {
