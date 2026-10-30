@@ -29,7 +29,7 @@ Linux cannot stop a running watchdog through its registers: once WDTEN is set, o
 
 ### 1.3 The proof
 
-`rzv2l-wdt-test.c` checks the reset values, the 24 MHz count, the first and second overflow, the CPG mask and flag, the forced parity error and the reset line. Eleven mutations each turn one check red ([tasks](../units/M4-vendor-kernel/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). The acceptance run starts BusyBox's `watchdog` on the vendor kernel three ways: pinged (no reset), stopped (no reset), and started with no ping, which resets the board and leaves `CPG_WDTOVF_RST` = 1.
+`rzv2l-wdt-test.c` checks the reset values, the 24 MHz count, the first and second overflow, the CPG mask and flag, the forced parity error and the reset line. Fifteen mutations each turn one check red ([tasks](../units/M4-vendor-kernel/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). The acceptance run starts BusyBox's `watchdog` on the vendor kernel three ways: pinged (no reset), stopped (no reset), and started with no ping, which resets the board and leaves `CPG_WDTOVF_RST` = 1.
 
 ## 2. Pitfalls
 
@@ -38,5 +38,6 @@ Linux cannot stop a running watchdog through its registers: once WDTEN is set, o
 - **The RZ/V2L watchdog cannot reset the chip until firmware allows it.** `CPG_WDTRST_SEL` resets to `0x88`: every channel's system reset masked (§7.2.4.183 p.460). A model that resets on every second overflow resets in firmware mode where the silicon would not.
 - **A watchdog that cannot be stopped needs its reset line.** Linux stops it by applying the CPG reset, and changes a running timeout by a stop and a start. Without the reset line, a stopped watchdog keeps counting and resets the board later (`rzg2l_wdt.c:126-140`).
 - **"Reset" has two directions here.** The CPG's `RST_WDT` resets the watchdog; the watchdog's WDTRSTB resets the system through the CPG. They are separate lines in the model.
-- **A flag that reports a reset must survive it.** `CPG_WDTOVF_RST` would be useless if the reset it reports cleared it, so the model keeps it outside the reset values (§7.2.4.182 p.459).
+- **A flag that reports a reset must survive it.** The manual says `CPG_WDTOVF_RST` identifies the channel after the release from the reset it caused (§7.2.4.182 p.459), so the model keeps it outside the reset values. `CPG_WDTRST_SEL`, by contrast, goes back to its initial value on a system reset (the note to §7.2.4.183 p.461).
+- **A reset request is a level, not an event.** If WDTRSTB is asserted while the CPG masks it, the request is still held when firmware unmasks it later, and the reset then happens. An edge-only model would lose it.
 - **The real board starts with the watchdog running.** U-Boot autostarts WDT0 with 60 s (EVK-R40). Direct mode starts it stopped on purpose (device map gap 16): a guest without a watchdog daemon would reset after a minute.

@@ -120,7 +120,7 @@ Values Linux or the console path can observe. "Code" = derived from the pinned f
 | SYSC DEVID / PRR / LSI_MODE | latched | `0x18447447` / `0` / boot switches | O (BL2) | N (re-read in EVK-R01) |
 | SYC CNTCR / CNTFID0 (`+0x020`, I) | TRM | EN=1 / `0x016E3600` | I | Y (EVK-R50) |
 | WDT0 WDTCNT `0x12800800` | `0` | `1`: U-Boot autostarts it (EVK-R40: WDTCNT 1, WDTSET `0x2AE00000`, a 30 s cycle, reset after 60 s); **direct mode: not running** (gap 16) | EVK-R40 | Y (EVK-R40) |
-| CPG_WDTRST_SEL `0x11010B14` | `0x88` (WDT system reset masked) | `0x8F`: TF-A `cpg_setup` sets bits 2:0 | TF-A `cpg.c` (code-derived) | N (not read on the EVK) |
+| CPG_WDTRST_SEL `0x11010B14` | `0x88` (WDT system reset masked) | `0x8F`: TF-A `cpg_setup` sets bits 2:0 | O (EVK-R73) | Y (EVK-R73) |
 | CNTFRQ_EL0 | — | 24 MHz | O | N |
 | GIC | — | all SPIs Group 1 NS, DS=0 (QEMU `irq_reset_nonsecure`) | O (DS=0) + cpu-gic §6 D2 | Y (EVK-R60…R66) |
 
