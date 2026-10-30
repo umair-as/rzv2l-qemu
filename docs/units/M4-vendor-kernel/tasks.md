@@ -21,15 +21,15 @@ Fork branch `unit/M4-vendor-kernel` from `rzv2l-dev` `01168f7f3e`; project branc
 | 4 | WDTSET and WDTTIM writable while running | `rzv2l-wdt-test.c:115 test_count`: `0x2ae00000 == 0x00000000` |
 | 5 | INTDISP = 1 does not clear the running counter | `rzv2l-wdt-test.c:143 test_first_overflow`: `24023 == 0` |
 | 6 | the second overflow resets whatever `WDTRST_SEL` says | `rzv2l-wdt-test.c:154 test_reset_request`: `0x00000000 == 0x00000001` |
-| 7 | PEEN forces a reset whatever PECR says | `rzv2l-wdt-test.c:244 test_parity_force`: `'qtest_get_irq(qts, 1)' should be TRUE` |
-| 8 | `WDTOVF_RST` clears without its write-enable bit | `rzv2l-wdt-test.c:176 test_reset_request`: `0x00000000 == 0x00000001` |
-| 9 | `RST_WDT` does not drive PRESETN | `rzv2l-wdt-test.c:264 test_presetn`: `0x00000000 == 0xfff00000` |
-| 10 | the system reset clears `WDTOVF_RST` | `rzv2l-wdt-test.c:171 test_reset_request`: `0x00000000 == 0x00000001` |
+| 7 | PEEN forces a reset whatever PECR says | `rzv2l-wdt-test.c:245 test_parity_force`: `'qtest_get_irq(qts, 1)' should be TRUE` |
+| 8 | `WDTOVF_RST` clears without its write-enable bit | `rzv2l-wdt-test.c:177 test_reset_request`: `0x00000000 == 0x00000001` |
+| 9 | `RST_WDT` does not drive PRESETN | `rzv2l-wdt-test.c:265 test_presetn`: `0x00000000 == 0xfff00000` |
+| 10 | the system reset clears `WDTOVF_RST` | `rzv2l-wdt-test.c:172 test_reset_request`: `0x00000000 == 0x00000001` |
 | 11 | the first overflow already resets | `rzv2l-wdt-test.c:163 test_reset_request`: `0x00000000 == 0x00000001` |
 | 12 | `RST_WDT` does not drive PRESETN (Linux's stop-and-start timeout change cannot apply, so WDT0 keeps its 60 s default) | M4 acceptance: `FAIL WDT0 not pinged (timeout 3 s): the board resets within 20 s (new boot after 20.3 s)` |
 | 13 | direct mode without `WDTRST_SEL 0x8F` (the system reset stays masked) | M4 acceptance: `FAIL WDT0 not pinged (timeout 3 s): the board resets within 20 s (new boot after 20.3 s)` |
-| 14 | `CPG_WDTRST_SEL` write does not act on a held reset request | `rzv2l-wdt-test.c:192 test_masked_request`: `0x00000001 == 0x00000000` |
-| 15 | a start value above the cycle waits a full 2^32 clocks before the first cycle | `rzv2l-wdt-test.c:213 test_start_above_period`: `0x00000000 == 0x00000001` |
+| 14 | `CPG_WDTRST_SEL` write does not act on a held reset request | `rzv2l-wdt-test.c:193 test_masked_request`: `0x00000001 == 0x00000000` |
+| 15 | a start value above the cycle waits a full 2^32 clocks before the first cycle | `rzv2l-wdt-test.c:214 test_start_above_period`: `0x00000000 == 0x00000001` |
 
 Each mutation was built with a confirmed relink and run alone; the source was restored and rebuilt, and the full test passed after each. Proofs 12-13 run `shell.py --tier g1 --watchdog`. Proof 12 first passed a 60 s wait (the reset came at 60.3 s), so the expiry check now bounds the reset at 20 s: 3 s, then the boot back to the console (5.0 s measured).
 
