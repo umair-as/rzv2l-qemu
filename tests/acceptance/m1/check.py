@@ -167,6 +167,21 @@ DTB_MEMORY = ("/memory@48000000",
               ['device_type = "memory";',
                "reg = <0x00 0x%x 0x00 0x%x>;"
                % (LINUX_MEM[0], LINUX_MEM[1] - LINUX_MEM[0])])
+# The vendor U-Boot's eSD edit (REQ-GUEST-005; M4-loader-fixups spec): in
+# the default boot mode (eSD) SD0's vqmmc-supply points at this regulator.
+DTB_SD0 = "/soc/mmc@11c00000"
+DTB_SD0_VQMMC_REG = "/regulator-vccq-sdhi0"
+
+
+def sd0_edit_ok(got, want):
+    """Only vqmmc-supply differs, and it holds the regulator's phandle."""
+    phandle = [l for l in want.get(DTB_SD0_VQMMC_REG, [])
+               if l.startswith("phandle = ")]
+    if not phandle:
+        return False
+    expect = "vqmmc-supply = " + phandle[0].split("=", 1)[1].strip()
+    old = [l for l in want[DTB_SD0] if not l.startswith("vqmmc-supply = ")]
+    return sorted(got[DTB_SD0]) == sorted(old + [expect])
 
 
 def check_dtb(captured, stock):
@@ -190,6 +205,8 @@ def check_dtb(captured, stock):
             continue
         if n in DTB_FIXUP_NODES:
             fixed.append(n)
+        elif n == DTB_SD0 and sd0_edit_ok(got, want):
+            fixed.append(n + " vqmmc-supply")
         else:
             rc = fail("dtb: %s differs: -%s +%s"
                       % (n, sorted(set(want[n]) - set(got[n])),
