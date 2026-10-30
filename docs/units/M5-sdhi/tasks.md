@@ -9,7 +9,7 @@ Fork branch `unit/M5-sdhi` from `rzv2l-dev` `76685b0c82`; project branch of the 
 | T3 | Built-in DMAC: `DM_CM_*`, `DM_DTRAN_ADDR`, transfers to and from guest RAM after `DM_START`, `DTRANEND0/1` | fork `hw/sd/renesas_sdhi.c` | qtest `/rzv2l-sdhi/dma` | done |
 | T4 | CPG `RST_SDHI` reset lines; SoC wiring at `0x11C00000`/`0x11C10000`, SPI 104-107; `-drive if=sd` index 0/1 on the board; QEMU board doc | fork `hw/misc/renesas_rzv2l_cpg.c`, `hw/arm/r9a07g054.c`, `rzv2l-smarc.c`, `docs/system/arm/rzv2l-smarc.rst` | qtest `/rzv2l-sdhi/cpg-reset`; G0/G1 boot | done |
 | T5 | SD image build script; storage acceptance (write, sync, unmount; host `e2fsck`/`debugfs`; second boot reads back); M1/M3/M4 expectations for the new device | `tests/guests/sd/build-image.sh`, `tests/acceptance/m5/`, `tests/acceptance/m1/expected/`, `m3`/`m4` log allow lists | M5 ACCEPTANCE | done |
-| T6 | Review response: `DM_START` takes over a transfer started without DMA (the manual's Figure 40.22-40.23 order); normal-mode commands time out without an answer; qtest checks for R2 placement, the access end on a timed-out data command, `SOFT_RST`, `INFO7` | fork `hw/sd/renesas_sdhi.c`, `rzv2l-sdhi-test.c` | proofs 11-16 | done |
+| T6 | Review response: `DM_START` takes over a transfer started without DMA (the manual's Figure 40.22-40.23 order); normal-mode commands time out without an answer; qtest checks for R2 placement, the access end on a timed-out data command, `SOFT_RST`, `INFO7` | fork `hw/sd/renesas_sdhi.c`, `rzv2l-sdhi-test.c` | proofs 11-17 | done |
 
 ## Proofs (each mutation: the exact change → the red line)
 
@@ -31,5 +31,6 @@ Fork branch `unit/M5-sdhi` from `rzv2l-dev` `76685b0c82`; project branch of the 
 | 14 | normal mode takes no answer as a command without response | `rzv2l-sdhi-test.c:272 test_no_card`: `0x00000000 == 0x00000040` |
 | 15 | `SOFT_RST.SDRST = 0` resets nothing | `rzv2l-sdhi-test.c:288 test_soft_reset`: `0x0000c0ee == 0x000040ee` |
 | 16 | `INFO7` set for a read-only card instead of a writable one | `rzv2l-sdhi-test.c:308 test_pio`: `0x00000020 == 0x000000a0` |
+| 17 | the DMAC refuses a write started without DMA (Figure 40.23 order) | `rzv2l-sdhi-test.c:443 test_dma`: `0x00000000 == 0x00010000` |
 
 Each mutation was built with a confirmed relink and run alone; the source was restored from git and rebuilt, and the tests passed again (six after the review), as did the other six RZ/V2L qtest files. Proofs 1-10 were run again against the final test file; the lines above are from that run.

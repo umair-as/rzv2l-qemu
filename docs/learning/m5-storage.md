@@ -1,6 +1,6 @@
 # M5: storage
 
-> **Context.** Milestone M5 (spec [§17](../spec/project.md#17-milestones)): an SD card with an ext4 file system, used by the unchanged Linux driver. Unit M5-sdhi: [spec](../units/M5-sdhi/spec.md), [tasks](../units/M5-sdhi/tasks.md), register evidence [`../research/sdhi.md`](../research/sdhi.md). The manual chapter is §40 (SD/MMC host interface). Code lines are at fork commit `f60fc7e183`.
+> **Context.** Milestone M5 (spec [§17](../spec/project.md#17-milestones)): an SD card with an ext4 file system, used by the unchanged Linux driver. Unit M5-sdhi: [spec](../units/M5-sdhi/spec.md), [tasks](../units/M5-sdhi/tasks.md), register evidence [`../research/sdhi.md`](../research/sdhi.md). The manual chapter is §40 (SD/MMC host interface). Code lines are at fork commit `bb315aa426`.
 
 ## 1. The SD/MMC host interface (unit M5-sdhi)
 
@@ -23,7 +23,7 @@ The model is one QEMU device per channel, `renesas-rzg2l-sdhi` (`qemu/hw/sd/rene
 
 ### 1.3 The proof
 
-`tests/qtest/rzv2l-sdhi-test.c` checks the reset values of §40.2, the CPG reset and the soft reset, a command with no card, one block each way through `SD_BUF0`, and DMA transfers with the automatic CMD12, in both the Linux order and the manual's order. The data comes from a card image that the test writes, and the written blocks are read back from the image file. Sixteen mutations each turn one check red ([tasks](../units/M5-sdhi/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). The acceptance run (`tests/acceptance/m5/run.sh`) boots both kernels with a fresh SD image and does three steps:
+`tests/qtest/rzv2l-sdhi-test.c` checks the reset values of §40.2, the CPG reset and the soft reset, a command with no card, one block each way through `SD_BUF0`, and DMA transfers with the automatic CMD12, in both the Linux order and the manual's order. The data comes from a card image that the test writes, and the written blocks are read back from the image file. Seventeen mutations each turn one check red ([tasks](../units/M5-sdhi/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). The acceptance run (`tests/acceptance/m5/run.sh`) boots both kernels with a fresh SD image and does three steps:
 
 1. In the guest, it writes files of 1, 513, 4097 and 1 MiB + 7 bytes, then syncs and unmounts.
 2. On the host, `e2fsck` and `debugfs` check the image.
