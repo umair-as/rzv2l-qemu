@@ -144,6 +144,7 @@ Values Linux or the console path can observe. "Code" = derived from the pinned f
 | 15 | IRQC external/TINT interrupt delivery | routes IRQ0-7, TINT | STUB at M3b: never asserted | gap until M6 | boot-dependency-graph §4 |
 | 16 | WDT0 in direct mode | running if U-Boot autostarted it | not running unless the U-Boot path is mimicked | documented choice (spec §9) | boot-chain-firmware §1; boot-dependency-graph §4 |
 | 17 | Windows left unmapped over working silicon | every DTB-U block works | each window not modelled yet (all but DDR, GIC, SYSC, SCIF0-4) is unmapped: an access aborts | recorded gap under DR-0005: no M2 guest touches one (the M2 acceptance log gate allows only the probe's two deliberate lines), and each window is reviewed at M3b (REQ-MAP-001) | DR-0005; `tests/acceptance/m2/` |
+| 18 | Generic timer rate | `CNTFRQ` 24 MHz (O: EVK boot log, `arch_timer` line) | `CNTFRQ` reads 24 MHz, but QEMU ticks the counter every 41 ns, the truncated 10^9 / 24·10^6 (`qemu/target/arm/cpu.c` `gt_cntfrq_period_ns`, deliberate upstream): it counts at 24.39 MHz, so guest time runs about 1.6 % fast against host time | FIDELITY GAP, guest-visible (time) | M3b-shell spec |
 
 ## 5. Note disagreements resolved here
 
