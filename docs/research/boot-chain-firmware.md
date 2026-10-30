@@ -94,20 +94,16 @@ Staging A/B/C/N is defined in `docs/spec/project.md` §12 and DR-0002.
 
 ## 4. Loader fixup contract (direct mode in place of U-Boot)
 
-These are the kernel-DT changes U-Boot makes at `bootm` in the studied build, and what QEMU's direct loader does about each:
+The studied build is the G2 image's U-Boot: the vendor `renesas-u-boot-cip` `4eebfbaa4e` plus that image's patches. The contract QEMU follows is the vendor's (G1); the patches' edits are G2. Item by item, with sources and what QEMU does: [M4-loader-fixups spec](../units/M4-loader-fixups/spec.md).
 
-| Fixup | U-Boot behaviour | QEMU direct mode |
+| Fixup | Source | QEMU direct mode |
 |---|---|---|
-| `/memory` | rewritten with the same value (`0x48000000`/`0x78000000`) | QEMU rewrites it from `-m` and must produce the same value |
-| `/chosen/bootargs` | taken from the DTB when env `bootargs` is unset | no `-append` → preserved |
-| `/chosen/u-boot,version`, `u-boot,bootconf` | added | not replicated; listed gap (informational) |
-| `/firmware/optee` | *(downstream)* injected from the U-Boot control DT; the kernel DTB has no OP-TEE node | Stage A: omit; Stage B+: real U-Boot |
-| `/chosen/kaslr-seed` | only when the OP-TEE RNG works | omit, or a QEMU seed listed as a gap |
-| SDHI0 `vqmmc-supply` (eSD boot) | added | listed |
-| `local-mac-address` | no-op without `ethaddr` | none |
-| reserved-memory, `rng-seed` | none | none |
-
-`wdt_overflow=` (a Renesas `bootm` bootargs append) reads a variable that is never assigned, so it is always 0. It is not part of the contract.
+| SDHI0 `vmmc-supply`/`vqmmc-supply` in eSD mode | vendor | applied; `vqmmc-supply` changes, `vmmc-supply` keeps its value (no `/regulator-vcc-sdhi0`) |
+| `/memory` rewritten with the same value | vendor | QEMU writes the same `0x48000000`/`0x78000000` |
+| `/chosen/u-boot,version` | vendor | not written; listed |
+| `/chosen/bootargs` from env, plus ` wdt_overflow=0` | vendor | `-append` stands for the env; the flag is not appended (no RZ/V2L consumer) |
+| `/chosen/kaslr-seed` from the OP-TEE RNG, `/firmware/optee`, `u-boot,bootconf`, `edge,boot-source` | G2 patches (FIT boot, `OF_BOARD_SETUP`) | none |
+| `local-mac-address` | vendor, no-op without `ethaddr` | none |
 
 ## 5. Open items
 

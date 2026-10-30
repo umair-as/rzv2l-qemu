@@ -1,6 +1,6 @@
 # M4: the vendor kernel
 
-> **Context.** Milestone M4 (spec [§17](../spec/project.md#17-milestones)): Renesas's own kernel and device tree (G1) boot to the same BusyBox shell as M3, and the watchdog works. Unit M4-vendor-kernel: [spec](../units/M4-vendor-kernel/spec.md), [tasks](../units/M4-vendor-kernel/tasks.md). The manual chapter is §21 (watchdog timer) and §7.2.4.182-183 (its CPG registers).
+> **Context.** Milestone M4 (spec [§17](../spec/project.md#17-milestones)): Renesas's own kernel and device tree (G1) boot to the same BusyBox shell as M3, and the watchdog works. Unit M4-vendor-kernel: [spec](../units/M4-vendor-kernel/spec.md), [tasks](../units/M4-vendor-kernel/tasks.md). Unit M4-loader-fixups: [spec](../units/M4-loader-fixups/spec.md), [tasks](../units/M4-loader-fixups/tasks.md). The manual chapter is §21 (watchdog timer) and §7.2.4.182-183 (its CPG registers).
 
 ## 1. The vendor kernel and the watchdog (unit M4-vendor-kernel)
 
@@ -31,7 +31,45 @@ Linux cannot stop a running watchdog through its registers: once WDTEN is set, o
 
 `rzv2l-wdt-test.c` checks the reset values, the 24 MHz count, the first and second overflow, the CPG mask and flag, the forced parity error and the reset line. Fifteen mutations each turn one check red ([tasks](../units/M4-vendor-kernel/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). The acceptance run starts BusyBox's `watchdog` on the vendor kernel three ways: pinged (no reset), stopped (no reset), and started with no ping, which resets the board and leaves `CPG_WDTOVF_RST` = 1.
 
-## 2. Pitfalls
+## 2. U-Boot's device-tree edits (unit M4-loader-fixups)
+
+This section shows how QEMU's loader stands in for U-Boot's edits to the kernel's device tree. On the EVK, U-Boot edits the DTB after it loads it and before it starts Linux. With `-kernel`, no U-Boot runs, so each edit must be made by QEMU or listed as a gap (REQ-GUEST-005).
+
+### 2.1 What U-Boot edits
+
+The EVK log shows the edits (EVK evidence §4):
+
+```
+Changing the current FDT in beaf4000.
+   Config Node /soc/mmc@11c00000
+	Set property vmmc-supply : <&/regulator-vcc-sdhi0>
+   Config Node /soc/mmc@11c00000
+	Set property vqmmc-supply : <&/regulator-vccq-sdhi0>
+```
+
+The EVK runs a G2 image, so its U-Boot is the vendor U-Boot plus the image's own patches. The first step was to sort each edit by its source. Only the vendor's edits are the contract:
+
+- The SD0 supply edit is vendor code. It applies only if the boot mode pins select eSD (`rzv2l-dev.c:269-292`, U-Boot `4eebfbaa4e`).
+- `kaslr-seed` comes from `ft_board_setup()`. Only the G2 patches enable it. The vendor `defconfig` does not set `OF_BOARD_SETUP`.
+- `u-boot,version` and the bootargs from the U-Boot environment are vendor edits. QEMU does not write them (spec "For the operator").
+
+The full list, with each condition and what QEMU does, is in the [unit spec](../units/M4-loader-fixups/spec.md#scope).
+
+### 2.2 How the edit is made
+
+`struct arm_boot_info` has a hook, `modify_dtb`, that QEMU's loader calls after its own edits (`/memory`, `/chosen`, `/psci`) and before it copies the DTB into guest RAM (`qemu/hw/arm/boot.c:632-633`). The board sets the hook (`qemu/hw/arm/rzv2l-smarc.c:118`). If the machine property `boot-mode` is 0 (eSD), the hook sets the two supply properties (`qemu/hw/arm/rzv2l-smarc.c:90-100`). `boot-mode` is the same value the SoC shows in `SYS_LSI_MODE[2:0]`, which U-Boot reads.
+
+The hook copies three details of U-Boot's `update_fdt()`:
+
+1. A supply points at the regulator by its phandle.
+2. If the regulator has no phandle, it gets the highest phandle in the tree plus 1. QEMU calls the same libfdt function as U-Boot, `fdt_generate_phandle()` (`qemu/hw/arm/rzv2l-smarc.c:68`).
+3. If the regulator node does not exist, the property keeps its value. The Linux DTBs have no `/regulator-vcc-sdhi0`, so only `vqmmc-supply` changes: from `0x18` (`regulator-1p8v`) to `0x74` (`regulator-vccq-sdhi0`).
+
+### 2.3 The proof
+
+`-machine dumpdtb=<file>` writes the DTB that the loader built, after the hook, and stops QEMU before the guest runs. `tests/acceptance/m4/loader-fixups.sh` uses it for the G0 and G1 DTBs in eSD and eMMC mode. It compares the result with the DTB file. A third case removes the regulator's phandle and expects the next free one. Three mutations turn the check red ([tasks](../units/M4-loader-fixups/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
+
+## 3. Pitfalls
 
 - **A defconfig is part of the guest.** Mainline and the vendor kernel share almost all code here, but the vendor `defconfig` builds in drivers that mainline leaves as modules, so the vendor kernel probes a dozen more blocks at boot. Compare the effective `.config` files before predicting a boot (`tests/guests/out/g1/linux/.config`).
 - **In QEMU, a watchdog reset should go through `watchdog_perform_action()`,** not a direct reset request. Then the user chooses the action with `-action watchdog=`, as for every other QEMU watchdog (`qemu/include/system/watchdog.h`).
@@ -41,3 +79,6 @@ Linux cannot stop a running watchdog through its registers: once WDTEN is set, o
 - **A flag that reports a reset must survive it.** The manual says `CPG_WDTOVF_RST` identifies the channel after the release from the reset it caused (§7.2.4.182 p.459), so the model keeps it outside the reset values. `CPG_WDTRST_SEL`, by contrast, goes back to its initial value on a system reset. That is an inference: the note to §7.2.4.183 (p.461) says only that a system reset returns its bit 7 to the initial value.
 - **A reset request is a level, not an event.** If WDTRSTB is asserted while the CPG masks it, the request is still held when firmware unmasks it later, and the reset then happens. An edge-only model would lose it.
 - **The real board starts with the watchdog running.** U-Boot autostarts WDT0 with 60 s (EVK-R40). Direct mode starts it stopped on purpose (device map gap 16): a guest without a watchdog daemon would reset after a minute.
+- **A board's firmware edits the device tree, so a DTB file is not what the kernel sees.** In QEMU, the `modify_dtb` hook of `struct arm_boot_info` is the place for such edits, and `-machine dumpdtb` shows the result. On the EVK, U-Boot changes SD0's `vqmmc-supply` in eSD mode (EVK evidence §4).
+- **A log from a product image mixes vendor and product edits.** The EVK's U-Boot prints `kaslr-seed=ok`, but that edit comes from the G2 image's patches, not from the vendor U-Boot. Sort each edit by its source before you model it (`rzv2l-dev.c:269-292` is vendor; `ft_board_setup()` needs `OF_BOARD_SETUP`).
+- **U-Boot can name a node that does not exist.** The vendor U-Boot sets `vmmc-supply` to `/regulator-vcc-sdhi0`, which no Linux DTB for the board has, so the property keeps its old value. A loader that writes 0 or fails here would differ from the board (`update_fdt.c:84-85,173-178`).

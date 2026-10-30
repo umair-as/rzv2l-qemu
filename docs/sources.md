@@ -17,7 +17,7 @@ Sources are authoritative by **domain**, not by a single ranking (spec §5):
 
 When sources disagree, the disagreement is recorded with all sides and resolved explicitly (example: the DEVID value, where Table 6.1 and §6.3.43 conflict and the EVK decides). No retrieval score or global rank silently picks a winner. Confirm document applicability to the physical board revision and the chosen BSP before deriving contracts.
 
-Pinned firmware sources studied so far: see `research/boot-chain-firmware.md` (TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b`, kernel 6.12.59-cip14).
+Pinned firmware sources studied so far: see `research/boot-chain-firmware.md` (TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b`, kernel 6.12.59-cip14). The vendor U-Boot (G1) is https://github.com/renesas-rz/renesas-u-boot-cip, `4eebfbaa4e` (on branch `v2024.07/rz`), `smarc-rzv2l_defconfig`.
 
 **Still missing:** standalone board schematics.
 
