@@ -8,10 +8,12 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Before the `rzv2l-v1.0` tag: one pass over traceability and requirement statuses.
 
+**M4 is under way: Renesas's own kernel boots to the same shell, and the watchdog resets the board** (first unit in review; the loader fixups follow).
+
 | | Release | Milestones | State |
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ milestones done; ⏭️ closure pass, then the tag |
-| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | ⏳ |
+| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 M4 |
 
 ## Milestones
 
@@ -21,7 +23,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M1 | Machine skeleton | `-M rzv2l-smarc`: 2× Cortex-A55, GIC-600, DDR, timer, SYSC ID registers | bare-metal probe |
 | ✅ | M2 | First character | the serial port (SCIFA) model; `Hello from RZ/V2L` on SCIF0 | bare-metal probe |
 | ✅ | M3 | Linux to a shell | clock controller, OS timer, pin and interrupt controllers; mainline Linux to a BusyBox shell, both CPUs | G0 |
-| ⏭️ | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog | G1 |
+| 🔄 | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
 | ⏳ | M5 | Storage | the SD/eMMC controller with the real driver; ext4 root file system (real user space) | G0, G1 |
 | ⏳ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP | G0, G1 |
 | ⏳ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
@@ -40,7 +42,8 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M3b-ostm](units/M3b-ostm/spec.md) | M3 | OS timer: kernel time and timer interrupts |
 | ✅ | [M3b-pfc-irqc](units/M3b-pfc-irqc/spec.md) | M3 | pin controller and interrupt control unit; the real serial driver takes over the console |
 | ✅ | [M3b-shell](units/M3b-shell/spec.md) | M3 | BusyBox initramfs; the M3 acceptance run |
-| ⏭️ | M4 unit page | M4 | to be written |
+| 🔄 | [M4-vendor-kernel](units/M4-vendor-kernel/spec.md) | M4 | the vendor kernel to a shell; watchdog timers WDT0-2, reset through the CPG (in review) |
+| ⏭️ | M4 loader fixups | M4 | U-Boot's device-tree edits, applied by QEMU or listed as gaps |
 
 ## The SoC blocks
 
@@ -57,7 +60,8 @@ What the model does with each block the guest touches. Classes: [`device-map.md`
 | 🟡 | IRQC (interrupt control) | register file; no external interrupts | M3 (routing M6) |
 | 🟡 | DMAC, USB PHY control | stubs that keep written values | later |
 | 🟡 | SDHI0/1, Ethernet, I2C, USB host, thermal sensor | stubs: the drivers fail within a bound | M5, M6, later |
-| ⏳ | WDT0 (watchdog) | not mapped | M4 |
+| 🟡 | display, CAN-FD, QSPI, USB function, SSI, RSPI, ADC | stubs for the drivers the vendor kernel builds in | later (QSPI: M7) |
+| ✅ | WDT0-2 (watchdog) | modelled; a watchdog reset resets the board through the CPG | M4 |
 | ⏳ | TSIP (closed crypto) | fails visibly; OP-TEE is rebuilt without it | M7 |
 
 🟡 a stub: logged, so every access is visible.
@@ -89,5 +93,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 ## What comes next
 
 1. ⏭️ **v1.0 closure:** traceability and requirement statuses, then the `rzv2l-v1.0` tag in both repositories.
-2. ⏭️ **M4:** the unit page for the Renesas kernel (its kernel, device tree, the watchdog, loader fixups).
+2. 🔄 **M4:** the vendor kernel and watchdog unit (in review), then the loader fixups unit.
 3. ⏳ M5 (storage, needs M4), then M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.
