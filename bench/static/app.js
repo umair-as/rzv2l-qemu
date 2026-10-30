@@ -872,8 +872,7 @@ $("reset").onclick = () => action("/api/session/reset");
 $("stop").onclick = () => action("/api/session/stop");
 // Copy text, or select it where the page has no clipboard access (plain
 // http on a non-loopback name)
-async function copyOrSelect(button, text, node) {
-  const label = button.textContent;
+async function copyOrSelect(button, label, text, node) {
   try {
     await navigator.clipboard.writeText(text);
     button.textContent = "Copied";
@@ -884,8 +883,8 @@ async function copyOrSelect(button, text, node) {
   setTimeout(() => { button.textContent = label; }, 1500);
 }
 $("cmdline-copy").onclick = () =>
-  copyOrSelect($("cmdline-copy"), $("cmdline-text").textContent, $("cmdline-text"));
-$("gdb-copy").onclick = () => copyOrSelect($("gdb-copy"),
+  copyOrSelect($("cmdline-copy"), "Copy", $("cmdline-text").textContent, $("cmdline-text"));
+$("gdb-copy").onclick = () => copyOrSelect($("gdb-copy"), "Copy gdb command",
   `gdb-multiarch -ex "target remote 127.0.0.1:${$("gdb-info").dataset.port}"`, $("gdb-info"));
 
 // ---- workspace: the console and the side panel share the width -------------
