@@ -17,6 +17,6 @@ How this project's QEMU model works, explained from real monitor output, code an
 | [`glossary.md`](glossary.md) | the terms |
 | [`STYLE.md`](STYLE.md) | how these docs are written (adapted Simple Technical English); read it before you add to them |
 
-Read them in that order the first time. Each unit adds one page at its end (one file per milestone, extended per unit), and the general files do not grow. A file about a milestone starts with a context box that links the spec and unit files of that milestone.
+Read them in that order the first time. A unit adds to its milestone's file when it brings a concept worth explaining (one file per milestone), and the general files do not grow. A file about a milestone starts with a context box that links the spec and unit files of that milestone.
 
 **Conventions.** Quotes come from QEMU's own docs in the `qemu/` submodule (v11.1.2) and are cited by path. Code references are `qemu/<file>:<line>` on `rzv2l-dev`; each file names the fork commit its line numbers are at. `§N` means a section of the same file, `` `file.md` §N `` a section of another one.

@@ -13,7 +13,7 @@ The rules live in the repo, not here: `docs/learning/STYLE.md` (adapted Simple T
 2. Choose the file:
    - a general QEMU concept → `qemu-basics.md`
    - how a test works → `testing.md`
-   - a unit's page → that milestone's file (`m2-first-character.md`; for a new milestone, a new `mN-<topic>.md` with the context box from STYLE.md §4.4, and a row in README.md). Written once, at the unit's end, about one page: what was modelled and why it is shaped so, the test that proves it, and the **Pitfalls** section of STYLE.md §4.5 for both readers named in README.md
+   - a new concept from a unit (only when one is worth explaining; AGENTS.md "Unit paperwork") → that milestone's file, extended rather than duplicated (`m2-first-character.md`; for a new milestone, a new `mN-<topic>.md` with the context box from STYLE.md §4.4, and a row in README.md). A tutorial: what was modelled and why it is shaped so, the test that proves it, and the **Pitfalls** section of STYLE.md §4.5 for both readers named in README.md
    - commands → `building-and-testing.md`
    - a new term → `glossary.md` and STYLE.md §5
 3. Write from real evidence: monitor output, test output, code with `file:line`. Run the command; do not invent output.
