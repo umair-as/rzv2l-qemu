@@ -96,7 +96,21 @@ h2, th, .tabs button, .silk, #map-extra h3 {
 }
 .brand .word span { color: var(--accent); }
 .mark { width: 26px; height: 26px; color: var(--brand); flex: none; }
-.controls { display: flex; align-items: center; gap: 6px; }
+.group, .controls { display: flex; align-items: center; gap: 6px; }
+.group { padding-right: 12px; border-right: 1px solid var(--line); }
+
+/* Button icons: masks over currentColor, so they follow every button state */
+button[data-icon] { display: inline-flex; align-items: center; gap: 6px; }
+button[data-icon]::before {
+  content: ""; width: 12px; height: 12px; flex: none; background: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat;
+}
+[data-icon="play"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 1.5v9l7.5-4.5z'/%3E%3C/svg%3E"); }
+[data-icon="step"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1.5 1.5h2v9h-2zM5 1.5v9l6-4.5z'/%3E%3C/svg%3E"); }
+[data-icon="pause"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 1.5h2.5v9H2.5zM7 1.5h2.5v9H7z'/%3E%3C/svg%3E"); }
+body[data-state="paused"] [data-icon="pause"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 1.5v9l7.5-4.5z'/%3E%3C/svg%3E"); }
+[data-icon="reset"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='1.6'%3E%3Cpath d='M9.8 6.5A3.9 3.9 0 1 1 8.6 3.2'/%3E%3Cpath d='M9.6 1.2v2.6H7' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+[data-icon="stop"] { --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Crect x='2' y='2' width='8' height='8' rx='1'/%3E%3C/svg%3E"); }
 .sep { width: 1px; height: 22px; background: var(--line); margin: 0 2px; }
 
 select, input, button {
@@ -185,6 +199,10 @@ a.btn-link:hover { border-color: var(--accent); }
   border-radius: var(--r-sm); padding: 4px 10px; font-family: var(--mono); font-size: 12.5px;
 }
 .why::before { content: "FAIL  "; font-weight: 700; white-space: pre; }
+.gdb-row { display: flex; gap: 8px; align-items: center; }
+.gdb-row[hidden] { display: none; }
+.gdb-row .gdb { flex: 1; min-width: 0; }
+.gdb-row button { font-size: 12px; padding: 3px 9px; }
 .gdb {
   font-family: var(--mono); font-size: 12.5px; color: var(--ink);
   background: var(--info-soft); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 4px 10px;
@@ -192,10 +210,34 @@ a.btn-link:hover { border-color: var(--accent); }
 
 /* ---- main: terminal and side panel share the height left ---------------- */
 
+/* --split is the console's share, set by the splitter (app.js) */
 main {
-  flex: 1; min-height: 0; display: grid; gap: 12px; padding: 10px 16px 14px;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  flex: 1; min-height: 0; display: grid; gap: 0; padding: 10px 16px 10px;
+  grid-template-columns: minmax(0, var(--split, 60%)) 12px minmax(0, 1fr);
 }
+.splitter {
+  cursor: col-resize; position: relative; touch-action: none; border-radius: 4px;
+}
+.splitter::before {
+  content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 36px;
+  margin: -18px 0 0 -2px; border-radius: 2px;
+  border-left: 1px solid var(--line-strong); border-right: 1px solid var(--line-strong);
+}
+.splitter:hover::before, .splitter[data-drag]::before, .splitter:focus-visible::before {
+  border-color: var(--accent);
+}
+.splitter:focus-visible { outline-offset: -2px; }
+
+/* ---- status bar: details of the session, and the page's own settings --- */
+
+.statusbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 4px 16px;
+  background: var(--panel); border-top: 1px solid var(--line);
+  font: 11.5px var(--mono); color: var(--muted);
+}
+.statusbar .sb-item { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48ch; }
+.statusbar .sb-fill { flex: 1; }
+.statusbar .theme button { padding: 2px 8px; font-size: 11.5px; }
 .panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
   box-shadow: var(--shadow);
@@ -376,7 +418,8 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, tran
 /* Narrow screens: stack, and let the page scroll */
 @media (max-width: 1100px) {
   body { height: auto; }
-  main { grid-template-columns: minmax(0, 1fr); }
+  main { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .splitter { display: none; }
   #term { height: 60vh; flex: none; }
   .panel.side { min-height: 70vh; }
   .readout { margin-left: 0; }
@@ -388,6 +431,4 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, tran
   .bar { gap: 8px 10px; }
   #profile { max-width: 200px; }
   .readout[data-verdict="pass"] #state, .readout[data-verdict="fail"] #state { display: none; }
-  .readout #machine { display: none; }
-  .theme button { padding: 4px 7px; }
 }

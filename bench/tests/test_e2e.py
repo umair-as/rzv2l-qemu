@@ -785,3 +785,29 @@ def test_readout_led_and_verdict(server, scheme):
             else:
                 expect(verdict).to_be_hidden()
         browser.close()
+
+
+def test_splitter_shares_the_width_and_is_kept(server):
+    """Arrow keys move the split in 2 % steps; the choice survives a reload;
+    a double-click goes back to the default."""
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = offline_page(browser, server)
+        sp = page.get_by_test_id("splitter")
+        expect(sp).to_have_attribute("aria-valuenow", "60")
+        console = page.locator(".console-panel")
+        main_w = page.locator("main").evaluate(       # the grid's content box
+            "(e) => { const c = getComputedStyle(e);"
+            " return e.clientWidth - parseFloat(c.paddingLeft) - parseFloat(c.paddingRight); }")
+        wide = console.evaluate("(e) => e.getBoundingClientRect().width")
+        sp.focus()
+        for _ in range(5):
+            page.keyboard.press("ArrowLeft")
+        expect(sp).to_have_attribute("aria-valuenow", "50")
+        narrow = console.evaluate("(e) => e.getBoundingClientRect().width")
+        assert wide - narrow == pytest.approx(main_w * 0.10, abs=1)
+        page.reload()
+        expect(page.get_by_test_id("splitter")).to_have_attribute("aria-valuenow", "50")
+        page.get_by_test_id("splitter").dblclick()
+        expect(page.get_by_test_id("splitter")).to_have_attribute("aria-valuenow", "60")
+        browser.close()

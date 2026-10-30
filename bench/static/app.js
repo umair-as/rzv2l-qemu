@@ -215,8 +215,11 @@ function showReadout(s) {
   dur.hidden = !(s.state === "exited" && s.started && s.ended);
   dur.textContent = dur.hidden ? "" : fmtDuration(s.ended - s.started);
 
+  $("sb-run").textContent = s.run ? `run ${s.run}` : "no run";
+
   const gdb = $("gdb-info");
   gdb.hidden = !(s.gdb_port && s.state !== "exited");
+  $("gdb-row").hidden = gdb.hidden;
   gdb.dataset.port = s.gdb_port || "";
   gdb.textContent = s.gdb_port
     ? `gdbstub on 127.0.0.1:${s.gdb_port} · gdb-multiarch -ex "target remote 127.0.0.1:${s.gdb_port}", then continue in gdb`
@@ -260,6 +263,7 @@ function setStatus(s) {
   lastStatus = s;
   if (state === "exited" && was !== "exited") term.write("\x1b[?25l");  // no cursor: nothing listens
   else if (state !== "exited" && was === "exited") term.write("\x1b[?25h");
+  document.body.dataset.state = state;     // style.css: the Pause button's icon
   const pill = $("state");
   pill.dataset.state = state;
   pill.textContent = state === "none" ? "no session" : state;
@@ -704,18 +708,61 @@ $("start-paused").onclick = () => start(true);
 $("pause").onclick = () => action(state === "paused" ? "/api/session/resume" : "/api/session/pause");
 $("reset").onclick = () => action("/api/session/reset");
 $("stop").onclick = () => action("/api/session/stop");
-$("cmdline-copy").onclick = async () => {
-  const b = $("cmdline-copy");
+// Copy text, or select it where the page has no clipboard access (plain
+// http on a non-loopback name)
+async function copyOrSelect(button, text, node) {
+  const label = button.textContent;
   try {
-    await navigator.clipboard.writeText($("cmdline-text").textContent);
-    b.textContent = "Copied";
+    await navigator.clipboard.writeText(text);
+    button.textContent = "Copied";
   } catch (e) {
-    // No clipboard access (plain http on a non-loopback name): select instead
-    getSelection().selectAllChildren($("cmdline-text"));
-    b.textContent = "Selected";
+    getSelection().selectAllChildren(node);
+    button.textContent = "Selected";
   }
-  setTimeout(() => { b.textContent = "Copy"; }, 1500);
-};
+  setTimeout(() => { button.textContent = label; }, 1500);
+}
+$("cmdline-copy").onclick = () =>
+  copyOrSelect($("cmdline-copy"), $("cmdline-text").textContent, $("cmdline-text"));
+$("gdb-copy").onclick = () => copyOrSelect($("gdb-copy"),
+  `gdb-multiarch -ex "target remote 127.0.0.1:${$("gdb-info").dataset.port}"`, $("gdb-info"));
+
+// ---- workspace: the console and the side panel share the width -------------
+
+const SPLIT = { min: 30, max: 80, def: 60 };
+
+function setSplit(pct, save) {
+  const v = Math.round(Math.min(SPLIT.max, Math.max(SPLIT.min, pct)));
+  document.querySelector("main").style.setProperty("--split", `${v}%`);
+  $("splitter").setAttribute("aria-valuenow", String(v));
+  if (save) store.set("bench.split", String(v));
+}
+
+{
+  const sp = $("splitter");
+  const main = document.querySelector("main");
+  sp.onpointerdown = (e) => {
+    sp.setPointerCapture(e.pointerId);
+    sp.dataset.drag = "";
+  };
+  sp.onpointermove = (e) => {
+    if (!("drag" in sp.dataset)) return;
+    const r = main.getBoundingClientRect();
+    setSplit(((e.clientX - r.left) / r.width) * 100, false);
+  };
+  sp.onpointerup = () => {
+    delete sp.dataset.drag;
+    store.set("bench.split", sp.getAttribute("aria-valuenow"));
+  };
+  sp.ondblclick = () => setSplit(SPLIT.def, true);
+  sp.onkeydown = (e) => {
+    const now = Number(sp.getAttribute("aria-valuenow"));
+    const to = { ArrowLeft: now - 2, ArrowRight: now + 2, Home: SPLIT.min, End: SPLIT.max }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    setSplit(to, true);
+  };
+  setSplit(Number(store.get("bench.split")) || SPLIT.def, false);
+}
 
 document.querySelectorAll("[data-panel=monitor] .chips button").forEach((b) => {
   b.onclick = () => monitor(b.dataset.cmd);

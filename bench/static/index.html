@@ -28,18 +28,20 @@
     </svg>
     <span class="word">rzv2l <span>bench</span></span>
   </div>
-  <select id="profile" data-testid="profile-select" aria-label="Profile"></select>
-  <span id="assets" class="assets" data-testid="assets" data-status="" hidden></span>
+  <div class="group" role="group" aria-label="Profile">
+    <select id="profile" data-testid="profile-select" aria-label="Profile"></select>
+    <span id="assets" class="assets" data-testid="assets" data-status="" hidden></span>
+  </div>
   <div class="controls" role="group" aria-label="Session">
-    <button id="start" data-testid="btn-start" class="primary">Start</button>
-    <button id="start-paused" data-testid="btn-start-paused">Start paused</button>
+    <button id="start" data-testid="btn-start" class="primary" data-icon="play">Start</button>
+    <button id="start-paused" data-testid="btn-start-paused" data-icon="step">Start paused</button>
     <label class="toggle" title="Start with gdbstub: adds -gdb on a free loopback port and starts paused. Connect gdb, then continue from gdb.">
       <input type="checkbox" id="gdb" data-testid="gdb-option"> gdbstub
     </label>
     <span class="sep" aria-hidden="true"></span>
-    <button id="pause" data-testid="btn-pause" disabled>Pause</button>
-    <button id="reset" data-testid="btn-reset" class="warn" disabled>Reset</button>
-    <button id="stop" data-testid="btn-stop" class="danger" disabled>Stop</button>
+    <button id="pause" data-testid="btn-pause" data-icon="pause" disabled>Pause</button>
+    <button id="reset" data-testid="btn-reset" class="warn" data-icon="reset" disabled>Reset</button>
+    <button id="stop" data-testid="btn-stop" class="danger" data-icon="stop" disabled>Stop</button>
   </div>
 
   <div class="readout" id="readout" data-testid="readout" data-state="none" data-verdict="" aria-live="polite">
@@ -47,24 +49,19 @@
     <span id="state" data-testid="status" data-state="none" role="status" aria-label="Session status">no session</span>
     <span id="verdict" class="verdict" data-testid="verdict" data-verdict="" role="status" aria-label="Verdict" hidden></span>
     <span id="lastrun" class="meta" data-testid="last-run" hidden></span>
-    <span id="machine" class="meta" data-testid="machine" hidden></span>
     <span id="markers" class="meta" data-testid="markers" hidden></span>
     <span id="exit" class="meta" data-testid="exit-code" role="status" aria-label="Exit status" hidden></span>
     <span id="duration" class="meta" data-testid="duration" hidden></span>
-    <span id="pid" class="meta" data-testid="pid" hidden></span>
-  </div>
-
-  <div class="theme" role="radiogroup" aria-label="Theme">
-    <button role="radio" data-theme-choice="system" data-testid="theme-system" aria-checked="true">System</button>
-    <button role="radio" data-theme-choice="light" data-testid="theme-light" aria-checked="false">Light</button>
-    <button role="radio" data-theme-choice="dark" data-testid="theme-dark" aria-checked="false">Dark</button>
   </div>
 </header>
 
 <div class="notes">
   <p id="profile-desc" class="desc"></p>
   <p id="verdict-why" class="why" data-testid="verdict-reasons" hidden></p>
-  <p id="gdb-info" class="gdb" data-testid="gdb-info" hidden></p>
+  <div class="gdb-row" id="gdb-row" hidden>
+    <p id="gdb-info" class="gdb" data-testid="gdb-info" hidden></p>
+    <button id="gdb-copy" data-testid="gdb-copy" type="button" title="Copy the gdb command">Copy gdb command</button>
+  </div>
 </div>
 
 <main>
@@ -91,6 +88,10 @@
     <div id="term" data-testid="console" role="region" aria-label="Terminal"></div>
     <pre id="console-text" data-testid="console-text" class="sr-only" role="log" aria-label="Console transcript" aria-live="off"></pre>
   </section>
+
+  <div id="splitter" class="splitter" data-testid="splitter" role="separator" tabindex="0"
+       aria-orientation="vertical" aria-label="Console width" aria-valuemin="30" aria-valuemax="80" aria-valuenow="60"
+       title="Drag, or use the arrow keys, to share the width; double-click for the default"></div>
 
   <section class="panel side">
     <nav class="tabs" role="tablist">
@@ -209,6 +210,18 @@
     </div>
   </section>
 </main>
+
+<footer class="statusbar" aria-label="Session details">
+  <span class="sb-item" id="sb-run" data-testid="statusbar-run" title="Run directory in build/bench/"></span>
+  <span id="machine" class="sb-item" data-testid="machine" hidden></span>
+  <span id="pid" class="sb-item" data-testid="pid" hidden></span>
+  <span class="sb-fill"></span>
+  <div class="theme" role="radiogroup" aria-label="Theme">
+    <button role="radio" data-theme-choice="system" data-testid="theme-system" aria-checked="true">System</button>
+    <button role="radio" data-theme-choice="light" data-testid="theme-light" aria-checked="false">Light</button>
+    <button role="radio" data-theme-choice="dark" data-testid="theme-dark" aria-checked="false">Dark</button>
+  </div>
+</footer>
 
 <script src="/static/vendor/xterm.js"></script>
 <script src="/static/vendor/addon-fit.js"></script>
