@@ -24,7 +24,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M2 | First character | the serial port (SCIFA) model; `Hello from RZ/V2L` on SCIF0 | bare-metal probe |
 | ✅ | M3 | Linux to a shell | clock controller, OS timer, pin and interrupt controllers; mainline Linux to a BusyBox shell, both CPUs | G0 |
 | ✅ | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
-| 🔄 | M5 | Storage | the SD/eMMC controller with the real driver; ext4 root file system (real user space) | G0, G1 |
+| 🔄 | M5 | Storage | the SD controller with the real driver; ext4 root file system (real user space); eMMC deferred | G0, G1 |
 | ⏳ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP | G0, G1 |
 | ⏳ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
 | ⏳ | M8 | Full boot chain | TF-A BL2 from an SPI flash image, with a DDR stub | G1 |
@@ -95,5 +95,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 ## What comes next
 
-1. 🔄 **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. ⏭️ Open in M5: an eMMC behind SDHI0 for boot mode 1, if the milestone is to include it (the operator's call); otherwise M5 is complete.
+1. 🔄 **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
 2. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.
