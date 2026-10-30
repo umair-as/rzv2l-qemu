@@ -13,6 +13,11 @@
 #       --no-net         no network backend on ETH0: no cable, and the
 #                        stock bootargs' ip=on then waits 120 s for one
 #                        (default: ETH0 on QEMU user networking, "net0")
+#   -f, --firmware       firmware mode: the board's TF-A BL31
+#                        (tests/guests/out/fw/bl31.bin) runs at EL3 as the
+#                        PSCI firmware and starts the kernel; no initramfs,
+#                        so give a root, e.g. --sd IMAGE -a "rw rootwait
+#                        root=/dev/mmcblk0p2"
 #   -s, --sd IMAGE       raw SD card image in the module slot (SDHI0, mmc0);
 #                        the guest writes to it, so pass a copy you can lose
 #                        (tests/guests/sd/build-image.sh builds one)
@@ -39,6 +44,7 @@ boot_mode=0
 append=""
 initrd=1
 net=1
+firmware=0
 sd=""
 debug="unimp,guest_errors,invalid_mem"
 out=""
@@ -57,6 +63,7 @@ while [ $# -gt 0 ]; do
         -a|--append) append="${2?}"; shift 2 ;;
         -n|--no-initrd) initrd=0; shift ;;
         --no-net) net=0; shift ;;
+        -f|--firmware) firmware=1; initrd=0; shift ;;
         -s|--sd) sd="${2:?}"; shift 2 ;;
         -d|--debug) debug="${2:?}"; shift 2 ;;
         -o|--out) out="${2:?}"; shift 2 ;;
@@ -77,6 +84,7 @@ KERNEL="$GUEST/linux/arch/arm64/boot/Image"
 DTB="$GUEST/r9a07g054l2-smarc.dtb"
 # One initramfs serves both kernels
 INITRD="$ROOT/tests/guests/out/g0/initramfs.cpio.gz"
+BL31="$ROOT/tests/guests/out/fw/bl31.bin"
 out="${out:-$ROOT/build/run/$tier}"
 
 [ -x "$QEMU" ] || die "no QEMU at $QEMU (build it: docs/learning/building-and-testing.md)"
@@ -84,6 +92,7 @@ for f in "$KERNEL" "$DTB"; do
     [ -f "$f" ] || die "missing $f (run tests/guests/$tier/build-*.sh)"
 done
 [ -z "$sd" ] || [ -f "$sd" ] || die "no SD image at $sd"
+[ "$firmware" -eq 0 ] || [ -f "$BL31" ] || die "missing $BL31 (run tests/guests/fw/build-tf-a.sh)"
 [ "$initrd" -eq 0 ] || [ -f "$INITRD" ] || die "missing $INITRD (run tests/guests/g0/build-initramfs.sh)"
 mkdir -p "$out"
 
@@ -92,6 +101,7 @@ machine="rzv2l-smarc,boot-mode=$boot_mode"
 
 cmd=("$QEMU" -M "$machine" -kernel "$KERNEL" -dtb "$DTB"
      -display none -nodefaults -serial mon:stdio)
+[ "$firmware" -eq 0 ] || cmd+=(-bios "$BL31")
 [ "$initrd" -eq 0 ] || cmd+=(-initrd "$INITRD")
 [ -z "$append" ] || cmd+=(-append "$append")
 [ -z "$sd" ] || cmd+=(-drive "if=sd,index=0,format=raw,file=$sd")
@@ -114,6 +124,7 @@ if [ "$dumpdtb" -eq 1 ]; then
 fi
 
 echo "rzv2l-smarc: tier $tier, boot mode $boot_mode; quit with Ctrl-A X, monitor Ctrl-A C"
+[ "$firmware" -eq 0 ] || echo "firmware mode: TF-A BL31 $BL31"
 [ -z "$sd" ] || echo "SD card (SDHI0, /dev/mmcblk0): $sd"
 [ "$debug" = none ] || echo "QEMU -d log: $out/qemu.log"
 [ "$gdb" -eq 0 ] || echo "waiting for gdb: target remote :1234"
