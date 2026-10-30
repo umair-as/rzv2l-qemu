@@ -6,7 +6,7 @@
 ![SoC](https://img.shields.io/badge/SoC-R9A07G054L2-6f42c1)
 ![CPU](https://img.shields.io/badge/CPU-2%C3%97%20Cortex--A55-2ea44f)
 ![QEMU](https://img.shields.io/badge/QEMU-aarch64--softmmu-ff6f00)
-![Status](https://img.shields.io/badge/status-early%20development-yellow)
+![Status](https://img.shields.io/badge/status-M3%20done%3A%20Linux%20to%20a%20shell-2ea44f)
 
 ---
 
@@ -65,7 +65,7 @@ flowchart LR
     class M7,M8,M9 fw
 ```
 
-🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** M0 and M1 are complete. M2 (first character) is in review: the board prints `Hello from RZ/V2L` on SCIF0, and the mainline kernel's early console is the next check. The v1.0 target is M2 + M3: mainline Linux to a shell on both CPUs. Exit criteria for each milestone are in the [specification](docs/spec/project.md).
+🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** ✅ M0-M3: the plain upstream Linux kernel boots to a shell on both CPUs, which is the v1.0 target. ⏭️ Next: M4, Renesas's own kernel. Progress, units and blocks: [Milestones](docs/milestones.md). Exit criteria: the [specification](docs/spec/project.md).
 
 ## 🚀 Building
 
@@ -79,8 +79,8 @@ ninja qemu-system-aarch64
 
 Rebuilding, running the tests, style checks, tracing and editor setup: [Building and testing by hand](docs/learning/building-and-testing.md).
 
-> [!WARNING]
-> The `rzv2l-smarc` machine is a skeleton (milestone M1): two Cortex-A55 cores, the GIC and the SYSC identification registers. It has no console yet; that arrives with M2.
+> [!NOTE]
+> The `rzv2l-smarc` machine boots the upstream Linux kernel to a BusyBox shell on the serial console. Storage, Ethernet, I2C and USB are stubs for now, so their drivers fail at boot; [Milestones](docs/milestones.md) shows what is modelled.
 
 The QEMU port lives in a fork, included as the `qemu/` submodule. It carries only code in the shape upstream QEMU would accept; the specification, research, evidence and tests live in this repository.
 
@@ -88,6 +88,7 @@ The QEMU port lives in a fork, included as the `qemu/` submodule. It carries onl
 
 | | Document | What it holds |
 |---|---|---|
+| 🏁 | [Milestones](docs/milestones.md) | progress: what is done, what comes next |
 | 📐 | [Specification](docs/spec/project.md) | goals, rules, fidelity classes, milestones |
 | 📋 | [Requirements](docs/spec/requirements.md) | the requirement catalogue, traced to tests |
 | 🗺️ | [Device map](docs/device-map.md) | every MMIO window, interrupt, clock and reset, with evidence |

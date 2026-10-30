@@ -38,7 +38,7 @@ qemu-rzv2l/        this repo: spec, research, evidence, tests, guest builds, scr
 | Reviewer | a *different* model (Codex, or another Claude model in a fresh, non-forked context) | tries to disprove the implementer's claims; never edits source or reviews its own work |
 
 - **What the operator sees:** only what review cannot settle: source conflicts, inferences, assumptions, design choices. Never ask the operator to proofread citations.
-- **Unit paperwork is one page.** A unit is `docs/units/<unit>/spec.md` (scope, what the guest needs, exit criterion, evidence) and `tasks.md` (a short table). Implementation follows the spec page without waiting for a review. One learning page per unit, at its end. Traceability and requirement statuses are updated once per release, not per unit.
+- **Unit paperwork is one page.** A unit is `docs/units/<unit>/spec.md` (scope, what the guest needs, exit criterion, evidence) and `tasks.md` (a short table). Implementation follows the spec page without waiting for a review. One learning page per unit, and an update of `docs/milestones.md`, at its end. Traceability and requirement statuses are updated once per release, not per unit.
 - **Record each proof once.** The test is the record. Its mutation is one line in the unit's `tasks.md`: the exact change → the red line. Not repeated in PR bodies or learning docs. `scripts/eval.py m2` is M2's regression suite: run it once before a PR, with `--no-mutations` unless the serial-port (SCIFA) code changed.
 - **Windows the boot touches** are mapped with the class `docs/device-map.md` gives them, without stopping. A window that needs a different class is listed for the operator at the unit's end.
 - **Review:** one round plus at most one recheck limited to the fixes; doc-only findings are fixed without a round. The implementer re-checks every finding at the source before acting. The report stays in the operator's working area; the PR body gets a short **Review fixes** list. The reviewer works from `docs/units/templates/review-prompt.md`, which has the review build and mutation rules. When a PR changes no QEMU code, there is no review build.
@@ -88,6 +88,7 @@ Lint checks this block against the tree: add or remove a line when a directory i
 
 ```
 docs/README.md      index of docs/, reading order and the project's words
+docs/milestones.md  progress: milestones, units, SoC blocks, what comes next
 docs/spec/          specification, requirements, traceability
 docs/units/         work units per milestone, and their templates
 docs/research/      per-block research notes

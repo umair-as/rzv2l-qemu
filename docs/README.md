@@ -2,6 +2,7 @@
 
 | Path | What it is |
 |---|---|
+| [`milestones.md`](milestones.md) | progress: milestones, units, SoC blocks, what comes next |
 | [`spec/`](spec/) | the specification ([`project.md`](spec/project.md)), the requirement IDs, traceability. Everything else follows from it. |
 | [`device-map.md`](device-map.md) | every MMIO window, IRQ, clock and reset of the board, how each is modelled, and the evidence |
 | [`sources.md`](sources.md) | the pinned sources, and which source wins in which domain |

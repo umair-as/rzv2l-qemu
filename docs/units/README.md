@@ -15,6 +15,6 @@ M1 and M2 also have a `design.md` from the earlier three-file form.
 2. Each test is proven once: one line in `tasks.md`, the mutation and the red line.
 3. The boot loop runs to the next blocker; `spec.md` records it with the coverage list.
 4. One independent review round (`templates/review-prompt.md`) plus at most one recheck of the fixes; the PR body gets a short Review fixes list.
-5. The unit's learning page (`../learning/`) is written at its end.
+5. At its end: the unit's learning page (`../learning/`) and the progress page (`../milestones.md`).
 
 Templates: `templates/spec.md`, `templates/tasks.md`, `templates/review-prompt.md`, and `templates/fidelity-bug.md` for a model that is found wrong.
