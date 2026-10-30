@@ -12,7 +12,7 @@ Contents:
 5. [Watching a device at work: trace points and logs](#5-watching-a-device-at-work-trace-points-and-logs)
 6. [Editor setup: VS Code with clangd](#6-editor-setup-vs-code-with-clangd)
 7. [Gotchas](#7-gotchas)
-8. [Booting the G0 Linux kernel](#8-booting-the-g0-linux-kernel)
+8. [Booting Linux by hand](#8-booting-linux-by-hand)
 
 ---
 
@@ -278,33 +278,46 @@ Reading QEMU code in the editor:
 | a new device file never compiles | its Kconfig switch is not selected by any machine yet | expected until the SoC selects it; compile-check by hand ([§2](#2-rebuilding-after-an-edit)) |
 | clangd: every QEMU type "unknown" | clangd cannot find `compile_commands.json` | [§6](#6-editor-setup-vs-code-with-clangd) |
 | checkpatch: "does MAINTAINERS need updating?" | new file not listed in `MAINTAINERS` | added once with the board (M1-T04) |
-| `-d unimp,guest_errors,invalid_mem` prints the list of log items and QEMU exits; or `-M rzv2l-smarc` is unknown | the shell ran the distribution QEMU (`/usr/bin/qemu-system-aarch64`, 8.2.2 on Ubuntu 24.04), which has no `invalid_mem` mask and no RZ/V2L machine | run `build/qemu/qemu-system-aarch64` ([§8](#8-booting-the-g0-linux-kernel)) |
+| `-d unimp,guest_errors,invalid_mem` prints the list of log items and QEMU exits; or `-M rzv2l-smarc` is unknown | the shell ran the distribution QEMU (`/usr/bin/qemu-system-aarch64`, 8.2.2 on Ubuntu 24.04), which has no `invalid_mem` mask and no RZ/V2L machine | run `build/qemu/qemu-system-aarch64` ([§8](#8-booting-linux-by-hand)) |
 
-## 8. Booting the G0 Linux kernel
+## 8. Booting Linux by hand
 
-G0 is a mainline Linux kernel (v6.12.59, arm64 `defconfig`) with the upstream device tree of the board, both unmodified. Build them once:
+`scripts/run.sh` boots a guest kernel with the BusyBox initramfs and puts the serial console (SCIF0) on the terminal. Two kernels are available, each with its own unmodified device tree:
 
-```bash
-tests/guests/g0/build-kernel.sh     # tests/guests/out/g0/linux/arch/arm64/boot/Image
-tests/guests/g0/build-dtb.sh        # tests/guests/out/g0/r9a07g054l2-smarc.dtb
-```
+- **G0:** mainline Linux v6.12.59, arm64 `defconfig`.
+- **G1:** the Renesas vendor kernel, with its own `defconfig`.
 
-Boot it from the repository root with the project's QEMU. Do not use `qemu-system-aarch64` from your `PATH`: that is the distribution QEMU ([§7](#7-gotchas)).
+Build the guests once:
 
 ```bash
-build/qemu/qemu-system-aarch64 -M rzv2l-smarc \
-    -kernel tests/guests/out/g0/linux/arch/arm64/boot/Image \
-    -dtb tests/guests/out/g0/r9a07g054l2-smarc.dtb \
-    -append "ignore_loglevel rw root=/dev/nfs ip=on earlycon" \
-    -display none -nodefaults -chardev file,id=scif0,path=build/serial.log -serial chardev:scif0 \
-    -d unimp,guest_errors,invalid_mem -D build/qemu.log
+tests/guests/g0/build-kernel.sh       # G0 kernel
+tests/guests/g0/build-dtb.sh          # G0 device tree
+tests/guests/g0/build-initramfs.sh    # BusyBox initramfs (both kernels use it)
+tests/guests/g1/build-kernel.sh       # G1 kernel and device tree
 ```
 
-- The terminal stays empty: the output goes to files under `build/` (ignored by git). `build/serial.log` gets the guest console (SCIF0). `build/qemu.log` gets one line for each access the model does not implement, and for each access to an unmapped address.
-- To watch the console in the terminal instead, replace the `-chardev … -serial chardev:scif0` pair with `-serial mon:stdio`. Then Ctrl-A X stops QEMU, and Ctrl-A C switches to the QEMU monitor.
-- `-append` is the device tree's own boot arguments plus `earlycon`, a recorded gap (device map §4 row 6).
-- The kernel output stops at `printk: legacy bootconsole [scif0] disabled`, because the real serial driver cannot start yet. To see the rest of the boot, add `keep_bootcon` to `-append`. It is for diagnosis only.
-- When the kernel panics, QEMU keeps running: the run has ended when `build/serial.log` ends with `end Kernel panic`. Stop QEMU with Ctrl-C.
-- Add `-trace "renesas_rzv2l_cpg_*"` to see each CPG register access in `qemu.log` ([§5](#5-watching-a-device-at-work-trace-points-and-logs)).
+Then boot. The script uses the project's QEMU (`build/qemu/qemu-system-aarch64`, or `$QEMU`), not the one on your `PATH` ([§7](#7-gotchas)).
 
-Where the boot stops today, and why, is in the latest unit page: [`../units/M3b-cpg/spec.md`](../units/M3b-cpg/spec.md) ("Next blocker").
+```bash
+scripts/run.sh                  # G1, eSD boot mode, the DTB's own boot arguments
+scripts/run.sh -t g0            # G0
+scripts/run.sh -b 1             # eMMC boot mode
+scripts/run.sh --dumpdtb        # write the DTB that QEMU gives the kernel, then stop
+scripts/run.sh --dry-run        # print the QEMU command
+scripts/run.sh --help           # all options; QEMU arguments go after --
+```
+
+- After about 20 s the shell prompt `rzv2l:~#` comes, after a banner with the machine, the CPUs, the memory and the watchdog.
+- Ctrl-A X stops QEMU. Ctrl-A C switches between the console and the QEMU monitor.
+- `build/run/<tier>/qemu.log` gets one line for each access that the model does not implement. Set the mask with `-d` (`-d none` turns the log off).
+- The SD hosts are stubs until M5. Thus the kernel prints `timeout waiting for hardware interrupt` for `mmc0` and `mmc1` while you work. These lines are expected.
+- `-g` stops QEMU before the first instruction and waits for gdb on port 1234.
+
+Checks to try at the prompt:
+
+| Command | Expected | What it shows |
+|---|---|---|
+| `cat /sys/devices/system/cpu/online` | `0-1` | both CPUs started through PSCI |
+| `hexdump -C /proc/device-tree/soc/mmc@11c00000/vqmmc-supply` | `00 00 00 74` (eSD); `00 00 00 18` with `-b 1` | the loader's U-Boot edit for an SD-card boot (unit M4-loader-fixups) |
+| `devmem 0x11020a00` | `0x00010000` in eSD mode; bits 2:0 are the boot mode (`-b`) | `SYS_LSI_MODE`, the boot mode pins. The EVK reads `0x00010200`: its DEBUGEN pin is high (`-M rzv2l-smarc,debugen=on`) |
+| `watchdog -T 3 -t 1000 /dev/watchdog`, then `killall -9 watchdog` | the board resets about 3 s later; after the new boot, `devmem 0x11010b10` reads 1 | WDT0 and the CPG reset flag ([M4-vendor-kernel](../units/M4-vendor-kernel/spec.md)) |
