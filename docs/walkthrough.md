@@ -173,13 +173,41 @@ dumpe2fs -h build/p2.img | grep features   # no needs_recovery
 e2fsck -fn build/p2.img
 ```
 
+## M6: Ethernet
+
+Networking needs QEMU built with user-mode networking (slirp): a private network inside QEMU, with a DHCP server and the host reachable as `10.0.2.2`. It touches no host interface and needs no root. Install the library and configure QEMU again (a few minutes):
+
+```bash
+sudo apt install libslirp-dev
+cd build/qemu && ../../qemu/configure --target-list=aarch64-softmmu --disable-docs \
+    | grep 'slirp support'                                   # slirp support : YES
+ninja qemu-system-aarch64 && cd ../..
+```
+
+In a second terminal, serve a file from the host: `python3 -m http.server -b 127.0.0.1 8000 -d docs`. Then boot with ETH0 on the user network (the first `-nic` is ETH0):
+
+```bash
+scripts/run.sh -t g0 -- -nic user,id=net0         # or -t g1
+```
+
+At the shell:
+
+```bash
+dmesg | grep -e ravb -e KSZ9131 -e 'Link is Up'   # both channels, PHY at address 7, 1Gbps/Full
+dmesg | grep -A1 'IP-Config: Complete'            # the kernel's own DHCP (ip=on in the boot arguments)
+udhcpc -i eth0 -n -q -s /dev/null      # BusyBox: lease of 10.0.2.15 obtained from 10.0.2.2
+wget -O /tmp/w.md http://10.0.2.2:8000/walkthrough.md; sha256sum /tmp/w.md
+```
+
+The hash matches `sha256sum docs/walkthrough.md` on the host. To pull the cable, open the QEMU monitor (Ctrl-A C), type `set_link net0 off`, and return with Ctrl-A C: the guest prints `eth0: Link is Down`; `set_link net0 on` brings it back at 1 Gb/s. ETH1 has no backend, so it has no cable. Read more: [`learning/m6-network.md`](learning/m6-network.md).
+
 ## Run every check at once
 
 ```bash
-tests/acceptance/m5/run.sh       # several minutes: it boots both kernels several times
+tests/acceptance/m6/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M5 in turn and ends with `M5 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn and ends with `M6 ACCEPTANCE: PASS`; M6 needs the slirp build above. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 ## Options of `scripts/run.sh`
 

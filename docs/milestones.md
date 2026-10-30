@@ -8,12 +8,12 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Traceability and requirement statuses are updated: 20 of 27 requirements verified, the rest planned for M4-M7 or noted ([traceability](spec/traceability.md)). **Tagged `rzv2l-v1.0`** (QEMU fork `rzv2l-dev` `aa1764973d`); the tag message lists the scope and the open requirements.
 
-**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 is done: both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs** ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)). An eMMC for boot mode 1 is deferred.
+**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 is done: both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs** ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)). An eMMC for boot mode 1 is deferred. **M6 is done: both kernels reach the network through the board's Gigabit Ethernet and PHY, get a DHCP lease, and move data both ways with matching hashes, through link and reset changes** ([walkthrough](walkthrough.md#m6-ethernet)).
 
 | | Release | Milestones | State |
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ tagged `rzv2l-v1.0` |
-| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 (M4, M5 done) |
+| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 (M4, M5, M6 done) |
 
 ## Milestones
 
@@ -25,7 +25,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M3 | Linux to a shell | clock controller, OS timer, pin and interrupt controllers; mainline Linux to a BusyBox shell, both CPUs | G0 |
 | ✅ | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
 | ✅ | M5 | Storage | the SD controller with the real driver; ext4 root file system (real user space); eMMC deferred | G0, G1 |
-| ⏳ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP | G0, G1 |
+| ✅ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP, data checked both ways, link and reset recovery ([walkthrough](walkthrough.md#m6-ethernet)) | G0, G1 |
 | ⏳ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
 | ⏳ | M8 | Full boot chain | TF-A BL2 from an SPI flash image, with a DDR stub | G1 |
 | ⏳ | M9 | Platform behaviour | A/B selection, bootcount, rollback, FIT signatures | G1 |
@@ -46,6 +46,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M4-loader-fixups](units/M4-loader-fixups/spec.md) | M4 | U-Boot's device-tree edits: the SD0 supplies in eSD mode applied by QEMU, the others listed as gaps |
 | ✅ | [M5-sdhi](units/M5-sdhi/spec.md) | M5 | the SD/MMC host interface and its DMA engine; an SD card on SDHI0 with ext4 |
 | ✅ | [M5-sd-rootfs](units/M5-sd-rootfs/spec.md) | M5 | user space from an ext4 root file system on the SD card, both kernels; clean power-off and reset |
+| ✅ | [M6-ravb](units/M6-ravb/spec.md) | M6 | Gigabit Ethernet (DMA rings, MDIO, checksum offload), the board's KSZ9131 PHYs, IRQ0-7 of the interrupt control unit |
 
 ## The SoC blocks
 
@@ -59,9 +60,10 @@ What the model does with each block the guest touches. Classes: [`device-map.md`
 | ✅ | CPG (clocks and resets) | modelled | M3 |
 | ✅ | OSTM0-2 (OS timer) | modelled | M3 |
 | ✅ | PFC (pins) | register file; pin electrical settings stored only | M3 |
-| 🟡 | IRQC (interrupt control) | register file; no external interrupts | M3 (routing M6) |
+| ✅ | IRQC (interrupt control) | register file; IRQ0-7 pin interrupts to the GIC; GPIO interrupts (TINT) and NMI not routed | M3, M6 |
 | 🟡 | DMAC, USB PHY control | stubs that keep written values | later |
-| 🟡 | Ethernet, I2C, USB host, thermal sensor | stubs: the drivers fail within a bound | M6, later |
+| ✅ | ETH0/1 (Gigabit Ethernet) + KSZ9131 PHYs | modelled: descriptor DMA, MDIO, checksum offload, link interrupts; the first `-nic` is ETH0 | M6 |
+| 🟡 | I2C, USB host, thermal sensor | stubs: the drivers fail within a bound | later |
 | 🟡 | display, CAN-FD, QSPI, USB function, SSI, RSPI, ADC | stubs for the drivers the vendor kernel builds in | later (QSPI: M7) |
 | ✅ | WDT0-2 (watchdog) | modelled; a watchdog reset resets the board through the CPG | M4 |
 | ✅ | SDHI0/1 (SD/MMC host) | modelled with the built-in DMA engine, for SD cards; bus tuning (SCC) not modelled | M5 |
@@ -75,6 +77,7 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 - Guest time runs about 1.6 % fast: QEMU ticks the 24 MHz counter every 41 ns (gap 18).
 - QEMU's built-in PSCI replaces TF-A until M7; no OP-TEE until then.
+- Ethernet links come up at 1 Gb/s full duplex at once and transfers take no wire time; flow control, the receive filters, wake-up and energy-efficient Ethernet are not modelled. A channel without `-nic` has no cable.
 - The SD hosts run SD cards at high speed and 3.3 V, as the EVK does; eMMC cards and the faster tuned modes are not modelled. Without `--sd` the slots are empty.
 
 ## Side track: the bench
@@ -96,4 +99,4 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 ## What comes next
 
 1. ✅ **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
-2. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.
+2. ✅ **M6:** networking. [M6-ravb](units/M6-ravb/spec.md): both kernels get a DHCP lease through QEMU user networking and move data both ways with matching hashes. ⏭️ Next: M7 (firmware, needs M4 and M5).
