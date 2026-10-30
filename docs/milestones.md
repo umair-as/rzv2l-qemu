@@ -8,12 +8,12 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Traceability and requirement statuses are updated: 20 of 27 requirements verified, the rest planned for M4-M7 or noted ([traceability](spec/traceability.md)). **Tagged `rzv2l-v1.0`** (QEMU fork `rzv2l-dev` `aa1764973d`); the tag message lists the scope and the open requirements.
 
-**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 (storage) is under way:** both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)).
+**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 is done: both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs** ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)). An eMMC for boot mode 1 is deferred.
 
 | | Release | Milestones | State |
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ tagged `rzv2l-v1.0` |
-| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 M5 (M4 done) |
+| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 (M4, M5 done) |
 
 ## Milestones
 
@@ -24,7 +24,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M2 | First character | the serial port (SCIFA) model; `Hello from RZ/V2L` on SCIF0 | bare-metal probe |
 | ✅ | M3 | Linux to a shell | clock controller, OS timer, pin and interrupt controllers; mainline Linux to a BusyBox shell, both CPUs | G0 |
 | ✅ | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
-| 🔄 | M5 | Storage | the SD controller with the real driver; ext4 root file system (real user space); eMMC deferred | G0, G1 |
+| ✅ | M5 | Storage | the SD controller with the real driver; ext4 root file system (real user space); eMMC deferred | G0, G1 |
 | ⏳ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP | G0, G1 |
 | ⏳ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
 | ⏳ | M8 | Full boot chain | TF-A BL2 from an SPI flash image, with a DDR stub | G1 |
@@ -95,5 +95,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 ## What comes next
 
-1. 🔄 **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
+1. ✅ **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
 2. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.
