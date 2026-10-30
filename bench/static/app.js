@@ -155,6 +155,7 @@ function resetViews() {
   term.reset();
   $("console-text").textContent = "";
   $("log").textContent = "";
+  logSearch.refresh(false);
   $("events").textContent = "";
   $("monitor-out").textContent = "";
   $("coverage").innerHTML = "";
@@ -243,7 +244,88 @@ function appendPre(id, line) {
   const atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
   pre.textContent += line.endsWith("\n") ? line : line + "\n";
   if (atEnd) pre.scrollTop = pre.scrollHeight;
+  if (id === "log") logSearch.refresh(true);
 }
+
+// ---- search in a text pane: highlights only, the text stays as it is --------
+// CSS Custom Highlight API: ranges over the pane's own text nodes, so the raw
+// bytes in the DOM are never wrapped or rewritten.
+
+const MAX_MATCHES = 5000;
+
+function makeSearch(name, pane) {
+  const box = document.querySelector(`[data-search="${name}"]`);
+  const input = box.querySelector("input");
+  const count = box.querySelector(".search-count");
+  let ranges = [];
+  let at = -1;
+
+  function paint() {
+    if (!window.CSS || !CSS.highlights) return;
+    CSS.highlights.set(`${name}-match`, new Highlight(...ranges));
+    if (at >= 0 && ranges[at]) CSS.highlights.set(`${name}-current`, new Highlight(ranges[at]));
+    else CSS.highlights.delete(`${name}-current`);
+  }
+
+  function show() {
+    const q = input.value;
+    box.dataset.state = !q ? "" : ranges.length ? "found" : "none";
+    count.textContent = !q ? "" : ranges.length
+      ? `${at + 1}/${ranges.length}${ranges.length >= MAX_MATCHES ? "+" : ""}` : "no match";
+  }
+
+  function find(keep) {
+    const q = input.value.toLowerCase();
+    ranges = [];
+    if (q) {
+      const walk = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT);
+      for (let n = walk.nextNode(); n && ranges.length < MAX_MATCHES; n = walk.nextNode()) {
+        const text = n.data.toLowerCase();
+        for (let i = text.indexOf(q); i >= 0 && ranges.length < MAX_MATCHES; i = text.indexOf(q, i + q.length)) {
+          const r = new Range();
+          r.setStart(n, i); r.setEnd(n, i + q.length);
+          ranges.push(r);
+        }
+      }
+    }
+    at = !ranges.length ? -1 : keep && at >= 0 ? Math.min(at, ranges.length - 1) : 0;
+    paint(); show();
+    if (!keep) reveal();
+  }
+
+  function reveal() {
+    if (at < 0) return;
+    const r = ranges[at].getBoundingClientRect();
+    const p = pane.getBoundingClientRect();
+    pane.scrollTop += r.top - p.top - pane.clientHeight / 2;
+  }
+
+  function step(d) {
+    if (!ranges.length) return;
+    at = (at + d + ranges.length) % ranges.length;
+    paint(); show(); reveal();
+  }
+
+  input.addEventListener("input", () => find(false));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
+  });
+  box.querySelectorAll("button[data-step]").forEach((b) => {
+    b.onclick = () => step(Number(b.dataset.step));
+  });
+  // Text changed under the search (new log lines, another file): find again
+  let timer;
+  return {
+    refresh(keep) {
+      if (!input.value) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => find(keep), 150);
+    },
+  };
+}
+
+const logSearch = makeSearch("log", $("log"));
+const runSearch = makeSearch("run", $("run-out"));
 
 // QEMU's own command line is long: the Command line block holds it in full
 function appendStderr(text) {
@@ -351,6 +433,7 @@ function showViewRun(info) {
       ? `${current ? "This session" : "Picked run"}: ${info.run} · ${info.machine || info.profile || ""}`
       : "";
     p.querySelector(".back").hidden = current;
+    p.dataset.pinned = String(!current);     // style.css: a past run is banded
   }
 }
 
@@ -589,8 +672,10 @@ function cell(tr, text, cls) {
 
 async function refreshRuns() {
   const hideTests = $("hide-tests").checked;
+  const failedOnly = $("failed-only").checked;
   const runs = (await api("GET", "/api/runs"))
-    .filter((r) => !(hideTests && r.origin === "test"));
+    .filter((r) => !(hideTests && r.origin === "test"))
+    .filter((r) => !failedOnly || r.verdict === "fail" || r.state === "lost");
   const body = $("runs");
   body.innerHTML = "";
   for (const r of runs) {
@@ -598,6 +683,7 @@ async function refreshRuns() {
     tr.setAttribute("data-testid", "run-row");
     tr.dataset.run = r.run;
     tr.dataset.origin = r.origin || "";
+    tr.dataset.verdict = r.state === "lost" ? "lost" : r.verdict || "";
     tr.setAttribute("aria-selected", String(r.run === currentRun));
 
     const prof = cell(tr, "");
@@ -623,9 +709,11 @@ async function refreshRuns() {
     body.append(tr);
   }
   $("runs-empty").hidden = runs.length > 0;
-  $("runs-empty").textContent = hideTests
-    ? "No runs besides test runs. Clear “Hide test runs” to see them."
-    : "No runs yet. Start a session and it is kept here.";
+  $("runs-empty").textContent = failedOnly
+    ? "No FAIL or lost runs in this list."
+    : hideTests
+      ? "No runs besides test runs. Clear “Hide test runs” to see them."
+      : "No runs yet. Start a session and it is kept here.";
 }
 
 async function openRun(id) {
@@ -649,12 +737,14 @@ async function showRunFile(file) {
   if (seq !== runFileSeq) return;
   $("run-out").textContent = text;
   $("run-out").dataset.file = file;
+  runSearch.refresh(false);
 }
 
 document.querySelectorAll("#run-view button[data-file]").forEach((b) => {
   b.onclick = () => showRunFile(b.dataset.file);
 });
 $("hide-tests").checked = store.get("bench.hideTests") === "1";
+$("failed-only").onchange = refreshRuns;
 $("hide-tests").onchange = () => {
   store.set("bench.hideTests", $("hide-tests").checked ? "1" : "0");
   refreshRuns();

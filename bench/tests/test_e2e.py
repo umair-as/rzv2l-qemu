@@ -858,3 +858,59 @@ def test_map_strip_draws_every_window(server):
         expect(page.get_by_test_id("map-filter-all")).to_have_attribute("aria-pressed", "true")
         expect(page.locator('[data-testid=map-row][data-base="0x40000000"]')).to_be_in_viewport()
         browser.close()
+
+
+def test_log_search_highlights_without_touching_the_text(server):
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = offline_page(browser, server)
+        lines = ["unimp: riic0 read 0x0", "guest_errors: pl011", "Unimp: riic0 write 0x4", "unimp: x"]
+        for line in lines[:3]:
+            page.evaluate("(l) => appendPre('log', l)", line)
+        before = page.get_by_test_id("log-lines").text_content()
+        page.get_by_test_id("log-search").fill("unimp")
+        count = page.get_by_test_id("log-search-count")
+        expect(count).to_have_text("1/2")                  # case-insensitive
+        page.get_by_test_id("log-search").press("Enter")
+        expect(count).to_have_text("2/2")
+        page.get_by_test_id("log-search-next").click()
+        expect(count).to_have_text("1/2")                  # wraps
+        assert page.evaluate("CSS.highlights.get('log-match').size") == 2
+        assert page.get_by_test_id("log-lines").text_content() == before
+        page.evaluate("(l) => appendPre('log', l)", lines[3])   # a new line is found too
+        expect(count).to_have_text("1/3")
+        page.get_by_test_id("log-search").fill("nothing-like-this")
+        expect(count).to_have_text("no match")
+        browser.close()
+
+
+RUNS = [
+    {"run": "r3", "profile": "virt-echo", "state": "exited", "exit_code": 0, "verdict": "pass", "origin": "",
+     "started": 3, "ended": 4},
+    {"run": "r2", "profile": "virt-echo", "state": "exited", "exit_code": 1, "verdict": "fail", "origin": "",
+     "started": 2, "ended": 3},
+    {"run": "r1", "profile": "virt-echo", "state": "lost", "exit_code": None, "verdict": None, "origin": "",
+     "started": 1, "ended": None},
+]
+
+
+def test_runs_filter_failures_and_band_past_runs(server):
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = offline_page(browser, server)
+        page.route("**/api/runs", lambda route: route.fulfill(json=RUNS))
+        page.get_by_test_id("tab-runs").click()
+        rows = page.get_by_test_id("run-row")
+        expect(rows).to_have_count(3)
+        page.get_by_test_id("runs-failed-only").check()
+        expect(rows).to_have_count(2)
+        assert rows.evaluate_all("(rs) => rs.map((r) => r.dataset.verdict)") == ["fail", "lost"]
+
+        band = page.get_by_test_id("map-run")
+        page.evaluate("viewPinned = true; showViewRun({run: 'r2', profile: 'virt-echo'})")
+        expect(band).to_have_attribute("data-pinned", "true")
+        expect(band).to_contain_text("Picked run: r2")
+        assert page.get_by_test_id("map-current").evaluate("(a) => a.hidden") is False
+        page.evaluate("viewPinned = false; showViewRun({run: 'r3', profile: 'virt-echo'})")
+        expect(band).to_have_attribute("data-pinned", "false")
+        browser.close()

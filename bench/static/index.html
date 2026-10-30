@@ -112,6 +112,12 @@
           <button id="cmdline-copy" data-testid="cmdline-copy" type="button">Copy</button>
         </div>
       </details>
+      <div class="search" data-search="log">
+        <input type="search" data-testid="log-search" aria-label="Search the log" placeholder="Search the log" autocomplete="off" spellcheck="false">
+        <span class="search-count" data-testid="log-search-count" aria-live="polite"></span>
+        <button type="button" data-step="-1" data-testid="log-search-prev" aria-label="Previous match" title="Previous (Shift+Enter)">&#8593;</button>
+        <button type="button" data-step="1" data-testid="log-search-next" aria-label="Next match" title="Next (Enter)">&#8595;</button>
+      </div>
       <pre id="log" data-testid="log-lines" class="scroll" role="log" aria-label="QEMU log"
            data-empty="QEMU's -d log and its own messages appear here once a session starts."></pre>
     </div>
@@ -189,7 +195,10 @@
     <div class="tab-body" data-panel="runs" hidden>
       <div class="runs-head">
         <p class="hint">Runs kept in <code>build/bench/</code>, newest first. Pick one to view its files.</p>
-        <label class="toggle"><input type="checkbox" id="hide-tests" data-testid="runs-hide-tests"> Hide test runs</label>
+        <div class="runs-filters">
+          <label class="toggle"><input type="checkbox" id="failed-only" data-testid="runs-failed-only"> Only FAIL or lost</label>
+          <label class="toggle"><input type="checkbox" id="hide-tests" data-testid="runs-hide-tests"> Hide test runs</label>
+        </div>
       </div>
       <p id="runs-empty" class="empty" data-testid="runs-empty" hidden>No runs yet. Start a session and it is kept here.</p>
       <div class="table-wrap runs-wrap">
@@ -208,6 +217,12 @@
             <button data-file="cmdline" data-testid="run-cmdline">cmdline</button>
             <a id="run-csv" class="btn-link" data-testid="run-coverage-csv" href="#" download>coverage CSV</a>
           </div>
+        </div>
+        <div class="search" data-search="run">
+          <input type="search" data-testid="run-search" aria-label="Search this file" placeholder="Search this file" autocomplete="off" spellcheck="false">
+          <span class="search-count" data-testid="run-search-count" aria-live="polite"></span>
+          <button type="button" data-step="-1" data-testid="run-search-prev" aria-label="Previous match" title="Previous (Shift+Enter)">&#8593;</button>
+          <button type="button" data-step="1" data-testid="run-search-next" aria-label="Next match" title="Next (Enter)">&#8595;</button>
         </div>
         <pre id="run-out" data-testid="run-output" class="scroll" role="log" aria-label="Run file"></pre>
       </div>

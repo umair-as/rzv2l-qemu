@@ -310,6 +310,15 @@ h2 { margin: 0; color: var(--muted); }
 .cmdline-body { display: flex; gap: 8px; align-items: flex-start; padding: 0 10px 8px; }
 .cmdline-body pre { flex: 1; margin: 0; max-height: 9em; overflow: auto; white-space: pre-wrap; word-break: break-all; }
 
+/* Search in a text pane: the matches are highlights, never markup */
+.search { display: flex; gap: 4px; align-items: center; margin: 0 0 6px; flex: none; }
+.search input { flex: 1; min-width: 0; font: 12px var(--mono); padding: 4px 8px; }
+.search button { padding: 2px 8px; font-size: 12px; }
+.search-count { font: 11.5px var(--mono); color: var(--muted); min-width: 7ch; text-align: right; }
+.search[data-state="none"] .search-count { color: var(--danger); }
+::highlight(log-match), ::highlight(run-match) { background-color: color-mix(in srgb, var(--warn) 28%, transparent); color: var(--ink); }
+::highlight(log-current), ::highlight(run-current) { background-color: var(--warn); color: var(--panel); }
+
 .row { display: flex; gap: 6px; margin: 8px 0; flex: none; }
 .row input { flex: 1; min-width: 0; font-family: var(--mono); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: none; }
@@ -338,6 +347,12 @@ th { color: var(--muted); position: sticky; top: 0; z-index: 1; background: var(
 tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, transparent); }
 
 .runs-head { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; flex: none; }
+.runs-filters { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+/* A verdict stripe on each run row's first cell */
+#runs td:first-child { box-shadow: inset 3px 0 0 var(--vs, transparent); padding-left: 9px; }
+#runs tr[data-verdict="pass"] { --vs: var(--ok); }
+#runs tr[data-verdict="fail"] { --vs: var(--danger); }
+#runs tr[data-verdict="lost"] { --vs: var(--warn); }
 .runs-wrap { flex: 0 1 auto; max-height: 38%; margin-bottom: 8px; }
 #runs tr { cursor: pointer; }
 #runs td { white-space: nowrap; }
@@ -366,6 +381,13 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--ink) 3%, tran
 #map .st[data-status="covered"] { color: var(--muted); }
 .view-run { margin: 0 0 6px; font: 12px var(--mono); color: var(--muted); }
 .view-run .which { color: var(--ink); }
+/* A picked (past) run, not the live session: banded so it cannot pass for live */
+.view-run[data-pinned="true"] {
+  padding: 4px 8px; border-radius: var(--r-sm); border: 1px solid var(--warn);
+  background: var(--warn-soft);
+}
+.view-run[data-pinned="true"] .which::before { content: "PAST RUN  "; color: var(--warn); font-weight: 700; white-space: pre; }
+#run-view .run-bar { padding: 4px 8px; border-radius: var(--r-sm); background: var(--sunken); border: 1px solid var(--line); }
 .unplaced { margin: 0 0 8px; padding: 6px 10px 6px 26px; font: 12px var(--mono); color: var(--ink);
   background: var(--warn-soft); border: 1px solid var(--line); border-radius: var(--r-sm); }
 .unplaced li span { color: var(--muted); font-family: var(--sans); }
