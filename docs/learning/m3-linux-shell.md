@@ -149,7 +149,7 @@ Six mutations each turn one check red ([tasks](../units/M3b-shell/tasks.md#proof
 ### 4.3 What the run showed
 
 - **Guest time runs about 1.6 % fast.** QEMU ticks the generic counter every 41 ns, the truncated period of 24 MHz (`qemu/target/arm/cpu.c:1430`). The counter runs at 24.39 MHz, but `CNTFRQ` says 24 MHz. The acceptance run measures guest time / host time = 1.0165. The device map lists it as gap 18.
-- **The eMMC controller retries for about 4.5 minutes.** SDHI0 is the eMMC (`non-removable`), so the MMC core keeps trying to start it. With a read-as-zero stub, each try waits for a timeout. In a 600 s run, a message appeared every 5 s until 268 s. The device map class stays UNIMP until the SD unit (M5).
+- **The eMMC controller retries for about 4.5 minutes.** SDHI0 is the eMMC (`non-removable`), so the MMC core keeps trying to start it. With a read-as-zero stub, each try waits for a timeout. In a 600 s run, a message appeared every 5 s until 268 s. M5 replaced the stub with a model of the SD host: the controller now answers "no card" at once, and the retries are gone ([`m5-storage.md`](m5-storage.md)).
 
 ## 5. Pitfalls
 

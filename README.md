@@ -65,7 +65,7 @@ flowchart LR
     class M7,M8,M9 fw
 ```
 
-🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** ✅ M0-M3: the plain upstream Linux kernel boots to a shell on both CPUs, which is the v1.0 target. ⏭️ Next: M4, Renesas's own kernel. Progress, units and blocks: [Milestones](docs/milestones.md). Exit criteria: the [specification](docs/spec/project.md).
+🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** ✅ M0-M4: mainline Linux and Renesas's own kernel boot to a shell on both CPUs, and the watchdog resets the board. 🔄 M5: an SD card with ext4 through the SD host model. **To run each milestone yourself, follow the [walkthrough](docs/walkthrough.md).** Progress, units and blocks: [Milestones](docs/milestones.md). Exit criteria: the [specification](docs/spec/project.md).
 
 ## 🚀 Building
 
@@ -80,7 +80,9 @@ ninja qemu-system-aarch64
 Rebuilding, running the tests, style checks, tracing and editor setup: [Building and testing by hand](docs/learning/building-and-testing.md).
 
 > [!NOTE]
-> The `rzv2l-smarc` machine boots the upstream Linux kernel to a BusyBox shell on the serial console. Storage, Ethernet, I2C and USB are stubs for now, so their drivers fail at boot; [Milestones](docs/milestones.md) shows what is modelled.
+> The `rzv2l-smarc` machine boots mainline Linux and Renesas's kernel to a BusyBox shell on the serial console, with an SD card if you give it one. Ethernet, I2C and USB are stubs for now, so their drivers fail at boot; [Milestones](docs/milestones.md) shows what is modelled.
+
+Next: build the guests and run each milestone with the [walkthrough](docs/walkthrough.md).
 
 The QEMU port lives in a fork, included as the `qemu/` submodule. It carries only code in the shape upstream QEMU would accept; the specification, research, evidence and tests live in this repository.
 
@@ -88,6 +90,7 @@ The QEMU port lives in a fork, included as the `qemu/` submodule. It carries onl
 
 | | Document | What it holds |
 |---|---|---|
+| 🚶 | [Walkthrough](docs/walkthrough.md) | **start here:** build, then run M1, M2, … yourself, with what you should see |
 | 🏁 | [Milestones](docs/milestones.md) | progress: what is done, what comes next |
 | 📐 | [Specification](docs/spec/project.md) | goals, rules, fidelity classes, milestones |
 | 📋 | [Requirements](docs/spec/requirements.md) | the requirement catalogue, traced to tests |

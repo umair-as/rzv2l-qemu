@@ -8,7 +8,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Traceability and requirement statuses are updated: 20 of 27 requirements verified, the rest planned for M4-M7 or noted ([traceability](spec/traceability.md)). **Tagged `rzv2l-v1.0`** (QEMU fork `rzv2l-dev` `aa1764973d`); the tag message lists the scope and the open requirements.
 
-**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 (storage) has started:** its first unit spec is written.
+**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 (storage) is under way:** both kernels read and write ext4 on an SD card ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)).
 
 | | Release | Milestones | State |
 |---|---|---|---|
@@ -44,7 +44,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M3b-shell](units/M3b-shell/spec.md) | M3 | BusyBox initramfs; the M3 acceptance run |
 | ✅ | [M4-vendor-kernel](units/M4-vendor-kernel/spec.md) | M4 | the vendor kernel to a shell; watchdog timers WDT0-2, reset through the CPG |
 | ✅ | [M4-loader-fixups](units/M4-loader-fixups/spec.md) | M4 | U-Boot's device-tree edits: the SD0 supplies in eSD mode applied by QEMU, the others listed as gaps |
-| 🔄 | [M5-sdhi](units/M5-sdhi/spec.md) | M5 | the SD/MMC host interface and its DMA engine; an SD card on SDHI0 with ext4 (in review) |
+| ✅ | [M5-sdhi](units/M5-sdhi/spec.md) | M5 | the SD/MMC host interface and its DMA engine; an SD card on SDHI0 with ext4 |
 
 ## The SoC blocks
 
@@ -63,7 +63,7 @@ What the model does with each block the guest touches. Classes: [`device-map.md`
 | 🟡 | Ethernet, I2C, USB host, thermal sensor | stubs: the drivers fail within a bound | M6, later |
 | 🟡 | display, CAN-FD, QSPI, USB function, SSI, RSPI, ADC | stubs for the drivers the vendor kernel builds in | later (QSPI: M7) |
 | ✅ | WDT0-2 (watchdog) | modelled; a watchdog reset resets the board through the CPG | M4 |
-| 🔄 | SDHI0/1 (SD/MMC host) | modelled with the built-in DMA engine, for SD cards; bus tuning (SCC) not modelled | M5 |
+| ✅ | SDHI0/1 (SD/MMC host) | modelled with the built-in DMA engine, for SD cards; bus tuning (SCC) not modelled | M5 |
 | ⏳ | TSIP (closed crypto) | fails visibly; OP-TEE is rebuilt without it | M7 |
 
 🟡 a stub: logged, so every access is visible.
@@ -74,7 +74,7 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 - Guest time runs about 1.6 % fast: QEMU ticks the 24 MHz counter every 41 ns (gap 18).
 - QEMU's built-in PSCI replaces TF-A until M7; no OP-TEE until then.
-- The stubbed eMMC makes the kernel retry for about 4.5 minutes after boot (until M5).
+- The SD hosts run SD cards at high speed and 3.3 V, as the EVK does; eMMC cards and the faster tuned modes are not modelled. Without `--sd` the slots are empty.
 
 ## Side track: the bench
 
@@ -94,5 +94,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 ## What comes next
 
-1. 🔄 **M5:** storage: the first unit, [M5-sdhi](units/M5-sdhi/spec.md), models the SD/MMC host interface and its DMA engine; both kernels read and write ext4 on an SD card (in review). Next in M5: a root file system on the card.
+1. 🔄 **M5:** storage. The first unit, [M5-sdhi](units/M5-sdhi/spec.md), is merged: both kernels read and write ext4 on an SD card. ⏭️ Next in M5: Linux user space from a root file system on the card.
 2. ⏳ After M5: M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.

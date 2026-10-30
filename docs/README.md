@@ -2,6 +2,7 @@
 
 | Path | What it is |
 |---|---|
+| [`walkthrough.md`](walkthrough.md) | for a user of the repo: build, then run each milestone yourself, with what you should see |
 | [`milestones.md`](milestones.md) | progress: milestones, units, SoC blocks, what comes next |
 | [`spec/`](spec/) | the specification ([`project.md`](spec/project.md)), the requirement IDs, traceability. Everything else follows from it. |
 | [`device-map.md`](device-map.md) | every MMIO window, IRQ, clock and reset of the board, how each is modelled, and the evidence |
