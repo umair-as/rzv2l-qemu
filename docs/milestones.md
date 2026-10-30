@@ -8,7 +8,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Before the `rzv2l-v1.0` tag: one pass over traceability and requirement statuses.
 
-**M4 is under way: Renesas's own kernel boots to the same shell, and the watchdog resets the board** (first unit in review; the loader fixups follow).
+**M4 is under way: Renesas's own kernel boots to the same shell, and the watchdog resets the board** (first unit merged; U-Boot's device-tree edits are next).
 
 | | Release | Milestones | State |
 |---|---|---|---|
@@ -42,7 +42,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M3b-ostm](units/M3b-ostm/spec.md) | M3 | OS timer: kernel time and timer interrupts |
 | ✅ | [M3b-pfc-irqc](units/M3b-pfc-irqc/spec.md) | M3 | pin controller and interrupt control unit; the real serial driver takes over the console |
 | ✅ | [M3b-shell](units/M3b-shell/spec.md) | M3 | BusyBox initramfs; the M3 acceptance run |
-| 🔄 | [M4-vendor-kernel](units/M4-vendor-kernel/spec.md) | M4 | the vendor kernel to a shell; watchdog timers WDT0-2, reset through the CPG (in review) |
+| ✅ | [M4-vendor-kernel](units/M4-vendor-kernel/spec.md) | M4 | the vendor kernel to a shell; watchdog timers WDT0-2, reset through the CPG |
 | ⏭️ | M4 loader fixups | M4 | U-Boot's device-tree edits, applied by QEMU or listed as gaps |
 
 ## The SoC blocks
@@ -93,5 +93,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 ## What comes next
 
 1. ⏭️ **v1.0 closure:** traceability and requirement statuses, then the `rzv2l-v1.0` tag in both repositories.
-2. 🔄 **M4:** the vendor kernel and watchdog unit (in review), then the loader fixups unit.
+2. ⏭️ **M4:** the loader fixups unit: U-Boot's device-tree edits, applied by QEMU or listed as gaps ([EVK evidence](evidence/EVK-2026-10-30-linux.md)).
 3. ⏳ M5 (storage, needs M4), then M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.
