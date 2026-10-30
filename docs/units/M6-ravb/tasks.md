@@ -11,7 +11,8 @@ Fork branch `unit/M6-ravb` from `rzv2l-dev` `10df946cc8`; project branch of the 
 | T5 | GbEthernet: DMAC rings, E-MAC with MDIO decoder and `LINKI`, TOE checksums, honest faults | `b7ab54f7ec` | `/rzv2l-gbeth/*` | done |
 | T6 | SoC and board: ETH0/1 at `0x11C20000`/`0x11C30000`, SPI 84-89, PHYs at address 7 on IRQ2/IRQ3, NIC order, U-Boot's `local-mac-address` edit; QEMU board doc | `29e1718206` | M1 acceptance (mtree, qtree, DTB); G0/G1 boot | done |
 | T7 | qtest `rzv2l-gbeth-test` (10 tests) | `d0269cf05e` | proofs 1-25 | done |
-| T8 | M6 acceptance (`tests/acceptance/m6/`): DHCP, hashes both ways, frame sizes, ring turns, `set_link`, ifdown/up, reset, both kernels; M1 expectations for the new devices | — | M6 ACCEPTANCE | done |
+| T8 | M6 acceptance (`tests/acceptance/m6/`): DHCP, hashes both ways, frame sizes, ring turns, `set_link`, ifdown/up, reset, both kernels; M1 and M4 loader-fixup expectations for the new devices and the MAC address edit | — | M6 ACCEPTANCE; proof 26 | done |
+| T9 | A cable on ETH0 by default: `scripts/run.sh` (`--no-net` to leave it out) and the M3-M5 boots with the stock `ip=on` add `-nic user,id=net0`; `libslirp-dev` joins the build packages | — | M3-M5 acceptance within their boot timeouts | done |
 
 ## Proofs (each mutation: the exact change → the red line)
 
@@ -42,6 +43,7 @@ Fork branch `unit/M6-ravb` from `rzv2l-dev` `10df946cc8`; project branch of the 
 | 23 | the board swaps the PHY interrupts (ETH0 on IRQ3) | `rzv2l-gbeth-test.c:454 test_link_irq`: `'qtest_get_irq(qts, PHY_IRQ_ETH0)' should be TRUE` |
 | 24 | the board puts the PHY at address 1 | `rzv2l-gbeth-test.c:407 test_mdio`: `0x0000ffff == 0x00000022` |
 | 25 | the reset input's polarity inverted | `rzv2l-gbeth-test.c:388 test_cpg_reset`: `0x12345678 == 0x00000000` |
+| 26 | the board writes each channel's MAC into the other channel's node (`eth[1 - i]` in `rzv2l_smarc_set_mac_addresses`) | `tests/acceptance/m4/loader-fixups.sh`: `FAIL g0 eth0 local-mac-address: 52 54 0 12 34 57, expected 52 54 0 12 34 56`; M1 `check.py dtb`: `FAIL dtb: /soc/ethernet@11c20000 differs` |
 
 Each mutation was built with a confirmed relink and run alone; the source was restored from git and rebuilt, and the ten tests passed again. The lines above are from a run against the final test file. A first `IITSR` edge-mode check passed with mutation 9 (it read `ISCR` only after the pin rose again); the test now reads it after the falling edge and after a rising edge.
 

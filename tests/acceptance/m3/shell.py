@@ -154,6 +154,9 @@ def main():
            "-initrd", INITRD, "-display", "none", "-nodefaults",
            "-chardev", "socket,id=scif0,path=%s,server=on,wait=on" % sock,
            "-serial", "chardev:scif0",
+           # A cable on ETH0, so the stock bootargs' ip=on does not wait
+           # 120 s for one (QEMU user networking)
+           "-nic", "user,id=net0",
            "-d", "unimp,guest_errors,invalid_mem",
            "-D", os.path.join(out, "qemu.log")] + extra
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,

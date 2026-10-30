@@ -8,7 +8,10 @@
 #               no /regulator-vcc-sdhi0);
 #   modes 1-5:  both supplies unchanged (eMMC, QSPI, SCIF download);
 #   all:        /aliases mmc0 = SDHI0, mmc1 = SDHI1 added (QEMU's own edit,
-#               the stock DTBs have none); no other difference than
+#               the stock DTBs have none); the node of each ethernetN
+#               alias gets local-mac-address = the channel's NIC MAC, and
+#               mac-address if it has one (U-Boot's fdt_fixup_ethernet(),
+#               docs/units/M6-ravb/spec.md); no other difference than
 #               QEMU's own /psci node.
 # A regulator without a phandle gets the next free one (max + 1).
 # Exit 0 only if every check passes.
@@ -42,7 +45,16 @@ other_changes() {
     diff <(dtc -q -I dtb -O dts -s "$1") <(dtc -q -I dtb -O dts -s "$2") |
         grep '^[<>]' | grep -v -E 'arm,psci|cpu_off|cpu_on|cpu_suspend|migrate' |
         grep -v -E "vqmmc-supply" |
-        grep -v -E '^> \s+mmc[01] = "/soc/mmc@11c[01]0000";$'
+        grep -v -E '^> \s+mmc[01] = "/soc/mmc@11c[01]0000";$' |
+        grep -v -E '^> \s+local-mac-address = \[52 54 00 12 34 5[67]\];$'
+}
+
+# QEMU's default NIC MACs: ETH0 52:54:00:12:34:56, ETH1 ...:57
+check_macs() {      # check_macs <label> <dtb>
+    check "$1 eth0 local-mac-address" \
+        "$(fdtget -t bx "$2" /soc/ethernet@11c20000 local-mac-address)" "52 54 0 12 34 56"
+    check "$1 eth1 local-mac-address" \
+        "$(fdtget -t bx "$2" /soc/ethernet@11c30000 local-mac-address)" "52 54 0 12 34 57"
 }
 
 # The aliases QEMU adds: mmc0 = SDHI0, mmc1 = SDHI1
@@ -65,6 +77,7 @@ for tier in g0 g1; do
     check "$tier eSD vmmc-supply" "$(fdtget -t x "$OUT/$tier-esd.dtb" $MMC vmmc-supply)" "$vmmc"
     check "$tier eSD other changes" "$(other_changes "$DTB" "$OUT/$tier-esd.dtb" | wc -l)" 0
     check_aliases "$tier" "$OUT/$tier-esd.dtb" /soc/mmc@11c00000
+    check_macs "$tier" "$OUT/$tier-esd.dtb"
 
     for bm in 1 2 3 4 5; do
         d="$OUT/$tier-mode$bm.dtb"
@@ -80,6 +93,13 @@ cp "$DTB" "$OUT/alias.dtb"
 fdtput -t s "$OUT/alias.dtb" /aliases mmc0 /soc/mmc@11c10000
 dump "$OUT/alias.dtb" 0 "$OUT/alias-esd.dtb"
 check_aliases "g1 existing alias kept:" "$OUT/alias-esd.dtb" /soc/mmc@11c10000
+
+# A mac-address the DTB already has is rewritten too, as U-Boot does
+cp "$DTB" "$OUT/mac.dtb"
+fdtput -t bx "$OUT/mac.dtb" /soc/ethernet@11c20000 mac-address 0 0 0 0 0 1
+dump "$OUT/mac.dtb" 0 "$OUT/mac-esd.dtb"
+check "g1 existing mac-address rewritten" \
+    "$(fdtget -t bx "$OUT/mac-esd.dtb" /soc/ethernet@11c20000 mac-address)" "52 54 0 12 34 56"
 
 # The regulator without a phandle (and nothing pointing at it): U-Boot's
 # fdt_generate_phandle() gives it the highest phandle in the tree + 1

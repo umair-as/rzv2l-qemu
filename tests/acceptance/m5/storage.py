@@ -64,6 +64,8 @@ def boot(tier, out, img):
            "-chardev", "socket,id=scif0,path=%s,server=on,wait=on" % sock,
            "-serial", "chardev:scif0",
            "-drive", "if=sd,index=0,format=raw,file=%s" % img,
+           # A cable on ETH0, as in the M3 run (tests/acceptance/m3)
+           "-nic", "user,id=net0",
            "-d", "unimp,guest_errors,invalid_mem",
            "-D", os.path.join(out, "qemu.log")]
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
