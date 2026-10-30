@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Build the G0 initramfs: a static BusyBox 1.36.1 (aarch64) and an /init
-# that mounts proc, sysfs and devtmpfs, prints a ready line and runs a
-# shell on the console. Nothing in it knows about QEMU.
+# that mounts proc, sysfs and devtmpfs, prints a banner with what the
+# system reports (board model, kernel, CPUs, memory, watchdogs, boot time)
+# and a ready line, and runs a shell on the console. Nothing in it knows
+# about QEMU.
 # Source: busybox.net tarball, checked against its pinned SHA-256, kept in
 # ../dl. The cpio list is made with the G0 kernel's own gen_init_cpio, so
 # build-kernel.sh runs first.
@@ -42,7 +44,34 @@ cat > "$OUT/init" <<'EOF'
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
+
+# A banner from what the running system reports, the same on any board
+e=$(printf '\033')
+c="$e[1;36m"; y="$e[1;33m"; d="$e[2m"; n="$e[0m"
+model=$(tr -d '\000' < /proc/device-tree/model 2>/dev/null)
+cpus=$(grep -c '^processor' /proc/cpuinfo)
+mem=$(awk '/^MemTotal/ { printf "%d MiB", $2 / 1024 }' /proc/meminfo)
+wdt=$(cd /dev && ls watchdog? 2>/dev/null | tr '\n' ' ')
+up=$(cut -d' ' -f1 /proc/uptime)
+printf '\n%s' "$c"
+cat <<'BANNER'
+   ____    _____     __ __     __  ____    _
+  |  _ \  |__  /    / / \ \   / / |___ \  | |
+  | |_) |   / /    / /   \ \ / /    __) | | |
+  |  _ <   / /_   / /     \ V /    / __/  | |___
+  |_| \_\ /____| /_/       \_/    |_____| |_____|
+BANNER
+printf '%s\n' "$n"
+printf '  %s%-9s%s %s\n' "$y" machine "$n" "${model:-unknown}" \
+    "$y" kernel "$n" "$(uname -r)" \
+    "$y" cpus "$n" "$(cat /sys/devices/system/cpu/online) ($cpus online)" \
+    "$y" memory "$n" "$mem" \
+    "$y" watchdog "$n" "${wdt:-none}" \
+    "$y" boot "$n" "shell ${up} s after power-on"
+printf '  %sBusyBox initramfs: tests/guests/g0/build-initramfs.sh%s\n\n' "$d" "$n"
+
 echo "G0-INIT: ready, cpus online $(cat /sys/devices/system/cpu/online)"
+export PS1="\[$e[1;32m\]rzv2l\[$e[0m\]:\w# "
 exec setsid cttyhack sh
 EOF
 
