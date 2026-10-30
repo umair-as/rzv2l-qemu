@@ -13,12 +13,6 @@ Fork tasks go on `unit/M1-machine-skeleton` in `qemu/`; project tasks on `main` 
 | M1-T07 | Build DTB-U from pinned G0 (v6.12.59); `dumpdtb` diff shows only `/memory`, `/psci`, initrd fixups | MACH-006, GUEST-004 / AC08 | project `tests/guests/g0/` (DTB only), `tests/acceptance/m1/` | DT diff check in `run.sh` | change `ram_size` | DONE: run.sh PASS (209 nodes, only `/psci` rewritten); `ram_size` mutation red; `/psci` must keep `method = "smc"` and `compatible` `arm,psci-1.0` (both seen red on edited dumps). DTB-U SHA-256 `4c339906…e85620` with host DTC 1.7.0 (kernel's in-tree: 1.7.0-gbcd02b52), so a rebuild may differ by tool |
 | M1-T08 | Repo layout and traceability: add `tests/probes/`, `tests/acceptance/`, `tests/guests/` to AGENTS.md layout; fill traceability tasks/tests | TEST-002 | project `AGENTS.md`, `docs/spec/traceability.md` | `scripts/lint.py` 0 errors | — | DONE: layout lines present (`tests/guests/` added with T07); traceability rows for the 13 M1 REQs filled; lint 0 errors |
 
-## Closure checklist (before closing the unit)
-- [ ] every REQ in spec.md appears in at least one task
-- [ ] every task names a test; each test's result **and** its mutation check (the test seen to fail on a broken model) are recorded
-- [ ] `../../spec/traceability.md` updated; `scripts/lint.py` reports 0 errors
-- [ ] independent review done on the final revision: project commit `…`, fork commit `…`
-- [ ] every review finding has a disposition (fixed / gap / rejected with evidence); **no unresolved BLOCKER**, since a recorded blocker is still a blocker
-- [ ] material fixes rechecked by the reviewer on that final revision
-- [ ] fidelity gaps accepted by the operator are listed
-- [ ] later: EVK-R60–R66 and EVK-R01 confirm the TRM and BL2 values on silicon (not a closure gate; a conflict reopens AC10/AC12)
+## Closure
+
+Closed: reviewed and merged (`rzv2l-dev`, then `main`). Its traceability rows are updated with the v1.0 closure; the GIC identity it set from the TRM is confirmed on silicon by EVK-R60-R66 (`../../evidence/EVK-2026-10-29-post-firmware.md`).

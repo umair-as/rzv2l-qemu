@@ -6,13 +6,13 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 ## Where we are
 
-**M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Before the `rzv2l-v1.0` tag: one pass over traceability and requirement statuses.
+**M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Traceability and requirement statuses are updated: 20 of 27 requirements verified, the rest planned for M4-M7 or noted ([traceability](spec/traceability.md)). Next: the `rzv2l-v1.0` tag.
 
 **M4 is under way: Renesas's own kernel boots to the same shell, and the watchdog resets the board** (first unit merged; U-Boot's device-tree edits are next).
 
 | | Release | Milestones | State |
 |---|---|---|---|
-| 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ milestones done; ⏭️ closure pass, then the tag |
+| 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ milestones and closure done; ⏭️ the tag |
 | 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 M4 |
 
 ## Milestones
@@ -92,6 +92,6 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 ## What comes next
 
-1. ⏭️ **v1.0 closure:** traceability and requirement statuses, then the `rzv2l-v1.0` tag in both repositories.
+1. ⏭️ **v1.0 tag:** `rzv2l-v1.0` in both repositories.
 2. ⏭️ **M4:** the loader fixups unit: U-Boot's device-tree edits, applied by QEMU or listed as gaps ([EVK evidence](evidence/EVK-2026-10-30-linux.md)).
 3. ⏳ M5 (storage, needs M4), then M7 (firmware, needs M4 and M5); M6 when a boot path needs the network.

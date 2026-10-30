@@ -28,4 +28,4 @@ Part 1 (Ticket 1) is T01-T07, with T07 (SoC wiring) done before T05 if decision 
 - [x] independent review done on the final revision: project commit `1c5e157`, fork commit `d2222c06e1` (changes requested R1-R6; T13)
 - [x] every review finding has a disposition (fixed / gap / rejected with evidence); **no unresolved BLOCKER**, since a recorded blocker is still a blocker (R1 fixed)
 - [x] material fixes rechecked by the reviewer on that final revision: round 1 on fork `11f6e3f5aa` / project `8a6fa9a` (R4 reopened, N1-N4), round 2 on fork `1c74716c64` / project `6c85cf6`: approved for merge
-- [ ] fidelity gaps accepted by the operator are listed (spec decision (b); design §7): recorded, acceptance at merge: the `-append earlycon` gap (decision (b)), 7-bit receive, TE cleared mid-frame (N3), chardev byte lost while ORER is set (R2 choice)
+- [x] fidelity gaps accepted by the operator are listed (spec decision (b); design §7), accepted at merge: the `-append earlycon` gap (decision (b)), 7-bit receive, TE cleared mid-frame (N3), chardev byte lost while ORER is set (R2 choice)
