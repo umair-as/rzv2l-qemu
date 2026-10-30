@@ -171,6 +171,10 @@ DTB_MEMORY = ("/memory@48000000",
 # the default boot mode (eSD) SD0's vqmmc-supply points at this regulator.
 DTB_SD0 = "/soc/mmc@11c00000"
 DTB_SD0_VQMMC_REG = "/regulator-vccq-sdhi0"
+# QEMU's own edit (M5-sdhi spec): mmc0/mmc1 aliases for the two SD hosts
+# when the DTB has none, so Linux numbers the cards the same in each boot
+DTB_MMC_ALIASES = ['mmc0 = "/soc/mmc@11c00000";',
+                   'mmc1 = "/soc/mmc@11c10000";']
 
 
 def sd0_edit_ok(got, want):
@@ -207,6 +211,9 @@ def check_dtb(captured, stock):
             fixed.append(n)
         elif n == DTB_SD0 and sd0_edit_ok(got, want):
             fixed.append(n + " vqmmc-supply")
+        elif n == "/aliases" and sorted(got[n]) == sorted(
+                want[n] + DTB_MMC_ALIASES):
+            fixed.append("/aliases mmc0, mmc1")
         else:
             rc = fail("dtb: %s differs: -%s +%s"
                       % (n, sorted(set(want[n]) - set(got[n])),

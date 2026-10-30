@@ -5,8 +5,8 @@ Usage: storage.py OUTDIR --tier g0|g1
 
 On a fresh copy of tests/guests/out/sd/sd.img (OUTDIR/sd.img), with the
 kernel and DTB of the tier and the BusyBox initramfs:
-  boot 1: the SD card on SDHI0 is found (no request timeout), SDHI1 has
-          no card; mount the ext4 partition, check the image's README,
+  boot 1: the SD card on SDHI0 is found as mmc0 (the loader's mmc0/mmc1
+          aliases), no request timeout, SDHI1 has no card; mount the ext4 partition, check the image's README,
           write four files whose sizes cross block and request
           boundaries (1, 513, 4097 bytes, 1 MiB + 7), print their MD5,
           sync and unmount; then stop QEMU
@@ -98,7 +98,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     img = os.path.join(out, "sd.img")
     shutil.copyfile(IMAGE, img)
-    mount = "mkdir -p /mnt; P=$(ls /dev/mmcblk*p1); mount $P /mnt"
+    mount = "mkdir -p /mnt; mount /dev/mmcblk0p1 /mnt"
 
     # Boot 1: find the card, write the files
     proc, log, s, ready = boot(tier, os.path.join(out, "boot1"), img)
@@ -106,8 +106,8 @@ def main():
     try:
         if not check(ready, "boot 1: /init runs"):
             return 1
-        check(re.search(r"mmc\d: new (high speed )?SD(HC)? card", s.buf)
-              is not None, "boot 1: the SD card on SDHI0 is found")
+        check(re.search(r"mmc0: new (high speed )?SD(HC)? card", s.buf)
+              is not None, "boot 1: the SD card on SDHI0 is found as mmc0")
         check("timeout waiting for hardware interrupt" not in s.buf,
               "boot 1: no SD request timeout")
         o = run(s, "ls /sys/class/mmc_host | wc -l; "

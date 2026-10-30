@@ -7,7 +7,9 @@
 #               /regulator-vccq-sdhi0, vmmc-supply unchanged (the DTB has
 #               no /regulator-vcc-sdhi0);
 #   modes 1-5:  both supplies unchanged (eMMC, QSPI, SCIF download);
-#   all:        no other difference than QEMU's own /psci node.
+#   all:        /aliases mmc0 = SDHI0, mmc1 = SDHI1 added (QEMU's own edit,
+#               the stock DTBs have none); no other difference than
+#               QEMU's own /psci node.
 # A regulator without a phandle gets the next free one (max + 1).
 # Exit 0 only if every check passes.
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
@@ -39,7 +41,14 @@ dump() {    # dump <in.dtb> <boot-mode> <out.dtb>
 other_changes() {
     diff <(dtc -q -I dtb -O dts -s "$1") <(dtc -q -I dtb -O dts -s "$2") |
         grep '^[<>]' | grep -v -E 'arm,psci|cpu_off|cpu_on|cpu_suspend|migrate' |
-        grep -v -E "vqmmc-supply"
+        grep -v -E "vqmmc-supply" |
+        grep -v -E '^> \s+mmc[01] = "/soc/mmc@11c[01]0000";$'
+}
+
+# The aliases QEMU adds: mmc0 = SDHI0, mmc1 = SDHI1
+check_aliases() {   # check_aliases <label> <dtb> <want-mmc0>
+    check "$1 /aliases/mmc0" "$(fdtget "$2" /aliases mmc0)" "$3"
+    check "$1 /aliases/mmc1" "$(fdtget "$2" /aliases mmc1)" /soc/mmc@11c10000
 }
 
 for tier in g0 g1; do
@@ -55,6 +64,7 @@ for tier in g0 g1; do
     check "$tier eSD vqmmc-supply" "$(fdtget -t x "$OUT/$tier-esd.dtb" $MMC vqmmc-supply)" "$vccq"
     check "$tier eSD vmmc-supply" "$(fdtget -t x "$OUT/$tier-esd.dtb" $MMC vmmc-supply)" "$vmmc"
     check "$tier eSD other changes" "$(other_changes "$DTB" "$OUT/$tier-esd.dtb" | wc -l)" 0
+    check_aliases "$tier" "$OUT/$tier-esd.dtb" /soc/mmc@11c00000
 
     for bm in 1 2 3 4 5; do
         d="$OUT/$tier-mode$bm.dtb"
@@ -64,6 +74,12 @@ for tier in g0 g1; do
         check "$tier boot mode $bm other changes" "$(other_changes "$DTB" "$d" | wc -l)" 0
     done
 done
+
+# An alias the DTB already gives stays as it is
+cp "$DTB" "$OUT/alias.dtb"
+fdtput -t s "$OUT/alias.dtb" /aliases mmc0 /soc/mmc@11c10000
+dump "$OUT/alias.dtb" 0 "$OUT/alias-esd.dtb"
+check_aliases "g1 existing alias kept:" "$OUT/alias-esd.dtb" /soc/mmc@11c10000
 
 # The regulator without a phandle (and nothing pointing at it): U-Boot's
 # fdt_generate_phandle() gives it the highest phandle in the tree + 1
