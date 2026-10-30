@@ -1,8 +1,8 @@
 # M3: a Linux shell
 
-> **Context.** Milestone M3 (spec [§17](../spec/project.md#17-milestones)): the G0 Linux kernel boots to a shell through the real `sh-sci` driver, on both CPUs, with time advancing. The units are cut by what the kernel blocks on. Unit M3b-cpg: [spec](../units/M3b-cpg/spec.md), [tasks](../units/M3b-cpg/tasks.md). Unit M3b-ostm: [spec](../units/M3b-ostm/spec.md), [tasks](../units/M3b-ostm/tasks.md). Unit M3b-pfc-irqc: [spec](../units/M3b-pfc-irqc/spec.md), [tasks](../units/M3b-pfc-irqc/tasks.md). The CPG facts are in [`cpg-reset.md`](../research/cpg-reset.md). The EVK values are in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md).
+> **Context.** Milestone M3 (spec [§17](../spec/project.md#17-milestones)): the G0 Linux kernel boots to a shell through the real `sh-sci` driver, on both CPUs, with time advancing. The units are cut by what the kernel blocks on. Unit M3b-cpg: [spec](../units/M3b-cpg/spec.md), [tasks](../units/M3b-cpg/tasks.md). Unit M3b-ostm: [spec](../units/M3b-ostm/spec.md), [tasks](../units/M3b-ostm/tasks.md). Unit M3b-pfc-irqc: [spec](../units/M3b-pfc-irqc/spec.md), [tasks](../units/M3b-pfc-irqc/tasks.md). Unit M3b-shell: [spec](../units/M3b-shell/spec.md), [tasks](../units/M3b-shell/tasks.md). The CPG facts are in [`cpg-reset.md`](../research/cpg-reset.md). The EVK values are in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md).
 
-Code references are at fork commit `4ae1d307eb` (§1), `afe1e5b71b` (§2) and `7cdc8ea6a8` (§3).
+Code references are at fork commit `4ae1d307eb` (§1), `afe1e5b71b` (§2), `7cdc8ea6a8` (§3) and `01168f7f3e` (§4).
 
 ## 1. The clock pulse generator (unit M3b-cpg)
 
@@ -124,7 +124,34 @@ The pin controller (PFC) chooses each pin's function. Linux's serial driver appl
 
 With the console working, Linux probes Ethernet, I2C, USB and SD next. Each is a logged stub for now and fails within a bound. The boot then ends at "No working init found", because there is no root file system: that is the next unit.
 
-## 4. Pitfalls
+## 4. The shell (unit M3b-shell)
+
+This unit adds no device model. It gives the kernel a root file system and proves the M3 criterion with an acceptance run.
+
+### 4.1 The initramfs
+
+`tests/guests/g0/build-initramfs.sh` builds a static BusyBox 1.36.1 and packs it into a cpio archive with an `/init` script. QEMU loads the archive with `-initrd` and adds its address to the DTB (`linux,initrd-start`, a fixup on the gap list). The kernel unpacks the archive and runs `/init` (`init/main.c:162`). The script mounts `proc`, `sysfs` and `devtmpfs`, prints one line and starts a shell:
+
+```
+[   18.041968] Run /init as init process
+G0-INIT: ready, cpus online 0-1
+~ #
+```
+
+The run passes no `-append`. The kernel uses the `bootargs` of the DTB (`ignore_loglevel rw root=/dev/nfs ip=on`). `root=/dev/nfs` has no effect, because `/init` exists in the initramfs. `earlycon` is not needed, because `stdout-path` sends the console to `ttySC0` (`rz-smarc-common.dtsi:32`). The 17 s before `/init` are the SD probes: each command to a stubbed SD controller waits for a 5 s timeout.
+
+### 4.2 The acceptance run
+
+`tests/acceptance/m3/shell.py` connects SCIF0 to a socket and talks to the shell. It sends `echo <marker>-$((6*7))` with a random marker and waits for `<marker>-42`. The command line does not contain `42`, so only a working shell can print it. The script also reads `/proc/uptime` before and after `sleep 3`, and compares the guest time with the host time. `run.sh` runs M2 acceptance (which runs M1), boots twice from cold, and checks that the `-d` log has only accesses to windows the device map classes UNIMP.
+
+Four mutations each turn one check red ([tasks](../units/M3b-shell/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). For example, a CPU 1 affinity of `0x1` instead of `0x100` leaves `/sys/devices/system/cpu/online` at `0`: PSCI `CPU_ON` for `cpu@100` finds no core.
+
+### 4.3 What the run showed
+
+- **Guest time runs about 1.6 % fast.** QEMU ticks the generic counter every 41 ns, the truncated period of 24 MHz (`qemu/target/arm/cpu.c:1430`). The counter runs at 24.39 MHz, but `CNTFRQ` says 24 MHz. In the first run, `sleep 3` took 2.99 s of host time. The device map lists it as gap 18.
+- **The eMMC controller retries for about 4.5 minutes.** SDHI0 is the eMMC (`non-removable`), so the MMC core keeps trying to start it. With a read-as-zero stub, each try waits for a timeout. In a 600 s run, a message appeared every 5 s until 268 s. The device map class stays UNIMP until the SD unit (M5).
+
+## 5. Pitfalls
 
 - **A Renesas write-enable bit covers a field, not one bit.** In PL2_DDIV, bit 16 enables the 3-bit field at bits 2:0. Linux writes a mask of all field bits into the upper half, so it also sets bits 17 and 18. They have no function. A model that applies each upper bit to the bit 16 below gets the divider wrong (manual §7.2.4.17 p.275; tasks proof 3).
 - **RSTMON is the inverse of RST.** In RST, 1 means released; in RSTMON, 1 means in reset. A model that copies RST makes every Linux reset release time out after 200 µs (manual §7.2.4.135 p.409, §7.2.4.173 p.450; `rzg2l-cpg.c:1480`).
@@ -143,5 +170,8 @@ With the console working, Linux probes Ethernet, I2C, USB and SD next. Each is a
 - **Undefined offsets behave differently per block.** The PFC reads an undefined offset as 0 (EVK R71); the SYSC faults on its secure-only registers (R04, R05). Decide per block from evidence, not from one rule.
 - **A register map extracted from 3000 pages needs spot checks.** The PFC map came from a research pass over chapter 41. Its IEN list and IOLH resets were checked against the manual before the model used it, and the IOLH reset depends on a pin group column in another table (§41.3.7 Note 1).
 - **Read the driver variants.** The IRQC driver defines IMSK and TMSK at `0x10010` and `0x10020`, but only the RZ/Five paths use them; RZ/V2L never does (`irq-renesas-rzg2l.c:146-176`).
+- **In QEMU, the generic timer runs at 10^9 / period, with the period in whole nanoseconds.** For 24 MHz the period truncates from 41.67 ns to 41 ns, so guest time runs 1.6 % fast. QEMU does this on purpose to keep its timer scale exact. A test that requires a guest `sleep 3` to take 3 s of host time fails; compare rates instead (`qemu/target/arm/cpu.c:1430`).
+- **Serial output arrives in pieces.** A pattern that matches `online (\S+)` can match `0` before `-1` arrives. Match up to the line end (tasks, note under the proofs).
+- **A `non-removable` card costs minutes of retries.** The MMC core keeps trying to start an eMMC. Against a read-as-zero SD stub, each command waits for a 5 s timeout, so the retries ran until 268 s and printed 186 messages (`rzg2l-smarc-som.dtsi:369-378`).
 - **A driver that never binds can look like a missing console.** `sh-sci` defers until the pin controller binds, which waits for the IRQC. Without either model the serial console never takes over, with no error (`pinctrl.md` §6).
 
