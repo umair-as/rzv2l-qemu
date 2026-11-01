@@ -119,6 +119,7 @@ Measured at the U-Boot prompt (evidence file `EVK-2026-10-30-linux.md` §9). Reg
 | ID | Command | Register / meaning | Question it answers | Expected / predicted | Read effect | Source note | Result |
 |---|---|---|---|---|---|---|---|
 | EVK-R79 | `md.l 0x11040000 1; md.l 0x11050000 1; md.l 0x11060000 1; md.l 0x11070000 1` | TZC0-3 `BUILD_CONFIG` (TZC-400 TRM) | Address width (bits 13:8) of each controller; filters (25:24) and regions (4:0) as §13.1 gives them? | filters 1/1/1/4, regions 9; width unknown (model: 32/32/32/33, A) | none | M7-el3-platform spec || **ABORT** (2026-11-01): every read ends in a synchronous external abort (`esr 0x96000010`) and U-Boot resets: Non-secure reads refused; widths not readable from U-Boot ([evidence](EVK-2026-11-01-firmware.md) B) |
+| EVK-R80 | `md.l 0x1141018c 1` | DDR controller, U-Boot's ECC enable read (bits 25:24) | Which device tree U-Boot's FIT picks, and the value the model must return | bits 25:24 = 0 (the boot log's `Model: smarc-rzv2l`, not `-ecc`) | none; U-Boot reads it itself every boot (`board_fit_config_name_match`) | M7-optee-uboot spec | |
 
 ## 2. Optional: Linux side (post-Linux, read-only)
 

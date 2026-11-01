@@ -54,3 +54,30 @@ The same for `0x11050000`, `0x11060000` and `0x11070000`, each on a fresh boot: 
 **Reading:** `ESR` `0x96000010` is a data abort at the current exception level (EC `0x25`) with fault status `0x10`, a synchronous external abort: the access was answered with a bus error, not refused by the MMU. U-Boot runs in the Non-secure world, so the four controllers' registers do not take Non-secure reads (O). Which layer refuses them, the controller's own register interface or the SoC's slave access control in front of it (SYSC `SLVACCCTL`), is not known. The address widths stay unread: only Secure software could read them.
 
 **Side effect:** U-Boot's abort handler resets the CPU, so each read rebooted the board into BL2.
+
+## C. The boot chain's banners (U-Boot `reset` after each read in B)
+
+The order the next unit's firmware boot should follow, from one of B's reboots (G2 firmware: BL2 carries the product's `[EDGE]` line, U-Boot its autoboot prompt):
+
+```
+NOTICE:  BL2: v2.10.5(release):2.10.5/rz_1.1.0-dirty
+NOTICE:  BL2: SYS_LSI_MODE: 0x10200
+NOTICE:  BL2: SYS_LSI_DEVID: 0x18447447
+NOTICE:  BL2: Booting BL31
+NOTICE:  BL31: v2.10.5(release):2.10.5/rz_1.1.0-dirty
+I/TC: OP-TEE version: 82a5cd3b-dev (gcc version 15.3.0 (GCC)) #1 Fri Nov 21 09:32:50 UTC 2025 aarch64
+I/TC: Primary CPU initializing
+I/TC: Primary CPU switching to normal world boot
+U-Boot 2024.07 (Sep 22 2025 - 10:51:32 +0000)
+CPU:   Renesas Electronics CPU rev 1.0
+Model: smarc-rzv2l
+DRAM:  1.9 GiB
+I/TC: Reserved shared memory is enabled
+I/TC: Dynamic shared memory is enabled
+SF: Detected mt25qu512a with page size 256 Bytes, erase size 4 KiB, total 64 MiB
+WDT:   Started watchdog@12800800 with servicing every 1000ms (60s timeout)
+MMC:   sd@11c00000: 0, sd@11c10000: 1
+Loading Environment from MMC... Reading from MMC(0)... OK
+```
+
+Lines left out: BL2 build line and PRR, OP-TEE's two configuration warnings, the second `WDT:` lines, the console lines. OP-TEE's `I/TC` lines after `DRAM:` are its answers to U-Boot's OP-TEE probe (I: U-Boot's `CONFIG_OPTEE` driver probes it by SMC).

@@ -48,6 +48,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M5-sd-rootfs](units/M5-sd-rootfs/spec.md) | M5 | user space from an ext4 root file system on the SD card, both kernels; clean power-off and reset |
 | ✅ | [M6-ravb](units/M6-ravb/spec.md) | M6 | Gigabit Ethernet (DMA rings, MDIO, checksum offload), the board's KSZ9131 PHYs, IRQ0-7 of the interrupt control unit |
 | ✅ | [M7-el3-platform](units/M7-el3-platform/spec.md) | M7 | the board's TF-A BL31 as the PSCI firmware (firmware mode): CPU1 on and off, reset through WDT0 |
+| ⏳ | [M7-optee-uboot](units/M7-optee-uboot/spec.md) | M7 | planned: OP-TEE (without TSIP) and the vendor U-Boot after BL31; U-Boot loads Linux from the SD card |
 
 ## The SoC blocks
 
