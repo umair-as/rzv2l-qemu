@@ -26,8 +26,9 @@ ninja qemu-system-aarch64
 cd ../..
 ```
 
-Configure should report `slirp support: YES`. ccache reuses compiled objects
-across builds; inspect its counters with `ccache --show-stats`. New eval builds
+Configure should report `slirp support: YES`. ccache caches repeated compilation;
+inspect its counters with `ccache --show-stats`. Different source and debug paths
+can prevent reuse between worktrees. New eval builds
 also use it when installed. For an existing build, add `--cc="ccache cc"` to
 its original configure options when no build is running; preserve the other
 options from `build/qemu/config.status`. Review builds stay separate so their
