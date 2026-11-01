@@ -12,7 +12,7 @@ The words used here: **M1, M2, …** are the milestones ([milestones page](miles
 sudo apt install git build-essential ninja-build python3-venv pkg-config \
     libglib2.0-dev libpixman-1-dev flex bison bc libssl-dev cpio \
     gcc-aarch64-linux-gnu device-tree-compiler e2fsprogs fdisk fakeroot \
-    libslirp-dev
+    libslirp-dev ccache
 ```
 
 **QEMU** (the fork is the `qemu/` submodule; a few minutes):
@@ -21,10 +21,17 @@ sudo apt install git build-essential ninja-build python3-venv pkg-config \
 git clone --recurse-submodules https://github.com/umair-as/rzv2l-qemu.git
 cd rzv2l-qemu
 mkdir -p build/qemu && cd build/qemu
-../../qemu/configure --target-list=aarch64-softmmu --disable-docs   # says "slirp support : YES"
+../../qemu/configure --target-list=aarch64-softmmu --disable-docs --cc="ccache cc"
 ninja qemu-system-aarch64
 cd ../..
 ```
+
+Configure should report `slirp support: YES`. ccache reuses compiled objects
+across builds; inspect its counters with `ccache --show-stats`. New eval builds
+also use it when installed. For an existing build, add `--cc="ccache cc"` to
+its original configure options when no build is running; preserve the other
+options from `build/qemu/config.status`. Review builds stay separate so their
+mutations cannot affect your working build.
 
 **The guests** (the kernels take a while: each is a full kernel build):
 
