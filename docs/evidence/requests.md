@@ -118,7 +118,7 @@ Measured at the U-Boot prompt (evidence file `EVK-2026-10-30-linux.md` §9). Reg
 
 | ID | Command | Register / meaning | Question it answers | Expected / predicted | Read effect | Source note | Result |
 |---|---|---|---|---|---|---|---|
-| EVK-R79 | `md.l 0x11040000 1; md.l 0x11050000 1; md.l 0x11060000 1; md.l 0x11070000 1` | TZC0-3 `BUILD_CONFIG` (TZC-400 TRM) | Address width (bits 13:8) of each controller; filters (25:24) and regions (4:0) as §13.1 gives them? | filters 1/1/1/4, regions 9; width unknown (model: 32/32/32/33, A) | none | M7-el3-platform spec | |
+| EVK-R79 | `md.l 0x11040000 1; md.l 0x11050000 1; md.l 0x11060000 1; md.l 0x11070000 1` | TZC0-3 `BUILD_CONFIG` (TZC-400 TRM) | Address width (bits 13:8) of each controller; filters (25:24) and regions (4:0) as §13.1 gives them? | filters 1/1/1/4, regions 9; width unknown (model: 32/32/32/33, A) | none | M7-el3-platform spec || **ABORT** (2026-11-01): every read ends in a synchronous external abort (`esr 0x96000010`) and U-Boot resets: Non-secure reads refused; widths not readable from U-Boot ([evidence](EVK-2026-11-01-firmware.md) B) |
 
 ## 2. Optional: Linux side (post-Linux, read-only)
 
@@ -132,7 +132,7 @@ Measured at the U-Boot prompt (evidence file `EVK-2026-10-30-linux.md` §9). Reg
 | EVK-L04 | `dmesg \| grep -E 'Detected Renesas\|SoC mismatch'` | DEVID decode by Linux | `Detected Renesas RZ/V2L r9a07g054 Rev 1` | sysc.md Q7 | |
 | EVK-L05 | `grep . /sys/devices/system/cpu/cpu0/cache/index*/{level,type,size}; grep -m1 Features /proc/cpuinfo` | Cache topology on silicon (no L2, 256 KiB L3?) and crypto extension | L1 I/D 32K; L3 256K; `aes pmull sha1 sha2` (A) | cpu-gic.md Q2 | |
 | EVK-L06 | `cat /sys/devices/system/clocksource/clocksource0/{current,available}_clocksource; grep -E 'arch_timer\|ostm' /proc/interrupts` | Which clocksource wins; timer IRQ counts | `arch_sys_counter` current (rating 400 > OSTM 300) | cpu-gic.md Q4 | |
-| EVK-L07 | `dmesg \| grep -iE 'trusted os\|migrat\|smccc\|psci'; cat /sys/devices/system/cpu/vulnerabilities/*` | MIGRATE_INFO_TYPE with opteed (gap 5); SMCCC-dependent mitigations (gap 1) | open | cpu-gic.md Q5 | |
+| EVK-L07 | `dmesg \| grep -iE 'trusted os\|migrat\|smccc\|psci'; cat /sys/devices/system/cpu/vulnerabilities/*` | MIGRATE_INFO_TYPE with opteed (gap 5); SMCCC-dependent mitigations (gap 1) | open | cpu-gic.md Q5 || 2026-11-01: `Trusted OS migration not required` (2), SMCCC v1.4, `ARCH_SOC_ID not implemented`; only `spectre_v1` mitigated, as in QEMU in both modes ([evidence](EVK-2026-11-01-firmware.md) A) |
 | EVK-L08 | `grep -E '1004b800\|1004c000\|sci' /proc/interrupts` | Which SCIF SPIs (380-384, 390-394) are requested and counting (IRQ-sharing conflict) | 380, 381, 382, 383, 384 (one handler on 384) | scif.md Q3, conflict 1 | |
 | EVK-L09 | `grep -E 'P38\|P48' /sys/kernel/debug/pinctrl/11030000.pinctrl-pinctrl-rzg2l/pinmux-pins; ls /proc/device-tree/soc/serial@1004b800/` | SCIF0/SCIF2 pin ownership; does this image's `scif0` node have `pinctrl-0`? | P38_0/P38_1 owned by `1004b800.serial` | pinctrl.md Q5 | |
 | EVK-L10 | `cat /sys/kernel/debug/clk/clk_summary` | What the unused-clock sweep left on | SCIF0, GPIO, IA55, GIC, DMAC on | cpg-reset.md Q6 | |

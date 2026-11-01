@@ -14,6 +14,7 @@ SYC direct-mode start state (`CNTCR` 1, `CNTFID0` 24 MHz, EVK-R50): the M1 devic
 | T6 | CPG: core P-Channels, core run lines; the SoC starts and stops the cores from them | fork `hw/misc/renesas_rzv2l_cpg.c`, `hw/arm/r9a07g054.c` | qtests `/cpg/pchannel`, `/cpg/ca55-run`; firmware boot | done |
 | T7 | GIC-600 `GICR_PWRR`; Cortex-A55 `CPUPWRCTLR_EL1` | fork `hw/intc/arm_gicv3_*`, `target/arm/tcg/cpu64.c` | firmware boot, hotplug | done |
 | T8 | Firmware mode (`-bios`): BL2's hand-off, CPU0 start stub, BL33 kernel and DTB; QEMU board doc | fork `hw/arm/rzv2l-smarc.c`, `docs/system/arm/rzv2l-smarc.rst` | firmware boot | done |
+| T10 | EL3 probe: `GICR_PWRR` rules from EL3 and RAZ/WI from Non-secure EL1; TZC refuses Non-secure accesses (EVK-R79) | `tests/probes/el3-secure/`, fork `hw/misc/arm_tzc400.c` | EL3 probe, 16 checks | done |
 | T9 | Acceptance: firmware boot, CPU1 hotplug, reset; M1 expectations for the new devices; `run.sh --firmware` | `tests/acceptance/m7/`, `tests/acceptance/m1/expected/`, `scripts/run.sh` | M7 ACCEPTANCE | done |
 
 ## Proofs (each mutation: the exact change → the red line)
@@ -32,6 +33,14 @@ SYC direct-mode start state (`CNTCR` 1, `CNTFID0` 24 MHz, EVK-R50): the M1 devic
 | 10 | CPU: no `CPUPWRCTLR_EL1` on the Cortex-A55 | `firmware.py:131 main`: `FAIL hotplug 1: CPU1 offline (BL31 CPU_OFF): CPUs online 0` |
 | 11 | Board: BL33's entry point at offset 48 (the R-Car layout) | `firmware.py:82 boot_checks`: `FAIL boot 1: the card's init reaches the shell` |
 | 12 | CPG: a core runs with `CA55_RST3_n` applied | `rzv2l-cpg-test.c:389 test_ca55_run`: `'qtest_get_irq(qts, 1)' should be FALSE` (green until the test applied `CA55_RST3_1` alone) |
+
+| 13 | SYSC: `RVAL1` resets to 0 | `rzv2l-smarc-test.c:228 test_sysc_ca55`: `0x00000000 == 0x00020000` |
+| 14 | SoC: the TZCs accept Non-secure accesses | `probe.c:228`: `FAIL TZC0 BUILD_CONFIG read from Non-secure: external abort: 0x…0 (expected 0x…1)` |
+| 15 | GIC: `GICR_PWRR` RAZ/WI to every access | `probe.c:174`: `FAIL GICR1_PWRR RDG/RDGO: 0x…0 (expected 0x…100)` (the firmware boot stayed green: BL31 reads RAZ as powered up) |
+| 16 | GIC: `GICR_PWRR` open to Non-secure accesses | `probe.c:221`: `FAIL GICR1_PWRR from Non-secure: RAZ: 0x…100 (expected 0x…0)` |
+| 17 | GIC: `RDPD = 1` taken without `ProcessorSleep` | `probe.c:184`: `FAIL RDPD 1 without ProcessorSleep: ignored: 0x…1 (expected 0x…0)` |
+| 18 | GIC: `RDGPD` never follows the group | `probe.c:195`: `FAIL RDPD 1 on both: GICR0 state: 0x…1 (expected 0x…d)` |
+| 19 | GIC: `RDAG` ignored | `probe.c:202`: `FAIL RDAG with RDPD 0 from core 0: GICR1 state: 0x…1 (expected 0x…0)` |
 
 Each mutation was applied to a copy-backed file, built with a confirmed relink, run alone, and restored; the build and the full tests were run again after the last one.
 
@@ -58,3 +67,10 @@ SD-ROOT: ready, root /dev/mmcblk0p2, boot 2
 ```
 
 The `-d` log holds only the recorded stub windows of `tests/acceptance/m4/expected/log-allow.txt`. qtests: `rzv2l-smarc-test` 9/9, `rzv2l-cpg-test` 7/7, the other RZ/V2L qtests unchanged and passing; M1 acceptance PASS with the new devices.
+
+## Not covered (later scope, from the review)
+
+- `LP_CTL1`, `LP_CTL2` and `LP_CTL5` are never cleared by BL31, so from the second `CPU_OFF` on, BL31's poll is met by the flag the first one left; the model's rule (the flag rises with an unmasked request) is exercised once per boot. The rule is an assumption from §6.3.56; the second hotplug round proves the `CPU_ON` path from the off state, not the sleep flag again.
+- The P-Channel `OFF_EMU` request (`PSTATE` 1, the manual's §2.2.2 flows) has no test; BL31 uses OFF (0).
+- `CPUPWRCTLR_EL1` (RAZ/WI) is checked only by the firmware boot; the Cortex-A55 TRM is not in the repo, so its reset value is not checked.
+- The kernel's `rcar_canfd ... reset controller failed: -ETIMEDOUT` and the clock `WARNING` after it appear in direct mode too: not from this unit; a lead for the CAN-FD window.

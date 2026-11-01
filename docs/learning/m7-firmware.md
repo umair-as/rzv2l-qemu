@@ -84,17 +84,46 @@ The method was the project's failure loop (AGENTS.md rule 5): boot, find the fir
 | CPG write `0xb44` | `CPU_ON`: the P-Channel handshake | the P-Channels and the core run lines |
 | `CPU_OFF` never ends | the Cortex-A55 power-down sets `CPUPWRCTLR_EL1` | the register on QEMU's Cortex-A55 (EXP-001 had found it missing) |
 
-## 5. How we know it works
+## 5. Asking the board the same questions
+
+Two reads on the board check what firmware mode should reproduce. Both are in [`../evidence/EVK-2026-11-01-firmware.md`](../evidence/EVK-2026-11-01-firmware.md).
+
+**From Linux: what firmware is the kernel talking to?** At boot the kernel calls the firmware and logs what it finds. One filter shows the lines, on the board and in QEMU alike:
+
+```bash
+dmesg | grep -iE 'trusted os|migrat|smccc|psci'
+grep . /sys/devices/system/cpu/vulnerabilities/*
+```
+
+- `PSCIv1.1 detected in firmware`: the power interface's version.
+- `SMC Calling Convention v1.4`: the version of the rules for calling into the firmware. QEMU's own PSCI says v1.0; BL31 says v1.4, on the board and in firmware mode. This line tells you who answered.
+- `Trusted OS migration not required`: Linux asked whether the Secure OS (OP-TEE) is tied to one core. BL31 passes this question to OP-TEE's dispatcher, so the answer exists only while OP-TEE runs. Firmware mode has no OP-TEE yet and prints `MIGRATE_INFO_TYPE not supported.` instead; the next unit adds OP-TEE.
+- `vulnerabilities/*`: the CPU security bugs the kernel checked for, and its answer to each. Some mitigations need firmware calls, so these could differ; they read the same on the board and in both QEMU modes (only `spectre_v1` is mitigated, in the kernel itself).
+
+**From U-Boot: how is a TrustZone controller built?** The SoC has four TZC-400s, gatekeepers that decide which memory accesses the Secure and Non-secure worlds may make. Each has a read-only `BUILD_CONFIG` register that describes it. `md.l ADDRESS 1` in U-Boot reads one 32-bit word:
+
+```
+=> md.l 0x11040000 1
+"Synchronous Abort" handler, esr 0x96000010, far 0x11040000
+...
+Resetting CPU ...
+```
+
+The board refused the read. U-Boot runs in the Non-secure world, and the bus answered its access with an error: `ESR` `0x96000010` decodes as a data abort (`EC` `0x25`) from an external abort (`DFSC` `0x10`), not an MMU fault. U-Boot's reaction to an abort is to reset. So the controllers' own registers are Secure-only, which the model did not know: it now refuses Non-secure accesses the same way. BL31 is unaffected, because it runs in the Secure world at EL3.
+
+## 6. How we know it works
 
 1. **Register tests (qtest).** They assert the manual's reset values and rules: the reset vectors' reserved bits, the `LP_CTL5` flag rule, the P-Channel reset value and `PACCEPT`, the TZC filter and region counts. A qtest also watches the CPG's `ca55-run` lines while it applies resets and handshakes.
-2. **The firmware boot.** `tests/acceptance/m7/firmware.py` boots BL31 and the vendor kernel from the SD card. It checks the BL31 banner, SMC Calling Convention v1.4, both CPUs, CPU1 offline and online twice, and a `reboot` into BL31 again.
-3. **Mutations.** Twelve plausible mistakes, each seen to turn a check red ([tasks](../units/M7-el3-platform/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). Two stayed green at first and each got a test: an ignored P-Channel OFF, and a core that ignores one of its two resets.
+2. **The firmware boot.** `tests/acceptance/m7/firmware.py` boots BL31 and the vendor kernel from the SD card. It checks the BL31 banner, SMC Calling Convention v1.4, both CPUs, CPU1 offline and online twice, and a `reboot` into BL31 again. The second round checks the `CPU_ON` path from the off state again; it does not check the sleep flag again, because BL31 never clears it (the first `CPU_OFF` leaves it set).
+3. **A probe at EL3.** A qtest's accesses carry no security state, and BL31's boot cannot tell some mistakes apart (it reads a `GICR_PWRR` that always reads 0 as "powered up"). `tests/probes/el3-secure/` is a small bare-metal program run as `-bios`. It checks the `GICR_PWRR` rules of the GIC-600 TRM from EL3, then drops to Non-secure EL1, finds `GICR_PWRR` reading 0 and a TZC read aborting, and returns to EL3 with an SMC to confirm the Non-secure writes changed nothing.
+4. **Mutations.** Nineteen plausible mistakes, each seen to turn a check red ([tasks](../units/M7-el3-platform/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). Two stayed green at first and each got a test: an ignored P-Channel OFF, and a core that ignores one of its two resets.
 
-## 6. Pitfalls
+## 7. Pitfalls
 
 - **Two structures, one name.** A firmware tree can hold a platform family's copy of a structure next to another family's. Take the layout from the header the platform builds with, and confirm it in the binary (TF-A `include/rz_private.h:42`).
 - **A release firmware panics in silence.** BL31 built with `DEBUG=0` prints nothing when it panics. Read the PC from the QEMU monitor and the exception from `-d int` before you guess.
 - **An identification register has consequences.** The model reports a GIC-600 in its IIDR, as the board does (M1). TF-A then powers the Redistributors up through `GICR_PWRR`, a register QEMU's generic GICv3 did not have. An honest ID value makes firmware use the real part's extra registers.
 - **The sequence can hide a rule.** BL31's `CPU_ON` applies the core's reset before the ON handshake, so a model that ignores an OFF handshake still boots and hotplugs. Only a test that drives the handshake alone shows the difference (proof 8).
 - **QEMU's own PSCI must step aside.** If the CPUs' PSCI conduit is set, QEMU answers the kernel's SMCs, and a firmware boot "works" without BL31 doing anything. Check the SMC Calling Convention version the kernel prints: v1.4 is BL31, v1.0 is QEMU.
+- **Secure-only registers fail loudly on silicon.** A Non-secure read of a TZC register aborts on the board; a model that answers it hides the mistake from whoever wrote the access. Ask the board from the Non-secure world (U-Boot `md`) before assuming a register is readable there, and expect a reset if it is not.
 - **`poweroff` does not end the run.** This BL31 has no `SYSTEM_OFF` (`plat_pm.c:109`): it waits, as the board does. A test that waits for QEMU to exit will hang in firmware mode.

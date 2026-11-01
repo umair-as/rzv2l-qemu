@@ -16,7 +16,7 @@
   - SYSC `SYS_CA55_CFG_RVAL0/1`, `RVAH0/1` (manual §6.3.38-6.3.41 p.205-206): the reset vector each core starts from.
   - SYSC `SYS_LP_CTL1/2/5/6` (§6.3.54-6.3.57 p.219-224): a core's sleep request sets its `LP_CTL5` flag; `LP_CTL2` bit 0 marks the sleep sequence.
   - CPG `RST_CA55` (§7.2.4.106 p.377-379) with `RSTMON_CA55`, and `CORE0/1_PCHCTL`, `PCHMON` (§7.2.4.186-7.2.4.189 p.464-467): the P-Channel handshake (§2.2 p.84-89) accepts each request; a core starts at its reset vector when its resets are released and the channel accepts ON, and stops when its reset is applied or the channel accepts OFF.
-- **TZC-400 ×4** (§13 p.622-626, `0x11040000`-`0x11070000`): BL31 programs the two SRAM controllers (`plat_security.c:154-155`). A register file with the build values; programming is stored, never enforced (device map §4 gap 9).
+- **TZC-400 ×4** (§13 p.622-626, `0x11040000`-`0x11070000`): BL31 programs the two SRAM controllers (`plat_security.c:154-155`). A register file with the build values; programming is stored, never enforced (device map §4 gap 9). Only Secure accesses reach it: on the board a Non-secure read of any of the four ends in a synchronous external abort (EVK-R79, O), and the model refuses them the same way.
 - **SYC**, the system counter (§15, a CoreSight SoC-400 timestamp generator): BL31 writes `CNTFID0` and `CNTCR` (`drivers/syc.c`).
 - **GIC-600 `GICR_PWRR`** (GIC-600 TRM §3.6.1, §4.4.5): the Redistributors are powered down at reset and BL31 powers them up.
 - **Cortex-A55 `CPUPWRCTLR_EL1`**: BL31's core power-down writes it (EXP-001: QEMU's Cortex-A55 does not define it).
@@ -39,7 +39,7 @@ The kernel (G1, as in M4) needs from BL31: PSCI 1.x over SMC, `CPU_ON(0x100)` to
 
 ## Exit criterion
 
-1. qtests assert the manual reset values and rules: `RVAL/RVAH`, `LP_CTL5` set by a sleep request and cleared by a 0 write, `PCHCTL` reset value and `PACCEPT` following `PREQ`, the TZC-400 build values; each seen red on a mutation.
+1. qtests assert the manual reset values and rules: `RVAL/RVAH`, `LP_CTL5` set by a sleep request and cleared by a 0 write, `PCHCTL` reset value and `PACCEPT` following `PREQ`, the TZC-400 build values; each seen red on a mutation. A bare-metal probe at EL3 (`tests/probes/el3-secure/`) checks what depends on the security of the access: the GIC-600 `GICR_PWRR` rules (GIC-600 TRM §4.4.5) and its RAZ/WI from Non-secure, and the TZCs' refusal of Non-secure accesses.
 2. The CPG's core run lines follow the manual's start and stop conditions (qtest), and in firmware mode the real CPU1 runs from the reset vector BL31 programs, stops at `CPU_OFF` and runs again at `CPU_ON` (the acceptance below); each seen red on a mutation.
 3. Firmware mode, G1 kernel: the BL31 banner on SCIF0; Linux to the shell; both CPUs online through BL31's `CPU_ON`; CPU1 offline and online again; `reboot` resets the board through WDT0 and BL31 starts again in the same QEMU; the kernel reports the PSCI version from BL31.
 4. Direct mode: M1-M5 acceptance and the serial-port regression suite pass unchanged.
@@ -52,7 +52,7 @@ Manual sections above; TF-A `f59ed5a31` paths above; `../../research/boot-chain-
 
 - **Clocks and pins in firmware mode.** Without BL2, nothing sets the clocks and pins that BL2 and U-Boot set on the board. This unit keeps the direct-mode start values for the CPG, PFC and SCIF0 (the post-U-Boot state measured on the EVK) in firmware mode too, and records that as a gap. The alternative, starting them from reset values, needs BL2's clock setup (M8) or U-Boot's (next unit).
 - **Linux as BL33** is a staging step: the board always runs U-Boot there. The next unit puts U-Boot in its place.
-- **TZC-400 build values:** the manual gives the regions and filters (§13.1), not the address width; the model's 32 and 33 bits are an assumption until read on the EVK (`docs/evidence/requests.md`, `BUILD_CONFIG` at `0x11040000`-`0x11070000`).
+- **TZC-400 build values:** the manual gives the regions and filters (§13.1), not the address width; the model's 32 and 33 bits stay an assumption: the EVK read from U-Boot (EVK-R79) ended in an external abort, because the registers take Secure accesses only, so only code at EL3 or in the Secure world could read them.
 - **Simplifications to accept or reject** (device map §4 gaps 19-21): firmware mode's staging; the system counter runs whatever `CNTCR.EN` says; every P-Channel request is accepted at once and a core stops at its OFF handshake or reset, not at its WFI.
 
 ## Unit end
