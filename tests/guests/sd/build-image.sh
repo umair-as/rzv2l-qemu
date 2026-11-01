@@ -7,7 +7,9 @@
 #   p2  the rest, ext4 "rzv2l-root": a root file system with the project's
 #       static BusyBox (../g0/build-initramfs.sh), BusyBox init and an
 #       rcS that counts the boots in /var/boot-count. Linux boots it with
-#       "root=/dev/mmcblk0p2 rw rootwait" and no initramfs.
+#       "root=/dev/mmcblk0p2 rw rootwait" and no initramfs. Its /boot
+#       holds the Renesas kernel (../g1/) as the vendor U-Boot's default
+#       command loads it: boot/Image and boot/r9a07g054l2-smarc.dtb.
 # No root rights: each file system is made with mkfs.ext4 -d in a separate
 # file (under fakeroot, so the root files belong to root) and copied in.
 # Output: ../out/sd/sd.img (prints its partition table).
@@ -17,6 +19,7 @@ umask 022
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OUT="$HERE/../out/sd"
 BB="$HERE/../out/g0/busybox/busybox"
+G1="$HERE/../out/g1"
 SIZE=$((64 * 1024 * 1024))
 P1_START=2048
 P1_SECTORS=$((16 * 1024 * 2))
@@ -27,6 +30,11 @@ if [ ! -x "$BB" ]; then
     echo "build-image.sh: $BB missing; run ../g0/build-initramfs.sh first" >&2
     exit 1
 fi
+for f in "$G1/linux/arch/arm64/boot/Image" "$G1/r9a07g054l2-smarc.dtb"; do
+    [ -f "$f" ] || {
+        echo "build-image.sh: $f missing; build the G1 kernel first" >&2
+        exit 1; }
+done
 mkdir -p "$OUT"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -45,6 +53,8 @@ cp "$BB" "$r/bin/busybox"
     [ "$applet" = bin/busybox ] || ln -s /bin/busybox "$r/$applet"
 done
 echo 0 > "$r/var/boot-count"
+mkdir "$r/boot"
+cp "$G1/linux/arch/arm64/boot/Image" "$G1/r9a07g054l2-smarc.dtb" "$r/boot/"
 
 cat > "$r/etc/inittab" <<'EOF'
 ::sysinit:/etc/init.d/rcS
