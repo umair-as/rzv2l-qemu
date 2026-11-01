@@ -18,7 +18,7 @@ One page. Facts carry their source; inferences and assumptions are labelled (I) 
   - RPC/SPIBSC `0x10060000`: `s_init` writes `CMNCR`; `board_init` reads and rewrites the SPI-NOR's NVCR through it every boot (`board/renesas/rzv2l-dev/rzv2l-dev.c:171-226`; polls `TEND`, 1 s timeout per device map). Today a stub. If U-Boot continues after the bounded failure, the missing flash is a recorded gap here and the RPC + SPI-NOR model is its own unit (spec §11: "functional by M7"; M8's SPI boot needs it too).
   - DDR controller `0x11410000 + 0x18C`: U-Boot reads the ECC enable bits [25:24] to pick its device tree (`board_fit_config_name_match`); 0 selects `smarc-rzv2l`. Needs the board's value (EVK-R80) before a model value is written.
   - USB PHY control and the two OHCI hosts (`board_usb_init`): stores into the existing stubs.
-  - WDT0: U-Boot starts it (60 s) and Linux takes it over (M4 model). Whether the vendor kernel keeps it fed without a user-space daemon is checked by the run outliving the timeout (I: the watchdog core pings a running watchdog until user space opens it, if the driver reports it running).
+  - WDT0: U-Boot starts it (60 s) and leaves it running. The vendor kernel does not feed it: `rzg2l_wdt` never reports a running watchdog to the watchdog core (`drivers/watchdog/rzg2l_wdt.c` probe, no `WDOG_HW_RUNNING`), so without a user-space feeder the board resets after 60 s (I, from the driver; seen in QEMU). The board's product image feeds it from systemd (EVK-2026-10-30). Device map gap 16.
   - OTP `0x11860000` (chip ID `0x11861140`): OP-TEE's hardware unique key (research §1-§3); a stub with a documented value, not silicon's (device map).
 - **What Linux sees of OP-TEE:** BL31's OP-TEE dispatcher registers its PSCI hooks once OP-TEE is up, so `MIGRATE_INFO_TYPE` answers 2, `Trusted OS migration not required`, as on the board (EVK-L07; `services/spd/opteed/opteed_main.c:568`). The Linux OP-TEE driver does not probe on the vendor stack, because no device tree Linux gets has `/firmware/optee`:
   - the vendor kernel's `r9a07g054l2-smarc.dtb` (`rz-6.12-cip14` `212f6e88b7`) has no such node, not even a disabled one (F, `dtc` of the built DTB);
@@ -29,10 +29,10 @@ One page. Facts carry their source; inferences and assumptions are labelled (I) 
 - **Honest failures:** the SPI-NOR path and every other block without a model fail visibly (a timeout, an error status, an abort, a `-d unimp` line); no stub reports a command as done that it did not do.
 - **Not in this unit:** BL2, the boot ROM, DDR training and a FIP (M8); the production OP-TEE with TSIP: the negative Stage N needs a production binary, which cannot be built from public sources; it stays unavailable until a suitable legitimate binary exists, and no synthetic result stands in for it; FIT images, with signed boot and the rest of the security scope (M9: M7 follows the vendor's own `booti` path), and U-Boot's A/B and bootcount paths (M9); `saveenv` (the environment at `0x1F0000` on mmc 0 is only read; `env default -a` runs first anyway).
 
-## Design choices for the operator
+## Design choices
 
-1. **How the images are named.** Recommended: machine properties, `-machine rzv2l-smarc,bl32=tee-raw.bin,bl33=u-boot.bin` with `-bios bl31.bin`; `-kernel`/`-dtb` are then not needed. The machine keeps the whole BL2 stand-in in one place, and the parameter block is filled from what was given. The alternative, `-device loader` for each image plus entry-point properties, is generic QEMU but leaves the user to know BL2's addresses.
-2. **The SPI flash.** Recommended: stub first, model later. The flash is not on U-Boot's boot path (the kernel comes from the SD card). The stub never sets `TEND` or returns flash data, so U-Boot's NVCR access times out and U-Boot reports it. If U-Boot then continues, the RPC + SPI-NOR (QEMU has an `mt25qu512a` flash model) becomes M7 unit 3, before M8 needs it to boot from SPI.
+1. **How the images are named** (the operator's choice): machine properties, `-machine rzv2l-smarc,bl32=tee-raw.bin,bl33=u-boot.bin` with `-bios bl31.bin`; `-kernel`/`-dtb` are then refused. The machine keeps the whole BL2 stand-in in one place and fills the parameter block from what was given.
+2. **The SPI flash** (the recommendation, under the operator's rule that unmodelled devices fail visibly): the stub stays. U-Boot's JEDEC ID read returns 0, U-Boot reports `unrecognized JEDEC id bytes: 00, 00, 00` and carries on; the flash is not on its boot path. The RPC + SPI-NOR model is a later unit, before M8 boots from SPI.
 
 ## G2 integration experiment (not acceptance)
 
@@ -55,9 +55,8 @@ In order (research `boot-chain-firmware.md` §1, the EVK's boot of 2026-11-01 fo
 
 ## Exit criterion
 
-`scripts/run.sh` in the new mode boots, on SCIF0: the BL31 banner; OP-TEE's banner and `Primary CPU switching to normal world boot`, with no `opteed_fast` error; the U-Boot banner and `DRAM:  1.9 GiB`; U-Boot loads `boot/Image` and the DTB from the card and starts Linux; `psci: Trusted OS migration not required` and `SMC Calling Convention v1.4`; both CPUs; the shell from the card's root. Then CPU1 offline and online twice and `reboot` back through BL31, OP-TEE and U-Boot, and a run that outlives the 60 s watchdog. Every `-d unimp,guest_errors,invalid_mem` line is a recorded stub window. No `/dev/tee0` is expected: Linux's OP-TEE driver does not probe on this stack (above). Firmware mode without OP-TEE and U-Boot (unit 1) and direct mode are unchanged.
+`scripts/run.sh` in the new mode boots, on SCIF0: the BL31 banner; OP-TEE's banner and `Primary CPU switching to normal world boot`, with no `opteed_fast` error; the U-Boot banner and `DRAM:  1.9 GiB`; U-Boot loads `boot/Image` and the DTB from the card and starts Linux; `psci: Trusted OS migration not required` and `SMC Calling Convention v1.4`; both CPUs; the shell from the card's root. Then CPU1 offline and online twice and `reboot` back through BL31, OP-TEE and U-Boot; with BusyBox `watchdog` feeding `/dev/watchdog0`, no reset for 75 s; with nothing feeding it, the board resets on its own and boots again. Every `-d unimp,guest_errors,invalid_mem` line is a recorded stub window. No `/dev/tee0` is expected: Linux's OP-TEE driver does not probe on this stack (above). Firmware mode without OP-TEE and U-Boot (unit 1) and direct mode are unchanged.
 
-Expected next stop: U-Boot's SPI-NOR probe, if the stub is not enough to fail it within its timeout.
 
 ## Evidence
 
