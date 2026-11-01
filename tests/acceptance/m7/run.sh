@@ -28,6 +28,14 @@ step "firmware mode: BL31, G1 kernel, root on the SD card"
 python3 -I "$HERE/firmware.py" "$OUT/firmware"
 result $?
 
+step "EL3 probe: GICR_PWRR and TZC access by security state"
+"$HERE/../../probes/el3-secure/run.sh" > "$OUT/el3-secure.txt" 2>&1
+if [ $? -eq 0 ]; then
+    echo "PASS EL3 probe (full output: out/el3-secure.txt)"
+else
+    echo "FAIL EL3 probe (full output: out/el3-secure.txt)"; result 1
+fi
+
 # Log gate: every -d line is a recorded stub window or a listed line
 step "log gate"
 allow=$(cat "$HERE/../m4/expected/log-allow.txt" \
