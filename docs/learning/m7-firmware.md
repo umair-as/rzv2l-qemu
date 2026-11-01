@@ -8,6 +8,17 @@ Until M7, QEMU itself answered the kernel's power calls. This page shows what ch
 
 Linux does not start the second core itself. It asks the firmware with an SMC instruction: PSCI `CPU_ON`, with the core's ID and an entry address. On the board, TF-A's BL31 answers at EL3.
 
+Why ask the firmware at all? PSCI is Arm's standard interface, so one Linux driver works on every Arm SoC. The kernel only says "core `0x100` on, start it at this address". The way to do that differs from SoC to SoC: on the RZ/V2L it means programming the SYSC and CPG registers. Those registers belong to the secure world, and BL31 is the one piece of software that knows them. Each call is made by a particular core:
+
+| PSCI call | Made by | What it asks |
+|---|---|---|
+| `CPU_ON` | a running core (CPU0) | start another core at a given address |
+| `CPU_OFF` | the core going down, about itself | power me off; a core can only stop itself |
+| `AFFINITY_INFO` | a running core | is that core off yet? (the kernel's `CPU1 killed (polled 0 ms)`) |
+| `SYSTEM_RESET`, `SYSTEM_OFF` | any core | `reboot`, `poweroff` |
+
+So `echo 0 > /sys/devices/system/cpu/cpu1/online` goes like this: Linux moves CPU1's tasks and interrupts to CPU0, and CPU1 itself then calls `CPU_OFF` and never returns. Meanwhile CPU0 polls `AFFINITY_INFO` until BL31 reports CPU1 off. `echo 1` is a `CPU_ON` from CPU0, the same call that brought CPU1 up during boot.
+
 QEMU can stand in for BL31. When a machine starts a kernel directly, QEMU catches each SMC and answers the PSCI call in C (`qemu/target/arm/tcg/psci.c`). That is direct mode, used from M1 to M5. It is fast, and it hides everything BL31 does with the SoC.
 
 | | Direct mode (`-kernel`) | Firmware mode (`-bios bl31.bin -kernel`) |
@@ -43,7 +54,7 @@ Taking exception 4 [Data Abort] on CPU 0
 
 BL31 does not have QEMU's shortcut. It starts CPU1 the way the manual describes (§2.2), with three blocks of registers:
 
-1. **The reset vector**, in SYSC `SYS_CA55_CFG_RVAL1/RVAH1`: where the core starts.
+1. **The reset vector**, in SYSC `SYS_CA55_CFG_RVAL1/RVAH1`: where the core starts. BL31 writes its own warm-boot entry point there, not the kernel's address.
 2. **The core's resets**, in CPG `RST_CA55`: apply `CA55_RST1_1`, wait for `RSTMON_CA55`, then release `CA55_RST1_1` and `CA55_RST3_1`.
 3. **The P-Channel handshake**, in CPG `CORE1_PCHCTL/PCHMON`: request power mode ON with `PREQ`, wait for `PACCEPT`, drop `PREQ`, wait for `PACCEPT` to drop.
 
@@ -53,7 +64,12 @@ The model joins these to a real QEMU CPU:
 - The SoC takes the line. When a core starts, the SoC copies the SYSC reset vector into the CPU's `rvbar` and calls `arm_set_cpu_on_and_reset()`. The reset samples `rvbar` into the PC at EL3, which is what the hardware does with RVBAR when a core leaves reset.
 - When a core stops, the SoC calls `arm_set_cpu_off()`. That call completes later, on the core's own thread. So a start that follows at once is queued on the same thread, behind the stop.
 
-`CPU_OFF` goes the other way. The dying core asks the SYSC for sleep (`LP_CTL1`) and waits until its request flag is set in `LP_CTL5`; then the next `CPU_ON` first takes its P-Channel to OFF.
+A `CPU_ON` therefore enters BL31 twice, once on each core:
+
+1. **On CPU0**, at Linux's SMC: BL31 records the kernel's entry address for CPU1, writes the registers above, and returns to Linux on CPU0.
+2. **On CPU1**, when it leaves reset: it starts at EL3 in BL31's warm-boot entry, the address from step 1's reset vector. BL31 turns on CPU1's GIC CPU interface (`rzg2l_pwr_domain_on_finish` in `plat_pm.c`) and drops to non-secure EL1 at the kernel's address. Linux prints `CPU1: Booted secondary processor`.
+
+`CPU_OFF` goes the other way and runs on the dying core. BL31 turns off the core's GIC CPU interface, so no interrupt can wake it, and asks the SYSC for sleep (`LP_CTL6`, `LP_CTL1`). It waits until its request flag is set in `LP_CTL5`. Per the manual, that flag records the request and interrupts the Cortex-M33; BL31's comment calls it the M33's answer. The model sets the flag when the request arrives and has no Cortex-M33. BL31 then sets `LP_CTL2`, powers the core down through `CPUPWRCTLR_EL1` and waits in `wfi`. The next `CPU_ON` sees `LP_CTL2` and first takes the core's P-Channel to OFF. A boot only runs the first `CPU_ON`; the offline-online test also runs `CPU_OFF` and this second path.
 
 ## 4. Finding the missing pieces
 
