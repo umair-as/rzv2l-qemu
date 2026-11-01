@@ -1,0 +1,26 @@
+# Lines allowed in the -d log of the boot-loader run (BL31, OP-TEE and
+# U-Boot), besides those of ../../m4 and ../../m5. One extended regex per
+# line, each with the reason it is not a gap.
+#
+# U-Boot reads the DDR controller's ECC enable bits (0x1141018C) to pick
+# its device tree; the window is a stub that reads 0: no ECC, the board's
+# smarc-rzv2l (device map).
+^ddr-memc: unimplemented device (read|write) 
+# U-Boot's board_init writes the Ethernet pin registers ETH_ch0, ETH_ch1
+# and ETH_MII_RGMII (1 byte each) with 32-bit writel
+# (board/renesas/rzv2l-dev/rzv2l-dev.c); the PFC takes the low byte.
+^renesas_rzg2l_pfc: 4-byte (access|read|write) at 0x30(0c|10|18) 
+# U-Boot's watchdog ping rewrites WDTSET with the value it holds while
+# WDT0 runs (drivers/watchdog/rzg2l_wdt.c rzg2l_wdt_init_timeout), and
+# Linux's rzg2l_wdt start writes WDTSET and WDTTIM to the watchdog U-Boot
+# left running; neither can change while the counter runs (manual
+# 21.3.1), so U-Boot's 60 s stays.
+^renesas_rzg2l_wdt: write at offset 0x[48] while running is ignored$
+# U-Boot's SCIF driver writes BRR while SEMR.MDDRS selects MDDR, with TE
+# and RE set: the write lands on MDDR and is ignored (device map, SCIF0).
+^rz_scifa_write: MDDR write ignored while TE or RE is set$
+# U-Boot's SD driver writes SDHI_PORTSEL (USE_1PORT) at offset 0x8,
+# a register of older hosts of this family that the RZ/V2L's SD host does
+# not have (manual Table 40.2: nothing between SD_CMD and SD_ARG); the
+# model ignores it (drivers/mmc/sh_sdhi.c).
+^sdhi_write: undefined offset 0x8$

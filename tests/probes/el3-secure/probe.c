@@ -8,6 +8,9 @@
  *   - TZC0 and TZC3 BUILD_CONFIG: filter and region counts from EL3
  *     (manual 13.1); a Non-secure read or write ends in a synchronous
  *     external abort, as U-Boot's read does on the board (EVK-R79).
+ *   - MPIDR_EL1 of core 0: MT (bit 24) = 1, the core number in Aff1. The
+ *     board's OP-TEE (82a5cd3b, get_core_pos_mpidr()) finds core 1's
+ *     tables only this way, and brings core 1 up on the board (EVK-L07).
  * Order: EL3 checks; drop to Non-secure EL1; Non-secure checks; SMC back
  * to EL3; the final EL3 check; exit through semihosting.
  * Exit status: 0 every check passed, 1 a check failed.
@@ -168,6 +171,10 @@ static uint32_t pwrr(int n)
 static void el3_checks(void)
 {
     puts_("-- EL3 (Secure)\n");
+
+    /* MPIDR_EL1: bit 31 RES1, MT (bit 24) = 1, core 0 at Aff1 = 0 */
+    check("MPIDR_EL1 of core 0", READ_SYSREG(mpidr_el1) & 0xffffffffull,
+          0x81000000);
 
     /* Both cores in Redistributor group 0, at offsets 0 and 1 */
     check("GICR0_PWRR RDG/RDGO", pwrr(0) & PWRR_IDS, 0x000);

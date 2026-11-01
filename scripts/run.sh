@@ -18,6 +18,11 @@
 #                        PSCI firmware and starts the kernel; no initramfs,
 #                        so give a root, e.g. --sd IMAGE -a "rw rootwait
 #                        root=/dev/mmcblk0p2"
+#   -u, --boot-loader    the board's boot chain after BL2: TF-A BL31, OP-TEE
+#                        and U-Boot (tests/guests/out/fw/), which loads the
+#                        kernel and DTB from /boot on the card's partition 2
+#                        with its own default command; needs --sd; no
+#                        kernel, DTB, initramfs or command line from QEMU
 #   -s, --sd IMAGE       raw SD card image in the module slot (SDHI0, mmc0);
 #                        the guest writes to it, so pass a copy you can lose
 #                        (tests/guests/sd/build-image.sh builds one)
@@ -45,6 +50,7 @@ append=""
 initrd=1
 net=1
 firmware=0
+loader=0
 sd=""
 debug="unimp,guest_errors,invalid_mem"
 out=""
@@ -64,6 +70,7 @@ while [ $# -gt 0 ]; do
         -n|--no-initrd) initrd=0; shift ;;
         --no-net) net=0; shift ;;
         -f|--firmware) firmware=1; initrd=0; shift ;;
+        -u|--boot-loader) loader=1; firmware=1; initrd=0; shift ;;
         -s|--sd) sd="${2:?}"; shift 2 ;;
         -d|--debug) debug="${2:?}"; shift 2 ;;
         -o|--out) out="${2:?}"; shift 2 ;;
@@ -85,6 +92,8 @@ DTB="$GUEST/r9a07g054l2-smarc.dtb"
 # One initramfs serves both kernels
 INITRD="$ROOT/tests/guests/out/g0/initramfs.cpio.gz"
 BL31="$ROOT/tests/guests/out/fw/bl31.bin"
+BL32="$ROOT/tests/guests/out/fw/tee-raw.bin"
+BL33="$ROOT/tests/guests/out/fw/u-boot.bin"
 out="${out:-$ROOT/build/run/$tier}"
 
 [ -x "$QEMU" ] || die "no QEMU at $QEMU (build it: docs/learning/building-and-testing.md)"
@@ -93,14 +102,25 @@ for f in "$KERNEL" "$DTB"; do
 done
 [ -z "$sd" ] || [ -f "$sd" ] || die "no SD image at $sd"
 [ "$firmware" -eq 0 ] || [ -f "$BL31" ] || die "missing $BL31 (run tests/guests/fw/build-tf-a.sh)"
+if [ "$loader" -eq 1 ]; then
+    [ -n "$sd" ] || die "--boot-loader needs --sd: U-Boot loads the kernel from the card"
+    [ -z "$append" ] || die "--boot-loader: U-Boot sets the kernel command line"
+    [ -f "$BL32" ] || die "missing $BL32 (run tests/guests/fw/build-optee.sh)"
+    [ -f "$BL33" ] || die "missing $BL33 (run tests/guests/fw/build-u-boot.sh)"
+fi
 [ "$initrd" -eq 0 ] || [ -f "$INITRD" ] || die "missing $INITRD (run tests/guests/g0/build-initramfs.sh)"
 mkdir -p "$out"
 
 machine="rzv2l-smarc,boot-mode=$boot_mode"
 [ "$dumpdtb" -eq 0 ] || machine="$machine,dumpdtb=$out/qemu.dtb"
 
-cmd=("$QEMU" -M "$machine" -kernel "$KERNEL" -dtb "$DTB"
-     -display none -nodefaults -serial mon:stdio)
+if [ "$loader" -eq 1 ]; then
+    cmd=("$QEMU" -M "$machine,bl32=$BL32,bl33=$BL33"
+         -display none -nodefaults -serial mon:stdio)
+else
+    cmd=("$QEMU" -M "$machine" -kernel "$KERNEL" -dtb "$DTB"
+         -display none -nodefaults -serial mon:stdio)
+fi
 [ "$firmware" -eq 0 ] || cmd+=(-bios "$BL31")
 [ "$initrd" -eq 0 ] || cmd+=(-initrd "$INITRD")
 [ -z "$append" ] || cmd+=(-append "$append")
@@ -125,6 +145,7 @@ fi
 
 echo "rzv2l-smarc: tier $tier, boot mode $boot_mode; quit with Ctrl-A X, monitor Ctrl-A C"
 [ "$firmware" -eq 0 ] || echo "firmware mode: TF-A BL31 $BL31"
+[ "$loader" -eq 0 ] || echo "boot loader: OP-TEE $BL32, U-Boot $BL33"
 [ -z "$sd" ] || echo "SD card (SDHI0, /dev/mmcblk0): $sd"
 [ "$debug" = none ] || echo "QEMU -d log: $out/qemu.log"
 [ "$gdb" -eq 0 ] || echo "waiting for gdb: target remote :1234"
