@@ -9,7 +9,7 @@ Branches `unit/M7-optee-uboot` (project and fork), rebased on M7-el3-platform on
 | T3 | SD card with `boot/Image` and the DTB on partition 2 | `tests/guests/sd/build-image.sh` | U-Boot's `ext4load` | done: U-Boot's `ext4load` reads both files |
 | T4 | BL2 stand-in: BL32 and BL33 entries in the parameter block (BL32 `arg0` = `MODE_RW_64`, written explicitly), images loaded where BL2 puts them | fork `hw/arm/rzv2l-smarc.c` | firmware boot | done: `bl32=`/`bl33=` (operator's choice); BL2's device tree in `x1`; CPG as BL2 leaves it |
 | T5 | Failure loop: OP-TEE, then U-Boot (OTP, RPC, DDR ECC read, USB), each window with its class | fork models and SoC; `docs/device-map.md` | firmware boot, `-d` log gate | done: see below |
-| T6 | Acceptance: OP-TEE and U-Boot banners, Linux from the card, `MIGRATE_INFO_TYPE`, hotplug, reset, watchdog fed and not fed; unit 1's boot and direct mode unchanged | `tests/acceptance/m7/` | M7 ACCEPTANCE | done: `bootloader.py`, 27 checks PASS; log gate PASS |
+| T6 | Acceptance: OP-TEE and U-Boot banners, Linux from the card, `MIGRATE_INFO_TYPE`, hotplug, reset, watchdog fed, lost boots counted; unit 1's boot and direct mode unchanged | `tests/acceptance/m7/` | M7 ACCEPTANCE | done: `bootloader.py`; log gate PASS |
 | T7 | EVK-R80: DDR controller ECC enable as U-Boot reads it | `docs/evidence/` | — | requested |
 | T8 | G2 experiment (not acceptance): U-Boot with the product's OP-TEE DT node patch, applied by the experiment's script only; four results reported separately (node in Linux's DT, driver and `/dev/tee0`, `tee-supplicant`, `xtest` counts and limits) | `docs/experiments/`, `tests/experiments/` | the experiment's own run | after T6 |
 
@@ -18,22 +18,26 @@ Branches `unit/M7-optee-uboot` (project and fork), rebased on M7-el3-platform on
 In boot order; each fix is the smallest one the guest's code and the hardware contract call for.
 
 1. OP-TEE reads the OTP chip ID (`0x11861140`): unmapped, data abort. New OTP model, ID from properties (default 0, not silicon).
-2. U-Boot reads the DDR controller's ECC bits (`0x1141018C`): unmapped, U-Boot's exception loop. Stub window, reads 0: `Model: smarc-rzv2l` as on the board (EVK-R80 to confirm).
+2. U-Boot reads the DDR controller's ECC bits (`0x1141018C`): unmapped, U-Boot's exception loop. Stub window, reads 0: the non-ECC tree, as the board's `DRAM:  1.9 GiB` implies (I; EVK-R80 to confirm).
 3. U-Boot's SPI-NOR probe: JEDEC ID 0, `Failed to set up SPI slave`, U-Boot carries on. Left failing (honest; design choice 2).
-4. U-Boot's SD writes ignored: SDHI held in reset, the CPG at manual reset values. New `bl2-boot` CPG start state from BL2's `cpg_setup()` tables.
+4. U-Boot's SD writes ignored: SDHI held in reset, the CPG at manual reset values. New `bl2-boot` CPG start state from BL2's `cpg_setup()` tables and its DDR set-up.
 5. U-Boot's ACMD51 in normal mode had no data phase: the card never initialised. Normal mode decodes the data commands of Table 40.8.
-6. CPU1 faulted in OP-TEE at S-EL1 (`cpu_on_handler`, level-1 translation fault): `MPIDR_EL1.MT` was 0, so OP-TEE took core 1 for core 4 and used empty tables; the spinning core slowed the whole boot and the 60 s watchdog reset it. The Cortex-A55 reports MT = 1.
-7. WDT0, started by U-Boot, resets the board after 60 s: the vendor kernel never feeds it (spec, device map gap 16). Not a model fault; the acceptance feeds it from user space and also checks the reset without a feeder.
+6. CPU1 faulted in OP-TEE at S-EL1 (`cpu_on_handler`, level-1 translation fault): `MPIDR_EL1.MT` was 0, so OP-TEE took core 1 for core 4 and used empty tables; the spinning core slowed the whole boot and the 60 s watchdog reset it. The Cortex-A55 reports MT = 1; the SoC sets it through the new CPU property `mpidr-mt`, so other machines are unchanged.
+7. WDT0, started by U-Boot, resets the QEMU board after 60 s when nothing feeds it. On silicon Linux's unused-clock sweep gates its clocks first, which probably stops it (spec; device map gaps 11, 16); unverified until EVK-L14. The acceptance checks only that a fed watchdog keeps the board up.
+8. Some boots wait for `/dev/mmcblk0p2` while the card is `mmcblk1`: no `mmc` aliases in the vendor device tree (device map gap 22). The acceptance counts and prints these lost boots.
 
 ## Proofs (each mutation: the exact change → the red line)
 
 | # | Mutation | Red line |
 |---|---|---|
 | 1 | OTP: the chip ID at `0x1100` instead of `0x1140` | `rzv2l-smarc-test.c:347 test_otp_chip_id`: `0x00000000 == 0x03020100` |
-| 2 | SDHI: ACMD51 left out of the normal-mode reads | `rzv2l-sdhi-test.c:397 test_normal_mode`: `0x00000000 == 0x00004100` |
-| 3 | SDHI: every normal-mode command decoded as an ACMD | `rzv2l-sdhi-test.c:411 test_normal_mode` (CMD17): `0x00000000 == 0x00004100` |
-| 4 | CPG: `RST_SDHI` left out of the BL2 state | `rzv2l-cpg-test.c:214 check_values` (bl2-boot): `0x00000000 == 0x00000003` |
-| 5 | CPG: `bl2-boot` ignored | `rzv2l-cpg-test.c:214 check_values` (bl2-boot): `0x00000000 == 0x00000100` |
-| 6 | Cortex-A55: `MPIDR_EL1.MT` left 0 | EL3 probe `probe.c:176`: `FAIL MPIDR_EL1 of core 0: 0x0000000080000000 (expected 0x0000000081000000)`; the boot-loader run also fails (CPU1 never online, watchdog resets) |
-| 7 | BL2 stand-in: BL32 `arg0` = 1 (`MODE_RW_32`) | firmware boot: BL31's banner only, no `Primary CPU switching to normal world boot` (`bootloader.py` boot 1 check 2) |
-| 8 | BL2 stand-in: no BL32 entry | firmware boot: `Error initializing runtime service opteed_fast`, `MIGRATE_INFO_TYPE not supported.` (`bootloader.py` boot 1 checks 6-7) |
+| 2 | OTP: the chip-ID window one word wider | `rzv2l-smarc-test.c:353 test_otp_chip_id`: `0x46ad1d00 == 0x00000000` |
+| 3 | SDHI: ACMD51 left out of the normal-mode reads | `rzv2l-sdhi-test.c:398 test_normal_mode`: `0x00000000 == 0x00004100` |
+| 4 | SDHI: ACMD13 left out of the normal-mode reads | `rzv2l-sdhi-test.c:410 test_normal_mode`: `0x00000000 == 0x00004100` |
+| 5 | SDHI: every normal-mode command decoded as an ACMD | `rzv2l-sdhi-test.c:422 test_normal_mode` (CMD6): `0x00000000 == 0x00004100` |
+| 6 | CPG: `RST_SDHI` left out of the BL2 state | `rzv2l-cpg-test.c:217 check_values` (bl2-boot): `0x00000000 == 0x00000003` |
+| 7 | CPG: `bl2-boot` ignored | `rzv2l-cpg-test.c:217 check_values` (bl2-boot): `0x00000000 == 0x00000100` |
+| 8 | CPG: BL2's `WDTRST_SEL` left at the reset `0x88` | `rzv2l-cpg-test.c:217 check_values` (bl2-boot): `0x00000088 == 0x0000008f` |
+| 9 | SoC: `mpidr-mt` not set | EL3 probe `probe.c:176`: `FAIL MPIDR_EL1 of core 0: 0x0000000080000000 (expected 0x0000000081000000)`; the boot-loader run also fails (CPU1 never online) |
+| 10 | BL2 stand-in: BL32 `arg0` = 1 (`MODE_RW_32`) | firmware boot: BL31's banner only, no `Primary CPU switching to normal world boot` (`bootloader.py` boot 1 check 2) |
+| 11 | BL2 stand-in: no BL32 entry | firmware boot: `Error initializing runtime service opteed_fast`, `MIGRATE_INFO_TYPE not supported.` (`bootloader.py` boot 1 checks 6-7) |
