@@ -13,6 +13,7 @@ The format and states are defined in `project.md` §15. Evidence paths are relat
 | REQ-GUEST-003 | Firmware SHALL contain no QEMU-specific code. Build-config changes for closed, unemulatable IP are allowed and SHALL be listed as fidelity gaps. | spec §8, research/boot-chain-firmware.md | firmware recipe/config diff recorded | M7 | P |
 | REQ-GUEST-004 | Every boot argument, injected DT node or loader fixup in an acceptance run SHALL be listed as a fidelity gap. | spec §8 | gap list reviewed per milestone | M3 | V |
 | REQ-GUEST-005 | In direct mode the QEMU loader SHALL apply the G1 loader fixup contract, or list each omission. | research/boot-chain-firmware.md §5 | live-DT diff vs EVK | M4 | P |
+| REQ-GUEST-006 | When U-Boot boots Linux in an acceptance run, the project's boot configuration SHALL name the boot source and the Linux root separately and SHALL name the root by `root=PARTUUID=`, so that Linux's device enumeration order does not choose it; attached project images SHALL have distinct partition identifiers; a PARTUUID no attached partition has SHALL stop the boot visibly. The vendor's default boot SHALL run as a compatibility check with its own verdict. | decisions/DR-0007; device map gap 22; evidence/EVK-2026-11-02-vendor-kernel-on-board.md | M7 acceptance (`rootsel.py`, `bootloader.py`, `tee.py`); `compat.py` verdict | M7 | P |
 
 ## Machine
 

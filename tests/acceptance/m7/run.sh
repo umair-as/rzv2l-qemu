@@ -4,9 +4,14 @@
 # the root file system on the SD card (docs/units/M7-el3-platform/spec.md);
 # then BL31, OP-TEE and U-Boot booting the kernel from the card
 # (docs/units/M7-optee-uboot/spec.md); then the project's TEE kernel
-# reaching OP-TEE from Linux (docs/units/M7-optee-linux/spec.md). M6
-# acceptance first (which runs M5 to M1 in direct mode).
-# Exit 0 only if every check passes.
+# reaching OP-TEE from Linux (docs/units/M7-optee-linux/spec.md); then
+# the root chosen by PARTUUID (DR-0007). M6 acceptance first (which runs
+# M5 to M1 in direct mode). U-Boot boots with the project's boot
+# configuration (tests/guests/sd/boot.env).
+# Exit 0 only if every check passes ("M7 ACCEPTANCE").
+# Then, separately, the vendor's unchanged U-Boot boot (compat.py): its
+# own verdict line, "VENDOR-DEFAULT COMPATIBILITY", which does not change
+# the M7 acceptance result or the exit status; its failed boots are kept.
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
 # Guests: tests/guests/out (tests/guests/fw/build-tf-a.sh, build-optee.sh,
 # build-u-boot.sh; tests/guests/g1-tee/build-kernel.sh,
@@ -49,6 +54,10 @@ step "Linux and OP-TEE: TEE kernel, driver, devices, a trusted application"
 python3 -I "$HERE/tee.py" "$OUT/tee"
 rc=$?; result $rc; keep $rc tee
 
+step "root by PARTUUID: two attached cards, root on the other one; missing root"
+python3 -I "$HERE/rootsel.py" "$OUT/rootsel"
+rc=$?; result $rc; keep $rc rootsel
+
 step "EL3 probe: GICR_PWRR, TZC access by security state, MPIDR"
 "$HERE/../../probes/el3-secure/run.sh" > "$OUT/el3-secure.txt" 2>&1
 if [ $? -eq 0 ]; then
@@ -62,7 +71,8 @@ step "log gate"
 allow=$(cat "$HERE/../m4/expected/log-allow.txt" \
             "$HERE/../m5/expected/log-allow.txt" \
             "$HERE/expected/log-allow.txt" | grep -v -e '^#' -e '^$')
-for run in firmware bootloader tee; do
+for run in firmware bootloader tee rootsel/other-medium \
+           rootsel/missing-root; do
     log="$OUT/$run/qemu.log"
     if [ ! -s "$log" ]; then
         echo "FAIL $run/qemu.log: missing or empty"; result 1
@@ -80,8 +90,18 @@ done
 
 echo
 if [ "$failures" -eq 0 ]; then
-    echo "M7 ACCEPTANCE: PASS"
+    verdict="M7 ACCEPTANCE: PASS"
 else
-    echo "M7 ACCEPTANCE: FAIL ($failures check(s) failed)"
+    verdict="M7 ACCEPTANCE: FAIL ($failures check(s) failed)"
 fi
+echo "$verdict"
+
+# Not part of the acceptance: reported on its own line
+echo
+step "vendor default boot (compatibility, not acceptance): U-Boot's own command, root=/dev/mmcblk0p2"
+python3 -I "$HERE/compat.py" "$OUT/compat"
+rc=$?; keep $rc compat
+
+echo
+echo "$verdict"
 [ "$failures" -eq 0 ]

@@ -42,6 +42,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-GUEST-003 | — (process) | M7 | — | — | — | spec §8; `../research/boot-chain-firmware.md` | P |
 | REQ-GUEST-004 | — (process) | M3 | M1-machine-skeleton; M3b-shell | M1-T07 (M1 fixups); M3b-shell T3 | acceptance `dumpdtb` vs DTB-U; M3 runs with no `-append` | spec §8; device map §4 gaps 6-8 | V |
 | REQ-GUEST-005 | M4 (loader) | M4 | — | — | — | `../research/boot-chain-firmware.md` §4 | P |
+| REQ-GUEST-006 | M7 | M7 | M7-optee-uboot | T8 | `tests/acceptance/m7/rootsel.py`, `bootloader.py`, `tee.py`; `compat.py` (separate verdict) | `../decisions/DR-0007-root-by-partuuid.md` | P |
 | REQ-TEST-001 | M2 | M2 | M2-first-character | M2-T08, T09, T13 | `tests/acceptance/m2/run.sh` (A01: exact serial bytes); eval A01–A06 with mutations | spec §17; review and recheck | V |
 | REQ-TEST-002 | M1+ | every unit | every unit | M1-T01–T07; each unit's proofs | a qtest per device model with recorded mutations (`tasks.md` of M2, M3b-*, M4-vendor-kernel); M1: T04 has none of its own (covered by T03/T05); `/sysc/boot-mode-reserved`, `/gic/identity` and the PRR/default `LSI_MODE` reads have no recorded mutation | spec §13 | D |
 | REQ-TEST-003 | M3+ | M3+ | M1-machine-skeleton; M3b-shell; M4-vendor-kernel | M1-T06; M3b-shell T2; M4-vendor-kernel T5 | acceptance log gates (`-d unimp,guest_errors,invalid_mem`): only recorded stub windows, an empty log fails | spec §13 | V |

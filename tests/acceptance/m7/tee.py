@@ -9,8 +9,9 @@ CFG_RZ_SCE=n, U-Boot), with the project's TEE kernel on the card
 CONFIG_TEE/CONFIG_OPTEE and the vendor DTB with a /firmware/optee node,
 plus tee-supplicant and the hello_world client and trusted application
 from the OP-TEE 4.8.0 releases. Checks, on the serial line:
-  boot:  as bootloader.py's boot 1 (banners, U-Boot's load, PSCI with
-         OP-TEE, the shell, both CPUs), with the TEE kernel
+  boot:  as bootloader.py's boot 1 (banners, U-Boot's load, the root
+         by PARTUUID, PSCI with OP-TEE, the shell, both CPUs), with the
+         TEE kernel
   driver: the OP-TEE driver probes ("optee: initialized driver") and
          reports OP-TEE 82a5cd3b, as the board does (EVK-2026-11-02)
   devices: /dev/tee0 and /dev/teepriv0 are character devices

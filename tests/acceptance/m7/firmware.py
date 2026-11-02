@@ -6,11 +6,14 @@ Usage: firmware.py OUTDIR
 Firmware mode: -bios tests/guests/out/fw/bl31.bin (TF-A f59ed5a31, the
 board's BSP flags), the Renesas kernel (G1) and its DTB as BL33, the
 root file system on a fresh copy of the SD card image (no initramfs),
-the board's SD-root command line. QEMU stages BL2's hand-off; BL31 runs
+the vendor's SD-root command line with the root named by PARTUUID, as
+the project's U-Boot configuration names it (DR-0007). QEMU stages BL2's hand-off; BL31 runs
 at EL3 and answers the kernel's PSCI calls. Checks, on the serial line:
   boot 1: the BL31 banner; the kernel finds PSCI 1.1 and SMC Calling
           Convention 1.4 in the firmware, as on the board (QEMU's own
           PSCI reports SMCCC 1.0); the card's init reaches the shell;
+          / is the card's partition 2 by PARTUUID, whatever name Linux
+          gives the card;
           CPU1 boots through BL31's CPU_ON (the SoC's reset vector,
           reset and P-Channel registers): both CPUs online
   hotplug: CPU1 offline (BL31 CPU_OFF) and online again (CPU_ON from the
@@ -24,6 +27,7 @@ passes. QEMU binary: $QEMU.
 import os
 import re
 import secrets
+import struct
 import shutil
 import subprocess
 import sys
@@ -37,9 +41,12 @@ BL31 = os.path.join(OUT, "fw", "bl31.bin")
 KERNEL = os.path.join(OUT, "g1", "linux", "arch", "arm64", "boot", "Image")
 DTB = os.path.join(OUT, "g1", "r9a07g054l2-smarc.dtb")
 IMAGE = os.path.join(OUT, "sd", "sd.img")
-CMDLINE = "rw rootwait earlycon root=/dev/mmcblk0p2"
 BANNER = r"NOTICE:  BL31: v2\.10\.5"
-READY = r"SD-ROOT: ready, root (\S+), boot (\d+)"
+# Whole lines only: a match on a line still arriving would cut a field
+READY = (r"SD-ROOT: ready, root (\S+), boot (\d+), partuuid (\S+), "
+         r"card (\S+)\r?\n")
+# The kernel gave up on its root (rootwait=N ran out, or no rootwait)
+NOROOT = r"VFS: Unable to mount root fs[^\r\n]*\r?\n"
 ONLINE = "/sys/devices/system/cpu/online"
 CPU1 = "/sys/devices/system/cpu/cpu1/online"
 
@@ -67,6 +74,50 @@ def run(s, command, timeout=60):
     return s.buf[pos:]
 
 
+def partuuid(image, n=2):
+    """Linux's PARTUUID of partition n of an MS-DOS partition table"""
+    with open(image, "rb") as f:
+        mbr = f.read(512)
+    return "%08x-%02x" % (struct.unpack_from("<I", mbr, 440)[0], n)
+
+
+def card(image):
+    """The card's name in /etc/rzv2l-card: its image's base name"""
+    return os.path.splitext(os.path.basename(image))[0]
+
+
+def cmdline(image):
+    return ("rw rootwait=30 earlycon root=PARTUUID=%s" % partuuid(image))
+
+
+def wait_root(s, start, what):
+    """The card's init reaches the shell; None, with a FAIL, otherwise"""
+    m = s.wait(READY + "|" + NOROOT, BOOT_TIMEOUT, start)
+    if m is not None and m.group(0).startswith("VFS"):
+        want = re.search(r"root=(\S+)", s.buf[start:])
+        check(False, "%s: the card's init reaches the shell (the kernel "
+              "does not find %s: %s)" % (what, want.group(1) if want else
+                                         "its root", m.group(0).strip()))
+        return None
+    if not check(m is not None, "%s: the card's init reaches the shell"
+                 % what):
+        return None
+    return m
+
+
+def root_check(s, m, what, n, image):
+    """/ is image's partition 2, found by PARTUUID; boot n from it"""
+    want = partuuid(image)
+    asked = re.search(r"root=PARTUUID=(\S+)",
+                      run(s, "cat /proc/cmdline") or "")
+    check(asked is not None and asked.group(1) == want and
+          m.group(3) == want and m.group(4) == card(image) and
+          int(m.group(2)) == n,
+          "%s: / is PARTUUID %s on card %s, boot %s from it (Linux names "
+          "it %s)" % (what, m.group(3), m.group(4), m.group(2),
+                      m.group(1)))
+
+
 def online(s):
     o = run(s, "cat " + ONLINE) or ""
     m = re.search(r"^([0-9,-]+)\r?$", o, re.M)
@@ -78,18 +129,15 @@ def boot_checks(s, start, n):
     what = "boot %d" % n
     check(s.wait(BANNER, 30, start) is not None,
           "%s: the BL31 banner on SCIF0" % what)
-    m = s.wait(READY, BOOT_TIMEOUT, start)
-    if not check(m is not None, "%s: the card's init reaches the shell"
-                 % what):
+    m = wait_root(s, start, what)
+    if m is None:
         return False
     log = s.buf[start:]
     check("psci: PSCIv1.1 detected in firmware" in log and
           "psci: SMC Calling Convention v1.4" in log,
           "%s: the kernel finds PSCI 1.1 and SMCCC 1.4 (BL31, not QEMU's "
           "PSCI)" % what)
-    check(m.group(1) == "/dev/mmcblk0p2" and int(m.group(2)) == n,
-          "%s: / is %s, boot %s from the card" % (what, m.group(1),
-                                                  m.group(2)))
+    root_check(s, m, what, n, IMAGE)
     check("CPU1: Booted secondary processor 0x0000000100" in log and
           online(s) == "0-1",
           "%s: CPU1 booted through BL31's CPU_ON; CPUs online 0-1" % what)
@@ -110,7 +158,7 @@ def main():
         if os.path.exists(f):
             os.unlink(f)
     cmd = [os.environ["QEMU"], "-M", "rzv2l-smarc", "-bios", BL31,
-           "-kernel", KERNEL, "-dtb", DTB, "-append", CMDLINE,
+           "-kernel", KERNEL, "-dtb", DTB, "-append", cmdline(IMAGE),
            "-display", "none", "-nodefaults",
            "-chardev", "socket,id=scif0,path=%s,server=on,wait=on" % sock,
            "-serial", "chardev:scif0",

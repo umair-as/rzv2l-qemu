@@ -8,15 +8,19 @@ Firmware mode with the vendor boot chain after BL2, unmodified (G1):
 82a5cd3b built with CFG_RZ_SCE=n (tee-raw.bin), bl33= U-Boot 4eebfbaa4e
 smarc-rzv2l_defconfig (u-boot.bin); a fresh copy of the SD card image in
 the module slot, with the Renesas kernel (G1) and its DTB in /boot of
-the root partition. QEMU stands in for BL2 only. U-Boot runs its own
-default command: ext4load from mmc 0:2, then booti. Checks, on the
-serial line:
+the root partition. QEMU stands in for BL2 only. U-Boot reads the
+project's boot configuration from the card's environment block
+(tests/guests/sd/boot.env, DR-0007): ext4load from mmc 0:2, then booti
+with root=PARTUUID=<the card's partition 2>. Checks, on the serial
+line:
   boot 1: the BL31 banner; OP-TEE's banner and its switch to the normal
-          world; the U-Boot banner and 1.9 GiB of DRAM; U-Boot reads the
-          kernel from the card and starts it; the kernel finds PSCI 1.1,
+          world; the U-Boot banner and 1.9 GiB of DRAM; U-Boot loads the
+          project's environment from mmc 0; U-Boot reads the kernel
+          from the card and starts it; the kernel finds PSCI 1.1,
           SMCCC 1.4 and BL31's answer with OP-TEE up ("Trusted OS
           migration not required", as on the board); the card's init
-          reaches the shell; CPU1 boots through BL31 and OP-TEE: both
+          reaches the shell, with / the partition the command line
+          names by PARTUUID, whatever name Linux gives the card; CPU1 boots through BL31 and OP-TEE: both
           CPUs online
   hotplug: CPU1 offline and online again, twice, through BL31 and OP-TEE
   watchdog not fed: U-Boot leaves WDT0 running with 60 s; nothing feeds
@@ -27,17 +31,16 @@ serial line:
           for 75 s
   reset:  `reboot`: BL31's SYSTEM_RESET; boot 2 through the whole chain
           in the same QEMU, with both CPUs online
-A boot can lose its root: the vendor device tree has no mmc aliases, so
-Linux names the card mmcblk0 or mmcblk1 in probe order, and U-Boot's
-command line says root=/dev/mmcblk0p2 (docs/device-map.md, gap 22). Such a
-boot waits for its root for ever, as on the board (Linux stops WDT0's
-clock, so nothing resets it): it is a FAIL that names the cause, and its
-serial log is kept. There is no retry.
+The vendor device tree has no mmc aliases, so Linux names the card
+mmcblk0 or mmcblk1 in probe order (docs/device-map.md, gap 22); the
+PARTUUID does not depend on it. If the kernel cannot find the PARTUUID,
+it stops after rootwait=30 with "VFS: Unable to mount root fs": a FAIL
+that names the PARTUUID. The vendor's own default command is
+compat.py's.
 Writes OUTDIR/serial.log and qemu.log. Exit 0 only if every check
 passes. QEMU binary: $QEMU.
 """
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -46,8 +49,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "..", "m3"))
 import firmware  # noqa: E402
-from firmware import check, run, online, CPU1, READY  # noqa: E402
-from shell import Serial, BOOT_TIMEOUT  # noqa: E402
+from firmware import check, run, online, CPU1  # noqa: E402
+from shell import Serial  # noqa: E402
 
 FW = os.path.join(HERE, "..", "..", "guests", "out", "fw")
 BL31 = os.path.join(FW, "bl31.bin")
@@ -55,9 +58,8 @@ BL32 = os.path.join(FW, "tee-raw.bin")
 BL33 = os.path.join(FW, "u-boot.bin")
 IMAGE = firmware.IMAGE
 KERNEL = firmware.KERNEL
-
-
-LOST = r"Waiting for root device /dev/mmcblk0p2"
+SD = os.path.join(HERE, "..", "..", "guests", "sd")
+ENV_OK = r"Loading Environment from MMC\.\.\. Reading from MMC\(0\)\.\.\. OK"
 
 
 def boot_checks(s, start, n):
@@ -71,23 +73,15 @@ def boot_checks(s, start, n):
     check(s.wait(r"U-Boot 2024\.07-g4eebfbaa4e[^\n]*\n(.*\n)*?DRAM:  1\.9 "
                  r"GiB", 30, start) is not None,
           "%s: the U-Boot banner and DRAM 1.9 GiB" % what)
+    check(s.wait(ENV_OK, 30, start) is not None,
+          "%s: U-Boot loads the project's environment from mmc 0" % what)
     size = os.path.getsize(KERNEL)
     check(s.wait(r"%d bytes read" % size, 90, start) is not None and
           s.wait(r"Starting kernel", 30, start) is not None,
           "%s: U-Boot reads boot/Image (%d bytes) from the card and starts "
           "it" % (what, size))
-    m = s.wait(READY + "|" + LOST, BOOT_TIMEOUT, start)
-    if m is not None and m.group(0).startswith("Waiting"):
-        # Lost only if the card is named mmcblk1; a late card may still come
-        named = s.wait(r"mmcblk(\d): mmc\d+:\S+ QEMU!", 30, start)
-        if named is not None and named.group(1) == "1":
-            check(False, "%s: the card's init reaches the shell (lost its "
-                  "root: the card is mmcblk1, U-Boot asks for "
-                  "/dev/mmcblk0p2; device map gap 22)" % what)
-            return False
-        m = s.wait(READY, BOOT_TIMEOUT, start)
-    if not check(m is not None,
-                 "%s: the card's init reaches the shell" % what):
+    m = firmware.wait_root(s, start, what)
+    if m is None:
         return False
     log = s.buf[start:]
     check("psci: PSCIv1.1 detected in firmware" in log and
@@ -97,24 +91,52 @@ def boot_checks(s, start, n):
           "required' (BL31 with OP-TEE)" % what)
     check("opteed" not in log.lower(), "%s: no OP-TEE dispatcher error"
           % what)
-    check(m.group(1) == "/dev/mmcblk0p2" and int(m.group(2)) == n,
-          "%s: / is %s, boot %s from the card" % (what, m.group(1),
-                                                  m.group(2)))
+    firmware.root_check(s, m, what, n, ROOT or IMAGE)
     check("CPU1: Booted secondary processor 0x0000000100" in log and
           online(s) == "0-1",
           "%s: CPU1 booted through BL31 and OP-TEE; CPUs online 0-1" % what)
     return True
 
 
-def start(out):
-    """Start QEMU on a fresh copy of IMAGE; return (proc, serial, log)"""
-    for f in (BL31, BL32, BL33, IMAGE, KERNEL):
+# The card whose partition 2 is the root, when not IMAGE (rootsel.py)
+ROOT = None
+
+
+def card_copy(out, image, slot, env=None):
+    """A fresh copy of image for slot (0 module, 1 carrier); env: None
+    keeps its environment block, "vendor" clears it, a list of NAME=VALUE
+    rewrites it as build-image.sh does (the vendor default environment,
+    boot.env), with those changes"""
+    img = os.path.join(out, "slot%d-%s" % (slot, os.path.basename(image)))
+    shutil.copyfile(image, img)
+    tool = os.path.join(SD, "uboot-env.py")
+    if env == "vendor":
+        subprocess.run([sys.executable, "-I", tool, "clear", img],
+                       check=True)
+    elif env is not None:
+        subprocess.run([sys.executable, "-I", tool, "write", img,
+                        os.path.join(FW, "u-boot-initial-env"),
+                        os.path.join(SD, "boot.env")] + env, check=True)
+    return ["-drive", "if=sd,index=%d,format=raw,file=%s" % (slot, img)]
+
+
+def start(out, env=None, carrier=None):
+    """Start QEMU with a fresh copy of IMAGE in the module slot (and of
+    carrier in the carrier slot); return (proc, serial, log)"""
+    for f in (BL31, BL32, BL33, IMAGE, KERNEL) + ((carrier,) if carrier
+                                                   else ()):
         if not os.path.exists(f):
             print("FAIL missing %s (tests/guests/*/build-*.sh)" % f)
             sys.exit(1)
+    if carrier and firmware.partuuid(carrier) == firmware.partuuid(IMAGE):
+        # Two cards with one disk identifier: the PARTUUID is ambiguous
+        print("FAIL %s and %s share the disk identifier %s"
+              % (IMAGE, carrier, firmware.partuuid(IMAGE)[:8]))
+        sys.exit(1)
     os.makedirs(out, exist_ok=True)
-    img = os.path.join(out, "sd.img")
-    shutil.copyfile(IMAGE, img)
+    drives = card_copy(out, IMAGE, 0, env)
+    if carrier:
+        drives += card_copy(out, carrier, 1)
     sock = os.path.join(out, "serial.sock")
     for f in (sock, os.path.join(out, "qemu.log")):
         if os.path.exists(f):
@@ -124,7 +146,7 @@ def start(out):
            "-bios", BL31, "-display", "none", "-nodefaults",
            "-chardev", "socket,id=scif0,path=%s,server=on,wait=on" % sock,
            "-serial", "chardev:scif0",
-           "-drive", "if=sd,index=0,format=raw,file=%s" % img,
+           ] + drives + [
            "-d", "unimp,guest_errors,invalid_mem",
            "-D", os.path.join(out, "qemu.log")]
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,

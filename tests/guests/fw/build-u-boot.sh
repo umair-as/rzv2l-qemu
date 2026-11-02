@@ -6,7 +6,8 @@
 # v2024.07/rz), smarc-rzv2l_defconfig, cloned once into ../dl.
 # SOURCE_DATE_EPOCH is the commit time, so the same sources give the same
 # binary.
-# Output: ../out/fw/u-boot.bin, u-boot (ELF), u-boot.config (the effective
+# Output: ../out/fw/u-boot.bin, u-boot (ELF), u-boot-initial-env (the
+# built-in default environment), u-boot.config (the effective
 # .config) and build-u-boot.txt (the make line, the toolchain and the
 # SHA-256 of each output).
 set -euo pipefail
@@ -30,12 +31,15 @@ rm -rf "$B"
 export SOURCE_DATE_EPOCH="$(git -C "$SRC" log -1 --format=%ct)"
 make -s -C "$SRC" O="$B" CROSS_COMPILE="$CROSS" "$DEFCONFIG"
 make -s -C "$SRC" O="$B" CROSS_COMPILE="$CROSS" -j"$(nproc)"
-cp "$B/u-boot.bin" "$B/u-boot" "$OUT/"
+# The built-in default environment, as `env default -a` sets it: the base
+# of the project's saved environment (../sd/boot.env)
+make -s -C "$SRC" O="$B" CROSS_COMPILE="$CROSS" u-boot-initial-env
+cp "$B/u-boot.bin" "$B/u-boot" "$B/u-boot-initial-env" "$OUT/"
 cp "$B/.config" "$OUT/u-boot.config"
 {
     echo "source: $URL $(git -C "$SRC" rev-parse HEAD)"
     echo "make: CROSS_COMPILE=$CROSS $DEFCONFIG; all"
     echo "toolchain: $("${CROSS}gcc" --version | head -1)"
-    (cd "$OUT" && sha256sum u-boot.bin u-boot)
+    (cd "$OUT" && sha256sum u-boot.bin u-boot u-boot-initial-env)
 } > "$OUT/build-u-boot.txt"
 cat "$OUT/build-u-boot.txt"

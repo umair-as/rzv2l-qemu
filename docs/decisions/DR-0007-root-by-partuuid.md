@@ -1,0 +1,26 @@
+# DR-0007: the project's U-Boot boots choose the Linux root by PARTUUID
+
+**Status:** accepted by the operator, 2026-11-02.
+
+## Context
+
+With U-Boot as the boot loader, the vendor U-Boot (`renesas-u-boot-cip` `4eebfbaa4e`, `smarc-rzv2l_defconfig`) runs its default command: `env default -a; run bootcmd_check; run bootimage`. `bootcmd_check` loads the kernel and DTB from the carrier card (mmc 1, partition 2) with `root=/dev/mmcblk1p2` when that slot has a card, and otherwise from mmc 0 partition 2 with `root=/dev/mmcblk0p2` (`include/configs/smarc-rzv2l.h`). So it names Linux's root by Linux's device name, and assumes the root is on the medium the kernel came from.
+
+Linux names the SD hosts in probe order unless the device tree has `mmc` aliases, and the vendor DTB has none (fact: the vendor DTB; EVK-L14). The two SDHI hosts probe asynchronously. In QEMU about half the U-Boot boots named the card `mmcblk1` and waited for `/dev/mmcblk0p2` for ever (device map gap 22). On the board, two boots gave SDHI0 `mmc0` and SDHI1 `mmc1` (EVK-L14, EVK-L15); whether silicon ever swaps them is not established. Either way the vendor default ties the root to a probe order that nothing guarantees (code-derived inference).
+
+## Decision
+
+1. **Boot source and root are separate choices.** The project's boot configuration names where U-Boot loads the kernel and DTB (`kernel_iface`, `kernel_part`, in U-Boot's own device numbers, which its device tree fixes) and, separately, the root partition (`root_partuuid`). The root may be on the module card, the eMMC or the carrier card, on the kernel's medium or not.
+2. **The root is named by PARTUUID:** `root=PARTUUID=<disk identifier>-<partition>`. Linux's `mmcblkN` numbering takes no part. `rootwait=30` replaces `rootwait`: a PARTUUID no attached partition has stops the boot after 30 s with `VFS: Unable to mount root fs`, a visible failure, instead of a silent wait or a wrong root.
+3. **Where it lives:** `tests/guests/sd/boot.env` on top of the vendor's built-in default environment (`u-boot-initial-env` of the same U-Boot build), written by `tests/guests/sd/build-image.sh` (through `uboot-env.py`) into each card's U-Boot environment block (mmc 0, `0x1F0000`, 128 KiB, from the effective U-Boot configuration), as U-Boot's `saveenv` would. The U-Boot binary, the kernel and the DTB are unchanged. edge-ai-yocto is not involved.
+4. **Distinct identifiers:** every project image has its own MS-DOS disk identifier (`sd.img` `0x525a0001`, `sd-tee.img` `0x525a0002`), so no two attached project partitions share a PARTUUID. The identifiers are fixed, so that a build is reproducible and the acceptance knows them; two copies of one image share them, and the acceptance refuses to attach two cards with one disk identifier. A device fleet would need identifiers set per device at provisioning (`sfdisk --disk-id`); out of scope here.
+5. **Not done:** no `mmc` aliases added to a DTB, and no forced probe order in the QEMU model. QEMU's existing loader fixup, which adds `mmc` aliases when QEMU itself loads a DTB (`-dtb`, direct and firmware modes; device map gap 22), stays as it is; the root choice no longer depends on it.
+6. **The project's `bootargs` is padded.** At `booti` the vendor U-Boot appends ` wdt_overflow=N` to the `bootargs` string in place (`strcat`, `arch/arm/lib/bootm.c:208`), past the end of the string's heap allocation (`strdup`, `lib/hashtable.c`; 16-byte `dlmalloc` chunks, `common/dlmalloc.c`) unless the allocation has room (F, code). An unpadded 49-character `bootargs` ended every boot in a synchronous abort in U-Boot's EFI memory map code before Linux; the same environment with seven trailing spaces booted (O, QEMU runs). The spaces make the allocation hold the appended text exactly; Linux ignores them; `uboot-env.py` refuses a `bootargs` that would overrun. The vendor's own 41-character `bootargs` overruns by one byte (the terminating NUL; code-derived inference) and boots, by heap layout. This is a defect of the vendor U-Boot, not of the model, and it would behave the same on the board (I).
+7. **The vendor default stays as a compatibility check:** the same chain with the card's environment block cleared, so U-Boot runs its own default command. It has its own verdict, `VENDOR-DEFAULT COMPATIBILITY`, reported after and apart from the M7 acceptance result; its lost boots are counted and named, never retried into a PASS.
+
+## Consequences
+
+- A deviation from the vendor default, listed under REQ-GUEST-004 (device map gap 22): the kernel command line of the M7 U-Boot runs is `rw rootwait=30 earlycon root=PARTUUID=…` instead of `rw rootwait earlycon root=/dev/mmcblk0p2`. It is a boot configuration, not a change to fit the model: the vendor default depends on probe order on any hardware.
+- REQ-GUEST-006 states the contract. The M7 acceptance checks that `/` is the named partition by its PARTUUID and card, with the kernel and root on different cards, and that a missing PARTUUID fails visibly (`tests/acceptance/m7/rootsel.py`).
+- The firmware-mode run (QEMU loads the kernel) uses the same root naming.
+- On the board, the same environment would be written with `saveenv` or `fw_setenv`; not done, as no board write is authorized.
