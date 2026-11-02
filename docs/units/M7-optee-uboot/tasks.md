@@ -24,7 +24,7 @@ In boot order; each fix is the smallest one the guest's code and the hardware co
 6. CPU1 faulted in OP-TEE at S-EL1 (`cpu_on_handler`, level-1 translation fault): `MPIDR_EL1.MT` was 0, so OP-TEE took core 1 for core 4 and used empty tables; the spinning core slowed the whole boot and the 60 s watchdog reset it. The Cortex-A55 reports MT = 1; the SoC sets it through the new CPU property `mpidr-mt`, so other machines are unchanged.
 7. WDT0, started by U-Boot, reset the QEMU board after 60 s when nothing fed it. On the board, Linux's unused-clock sweep stops WDT0_CLK and the board does not reset (EVK-L14). The WDT model now runs its counter only while WDTn_CLK runs (manual §21.1.1), driven by the CPG's `CLK_ON_WDT` bit 2n + 1; the acceptance checks both: no reset unfed for 75 s, no reset fed for 75 s.
 8. Some boots wait for `/dev/mmcblk0p2` while the card is `mmcblk1`: no `mmc` aliases in the vendor device tree (device map gap 22). With the watchdog fixed such a boot waits for ever, as on the board; the acceptance reports it as a FAIL naming the cause, without retry.
-9. U-Boot sometimes hangs at a console character in `sh_serial_putc` (CPU0 PC `0x5003a1fc`): when the frame ends between its FTDR write and FSR read on QEMU's host-time clock, it clears the TEND it needs. Traces of 12 stalled boots show FSR `0x60` read, `0x20` written, then `0x20` for ever; none in 61 boots on a quiet host, 63 in 144 on a loaded one (device map gap 23). Unresolved; a stalled run is a FAIL.
+9. U-Boot sometimes hangs at a console character in `sh_serial_putc` (CPU0 PC `0x5003a1fc`): when the frame ends between its FTDR write and FSR read on QEMU's host-time clock, it clears the TEND it needs. An independent review's traces of 12 stalled boots show FSR `0x60` read, `0x20` written, then `0x20` for ever; it reported none in 61 boots on a quiet host and 63 in 144 on a loaded one (its runs; logs not in the repository; device map gap 23). Unresolved; a stalled run is a FAIL.
 
 ## Proofs (each mutation: the exact change → the red line)
 
@@ -45,3 +45,6 @@ In boot order; each fix is the smallest one the guest's code and the hardware co
 | 13 | WDT: the `clk` input ignored | `rzv2l-wdt-test.c:282 test_clock_stopped`: `0x00000000 == 0x0007ffff` |
 | 14 | WDT: counting resumes from 0, not the held count | `rzv2l-wdt-test.c:291 test_clock_stopped`: `0x00000000 == 0x00000001` |
 | 15 | CPG: the bus clock bit (2n) taken for WDTn_CLK (2n + 1) | `rzv2l-wdt-test.c:282 test_clock_stopped`: `0x00000000 == 0x0007ffff` |
+| 16 | WDT: a restart (WDTEN, INTDISP clear) arms the timer with WDTn_CLK stopped | `rzv2l-wdt-test.c:310 test_clock_stopped_start`: `0x00000000 == 0x00000001` (the board reset) |
+
+The overflow taken before the clock stops (a stop after the overflow time, before the model's timer has run) has no proof: qtest runs every due timer before the next access, so no test can create that window.
