@@ -225,13 +225,27 @@ reboot                                         # BL31 resets the board through W
 
 After `reboot` the BL31 banner comes again in the same QEMU. `poweroff` stops the kernel but not QEMU: this BL31 does not implement PSCI `SYSTEM_OFF`, and the board is not powered off either. Quit with Ctrl-A X.
 
+### OP-TEE and U-Boot after BL31
+
+The rest of the board's boot chain after BL2: BL31 starts OP-TEE (rebuilt from the vendor sources without the closed crypto engine) in the secure world, then the vendor U-Boot, which loads the kernel and its device tree from `/boot` on the card and starts it. QEMU stands in for BL2 only. Build the two images once:
+
+```bash
+tests/guests/fw/build-optee.sh
+tests/guests/fw/build-u-boot.sh
+tests/guests/sd/build-image.sh           # the card gets /boot/Image and the DTB
+cp tests/guests/out/sd/sd.img build/sd-try.img
+scripts/run.sh -u --sd build/sd-try.img
+```
+
+On the console, in order: the BL31 banner; `I/TC: Primary CPU switching to normal world boot` (OP-TEE); `U-Boot 2024.07-g4eebfbaa4e`, `DRAM:  1.9 GiB` and `unrecognized JEDEC id bytes: 00, 00, 00` (there is no SPI flash model yet); after a 2-second countdown `25963008 bytes read`; then Linux with `psci: Trusted OS migration not required` (BL31 answers through OP-TEE, as on the board) and both CPUs. U-Boot leaves the watchdog running with 60 s: at the shell, feed it first with `watchdog -T 10 -t 2 /dev/watchdog0`, then try CPU1 off and on and `reboot` as above. Two things can go wrong under emulation. A boot that stops at `Waiting for root device /dev/mmcblk0p2...` got the card as `mmcblk1`; the watchdog restarts it after 60 s. A boot that hangs right after OP-TEE's last line or after `DRAM:` lost a console race; quit and start again. Read more: [`units/M7-optee-uboot/spec.md`](units/M7-optee-uboot/spec.md).
+
 ## Run every check at once
 
 ```bash
 tests/acceptance/m7/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, and ends with `M7 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot and the boot through OP-TEE and U-Boot, and ends with `M7 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 ## Options of `scripts/run.sh`
 
@@ -242,6 +256,7 @@ It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, 
 | `--no-net` | no network on ETH0 (by default ETH0 is on QEMU user networking, `net0`) |
 | `-b N` | boot mode pins 0-5 (0: SD card, the default; 1: eMMC) |
 | `-f` | firmware mode: the board's TF-A BL31 is the PSCI firmware; no initramfs |
+| `-u` | the boot chain after BL2: BL31, OP-TEE and U-Boot, which loads the kernel from the card; needs `--sd` |
 | `-a "ARGS"` | kernel command line instead of the device tree's |
 | `--dumpdtb` | write the device tree QEMU gives Linux, then stop |
 | `-g` | wait for gdb on port 1234 |

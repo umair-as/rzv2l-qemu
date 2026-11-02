@@ -25,6 +25,7 @@ In boot order; each fix is the smallest one the guest's code and the hardware co
 6. CPU1 faulted in OP-TEE at S-EL1 (`cpu_on_handler`, level-1 translation fault): `MPIDR_EL1.MT` was 0, so OP-TEE took core 1 for core 4 and used empty tables; the spinning core slowed the whole boot and the 60 s watchdog reset it. The Cortex-A55 reports MT = 1; the SoC sets it through the new CPU property `mpidr-mt`, so other machines are unchanged.
 7. WDT0, started by U-Boot, resets the QEMU board after 60 s when nothing feeds it. On silicon Linux's unused-clock sweep gates its clocks first, which probably stops it (spec; device map gaps 11, 16); unverified until EVK-L14. The acceptance checks only that a fed watchdog keeps the board up.
 8. Some boots wait for `/dev/mmcblk0p2` while the card is `mmcblk1`: no `mmc` aliases in the vendor device tree (device map gap 22). The acceptance counts and prints these lost boots.
+9. Rarely (about 2 boots in 25), U-Boot hangs at its first character after it is loaded or relocated, in `sh_serial_putc` waiting for TEND (CPU0 PC `0x5003a1fc`): the frame can end between U-Boot's FTDR write and FSR read on QEMU's host-time clock, and U-Boot then clears the TEND it needs (device map gap 23). Unresolved; not hidden by a retry.
 
 ## Proofs (each mutation: the exact change → the red line)
 
