@@ -11,7 +11,6 @@ Branches `unit/M7-optee-uboot` (project and fork), rebased on M7-el3-platform on
 | T5 | Failure loop: OP-TEE, then U-Boot (OTP, RPC, DDR ECC read, USB), each window with its class | fork models and SoC; `docs/device-map.md` | firmware boot, `-d` log gate | done: see below |
 | T6 | Acceptance: OP-TEE and U-Boot banners, Linux from the card, `MIGRATE_INFO_TYPE`, hotplug, reset, watchdog fed, lost boots counted; unit 1's boot and direct mode unchanged | `tests/acceptance/m7/` | M7 ACCEPTANCE | done: `bootloader.py`; log gate PASS |
 | T7 | EVK-R80: DDR controller ECC enable as U-Boot reads it | `docs/evidence/` | — | done: `0x00000FFF`, bits 25:24 = 0 (EVK-2026-11-02) |
-| T8 | G2 experiment (not acceptance): U-Boot with the product's OP-TEE DT node patch, applied by the experiment's script only; four results reported separately (node in Linux's DT, driver and `/dev/tee0`, `tee-supplicant`, `xtest` counts and limits) | `docs/experiments/`, `tests/experiments/` | the experiment's own run | after T6 |
 
 ## What the failure loop met (T5)
 

@@ -239,13 +239,36 @@ scripts/run.sh -u --sd build/sd-try.img
 
 On the console, in order: the BL31 banner; `I/TC: Primary CPU switching to normal world boot` (OP-TEE); `U-Boot 2024.07-g4eebfbaa4e`, `DRAM:  1.9 GiB` and `unrecognized JEDEC id bytes: 00, 00, 00` (there is no SPI flash model yet); after a 2-second countdown `25963008 bytes read`; then Linux with `psci: Trusted OS migration not required` (BL31 answers through OP-TEE, as on the board) and both CPUs. U-Boot leaves the watchdog running with 60 s: at the shell, feed it first with `watchdog -T 10 -t 2 /dev/watchdog0`, then try CPU1 off and on and `reboot` as above. Two things can go wrong under emulation. A boot that stops at `Waiting for root device /dev/mmcblk0p2...` got the card as `mmcblk1`; the watchdog restarts it after 60 s. A boot that hangs right after OP-TEE's last line or after `DRAM:` lost a console race; quit and start again. Read more: [`units/M7-optee-uboot/spec.md`](units/M7-optee-uboot/spec.md).
 
+### Linux and OP-TEE
+
+The vendor kernel cannot talk to OP-TEE: it is built without the driver, and its device tree has no `/firmware/optee` node. The project's TEE kernel adds both (the vendor source, unchanged, with two config options and a small device-tree overlay), and the TEE card carries it with the OP-TEE client and an example trusted application:
+
+```bash
+tests/guests/g1-tee/build-kernel.sh
+tests/guests/g1-tee/build-optee-user.sh
+tests/guests/sd/build-image.sh --tee
+cp tests/guests/out/sd/sd-tee.img build/sd-try.img
+scripts/run.sh -u --sd build/sd-try.img
+```
+
+The firmware is the same as above. At the shell (feed the watchdog first, as above):
+
+```bash
+dmesg | grep optee:                # probing, revision 4.8 (82a5cd3b...), initialized driver
+ls /dev/tee*                       # /dev/tee0 /dev/teepriv0
+tee-supplicant -d                  # loads trusted applications from /lib/optee_armtz
+optee_example_hello_world          # Invoking TA to increment 42 ... TA incremented value to 43
+```
+
+The trusted application runs in OP-TEE, in the secure world, and logs `I/TA: Hello World!` on the console itself. OP-TEE warns `Failed to get monotonic counter for REE FS`: there is no RPMB, so its secure storage has no rollback counter. There is no hardware crypto or random number generator either: the board's TSIP is closed, and OP-TEE is built without it. Read more: [`units/M7-optee-linux/spec.md`](units/M7-optee-linux/spec.md).
+
 ## Run every check at once
 
 ```bash
 tests/acceptance/m7/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot and the boot through OP-TEE and U-Boot, and ends with `M7 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, and Linux calling a trusted application, and ends with `M7 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 ## Options of `scripts/run.sh`
 

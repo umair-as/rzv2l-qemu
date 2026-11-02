@@ -49,6 +49,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M6-ravb](units/M6-ravb/spec.md) | M6 | Gigabit Ethernet (DMA rings, MDIO, checksum offload), the board's KSZ9131 PHYs, IRQ0-7 of the interrupt control unit |
 | ✅ | [M7-el3-platform](units/M7-el3-platform/spec.md) | M7 | the board's TF-A BL31 as the PSCI firmware (firmware mode): CPU1 on and off, reset through WDT0 |
 | ✅ | [M7-optee-uboot](units/M7-optee-uboot/spec.md) | M7 | OP-TEE (without the closed crypto engine) and the vendor U-Boot after BL31; U-Boot loads Linux from the SD card ([walkthrough](walkthrough.md#op-tee-and-u-boot-after-bl31)) |
+| ✅ | [M7-optee-linux](units/M7-optee-linux/spec.md) | M7 | Linux reaches OP-TEE: the project's TEE kernel (vendor source, `CONFIG_OPTEE`, a `/firmware/optee` overlay), `/dev/tee0`, a trusted-application call ([walkthrough](walkthrough.md#linux-and-op-tee)) |
 
 ## The SoC blocks
 
@@ -103,4 +104,4 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 1. ✅ **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
 2. ✅ **M6:** networking. [M6-ravb](units/M6-ravb/spec.md): both kernels get a DHCP lease through QEMU user networking and move data both ways with matching hashes.
-3. 🔄 **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. [M7-optee-uboot](units/M7-optee-uboot/spec.md): OP-TEE and the vendor U-Boot follow BL31, and U-Boot loads Linux from the card. ⏭️ Next in M7: the SPI flash controller and its flash, and the OP-TEE device-tree experiment.
+3. 🔄 **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. [M7-optee-uboot](units/M7-optee-uboot/spec.md): OP-TEE and the vendor U-Boot follow BL31, and U-Boot loads Linux from the card. [M7-optee-linux](units/M7-optee-linux/spec.md): with the project's TEE kernel, Linux calls a trusted application in OP-TEE. ⏭️ Next in M7: the SPI flash controller and its flash.
