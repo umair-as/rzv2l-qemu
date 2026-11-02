@@ -5,7 +5,7 @@
 # U-Boot reads the DDR controller's ECC enable bits (0x1141018C) to pick
 # its device tree; the window is a stub that reads 0: no ECC, the board's
 # smarc-rzv2l (device map).
-^ddr-memc: unimplemented device (read|write) 
+^ddr-memc: unimplemented device read  \(size 4, offset 0x018c\)$
 # U-Boot's board_init writes the Ethernet pin registers ETH_ch0, ETH_ch1
 # and ETH_MII_RGMII (1 byte each) with 32-bit writel
 # (board/renesas/rzv2l-dev/rzv2l-dev.c); the PFC takes the low byte.

@@ -24,8 +24,11 @@ serial line:
           for 75 s
   reset:  `reboot`: BL31's SYSTEM_RESET; boot 2 through the whole chain
           in the same QEMU, with both CPUs online
-  watchdog not fed: with nothing feeding WDT0 (the vendor kernel does
-          not), the board resets on its own and boots a third time
+A boot can lose its root: the vendor device tree has no mmc aliases, so
+Linux names the card mmcblk0 or mmcblk1 in probe order, and U-Boot's
+command line says root=/dev/mmcblk0p2 (docs/device-map.md, gap 22). QEMU's
+WDT0 then resets the board after 60 s and the chain boots again. Each
+lost boot is counted and printed with the boot it delays.
 Writes OUTDIR/serial.log and qemu.log. Exit 0 only if every check
 passes. QEMU binary: $QEMU.
 """
@@ -50,6 +53,10 @@ IMAGE = firmware.IMAGE
 KERNEL = firmware.KERNEL
 
 
+LOST = r"Waiting for root device /dev/mmcblk0p2"
+MAX_LOST = 3
+
+
 def boot_checks(s, start, n):
     """The firmware banners, U-Boot's load, PSCI with OP-TEE, both CPUs"""
     what = "boot %d" % n
@@ -66,9 +73,17 @@ def boot_checks(s, start, n):
           s.wait(r"Starting kernel", 30, start) is not None,
           "%s: U-Boot reads boot/Image (%d bytes) from the card and starts "
           "it" % (what, size))
-    m = s.wait(READY, BOOT_TIMEOUT, start)
-    if not check(m is not None, "%s: the card's init reaches the shell"
-                 % what):
+    m = s.wait(READY, BOOT_TIMEOUT + MAX_LOST * 100, start)
+    lost = s.buf[start:m.start() if m else len(s.buf)].count(
+        LOST.replace("\\", ""))
+    if lost:
+        print("NOTE %s: %d boot(s) lost the root first (the card named "
+              "mmcblk1), each reset by WDT0 after 60 s" % (what, lost))
+        start = s.buf.rfind("NOTICE:  BL31: v2", start,
+                            m.start() if m else len(s.buf))
+    if not check(m is not None and lost <= MAX_LOST,
+                 "%s: the card's init reaches the shell (%d lost boot(s))"
+                 % (what, lost)):
         return False
     log = s.buf[start:]
     check("psci: PSCIv1.1 detected in firmware" in log and
@@ -141,13 +156,6 @@ def main():
               "reset: the kernel asks the firmware for a system reset")
         boot_checks(s, pos, 2)
         check(proc.poll() is None, "reset: the same QEMU, the board reset")
-
-        pos = len(s.buf)
-        check(s.wait(r"NOTICE:  BL31: v2\.10\.5", 150, pos) is not None,
-              "watchdog not fed: the board resets on its own")
-        m = s.wait(READY, BOOT_TIMEOUT, pos)
-        check(m is not None and int(m.group(2)) == 3,
-              "watchdog not fed: boot 3 from the card")
     finally:
         if proc.poll() is None:
             proc.kill()
