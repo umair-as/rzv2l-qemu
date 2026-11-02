@@ -10,7 +10,7 @@ Branches `unit/M7-optee-uboot` (project and fork), rebased on M7-el3-platform on
 | T4 | BL2 stand-in: BL32 and BL33 entries in the parameter block (BL32 `arg0` = `MODE_RW_64`, written explicitly), images loaded where BL2 puts them | fork `hw/arm/rzv2l-smarc.c` | firmware boot | done: `bl32=`/`bl33=` (operator's choice); BL2's device tree in `x1`; CPG as BL2 leaves it |
 | T5 | Failure loop: OP-TEE, then U-Boot (OTP, RPC, DDR ECC read, USB), each window with its class | fork models and SoC; `docs/device-map.md` | firmware boot, `-d` log gate | done: see below |
 | T6 | Acceptance: OP-TEE and U-Boot banners, Linux from the card, `MIGRATE_INFO_TYPE`, hotplug, reset, watchdog fed, lost boots counted; unit 1's boot and direct mode unchanged | `tests/acceptance/m7/` | M7 ACCEPTANCE | done: `bootloader.py`; log gate PASS |
-| T7 | EVK-R80: DDR controller ECC enable as U-Boot reads it | `docs/evidence/` | — | requested |
+| T7 | EVK-R80: DDR controller ECC enable as U-Boot reads it | `docs/evidence/` | — | done: `0x00000FFF`, bits 25:24 = 0 (EVK-2026-11-02) |
 | T8 | G2 experiment (not acceptance): U-Boot with the product's OP-TEE DT node patch, applied by the experiment's script only; four results reported separately (node in Linux's DT, driver and `/dev/tee0`, `tee-supplicant`, `xtest` counts and limits) | `docs/experiments/`, `tests/experiments/` | the experiment's own run | after T6 |
 
 ## What the failure loop met (T5)
@@ -18,7 +18,7 @@ Branches `unit/M7-optee-uboot` (project and fork), rebased on M7-el3-platform on
 In boot order; each fix is the smallest one the guest's code and the hardware contract call for.
 
 1. OP-TEE reads the OTP chip ID (`0x11861140`): unmapped, data abort. New OTP model, ID from properties (default 0, not silicon).
-2. U-Boot reads the DDR controller's ECC bits (`0x1141018C`): unmapped, U-Boot's exception loop. Stub window, reads 0: the non-ECC tree, as the board's `DRAM:  1.9 GiB` implies (I; EVK-R80 to confirm).
+2. U-Boot reads the DDR controller's ECC bits (`0x1141018C`): unmapped, U-Boot's exception loop. Stub window, reads 0: the non-ECC tree; the board reads bits 25:24 = 0 (EVK-R80).
 3. U-Boot's SPI-NOR probe: JEDEC ID 0, `Failed to set up SPI slave`, U-Boot carries on. Left failing (honest; design choice 2).
 4. U-Boot's SD writes ignored: SDHI held in reset, the CPG at manual reset values. New `bl2-boot` CPG start state from BL2's `cpg_setup()` tables and its DDR set-up.
 5. U-Boot's ACMD51 in normal mode had no data phase: the card never initialised. Normal mode decodes the data commands of Table 40.8.
