@@ -17,7 +17,7 @@ Sources are authoritative by **domain**, not by a single ranking (spec §5):
 
 When sources disagree, the disagreement is recorded with all sides and resolved explicitly (example: the DEVID value, where Table 6.1 and §6.3.43 conflict and the EVK decides). No retrieval score or global rank silently picks a winner. Confirm document applicability to the physical board revision and the chosen BSP before deriving contracts.
 
-Pinned firmware sources studied so far: see `research/boot-chain-firmware.md` (TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b`, kernel 6.12.59-cip14). The vendor U-Boot (G1) is https://github.com/renesas-rz/renesas-u-boot-cip, `4eebfbaa4e` (on branch `v2024.07/rz`), `smarc-rzv2l_defconfig`.
+Pinned firmware sources studied so far: see `research/boot-chain-firmware.md` (TF-A `f59ed5a31`, U-Boot `4eebfbaa4e`, OP-TEE `82a5cd3b`, kernel 6.12.59-cip14). The vendor U-Boot (G1) is https://github.com/renesas-rz/renesas-u-boot-cip, `4eebfbaa4e` (on branch `v2024.07/rz`), `smarc-rzv2l_defconfig`. The vendor OP-TEE is https://github.com/renesas-rz/rzg_optee-os, `82a5cd3b` (branch `4.8.0/rz`). For the M7 TEE run (DR-0006): https://github.com/OP-TEE/optee_client tag `4.8.0` (`9d6f69844f`) and https://github.com/linaro-swg/optee_examples tag `4.8.0` (`3ef17eb1f3`), the releases matching OP-TEE 4.8.
 
 **Still missing:** standalone board schematics; the Microchip KSZ9131RNX datasheet (the PHY model's vendor register reset values are assumptions until it or an EVK `mii read` is in hand, `research/ravb.md` §5).
 

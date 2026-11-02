@@ -8,7 +8,7 @@ The format and states are defined in `project.md` §15. Evidence paths are relat
 
 | ID | Statement | Evidence | Verification | M | Status |
 |---|---|---|---|---|---|
-| REQ-GUEST-001 | Acceptance runs SHALL use the tier's stock DTB, unmodified before loader fixups. | spec §8 | DTB SHA256 recorded in the run log | M3 | V |
+| REQ-GUEST-001 | Acceptance runs SHALL use the tier's stock DTB, unmodified before loader fixups. Exception: the M7 TEE run, whose DTB adds `/firmware/optee` by overlay (DR-0006, device map gap 24). | spec §8; decisions/DR-0006 | DTB SHA256 recorded in the run log | M3 | V |
 | REQ-GUEST-002 | Guest drivers SHALL NOT be patched for the emulator. | spec §8 | kernel source pinned; patch list = vendor's own | M3 | V |
 | REQ-GUEST-003 | Firmware SHALL contain no QEMU-specific code. Build-config changes for closed, unemulatable IP are allowed and SHALL be listed as fidelity gaps. | spec §8, research/boot-chain-firmware.md | firmware recipe/config diff recorded | M7 | P |
 | REQ-GUEST-004 | Every boot argument, injected DT node or loader fixup in an acceptance run SHALL be listed as a fidelity gap. | spec §8 | gap list reviewed per milestone | M3 | V |

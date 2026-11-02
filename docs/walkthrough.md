@@ -237,7 +237,7 @@ cp tests/guests/out/sd/sd.img build/sd-try.img
 scripts/run.sh -u --sd build/sd-try.img
 ```
 
-On the console, in order: the BL31 banner; `I/TC: Primary CPU switching to normal world boot` (OP-TEE); `U-Boot 2024.07-g4eebfbaa4e`, `DRAM:  1.9 GiB` and `unrecognized JEDEC id bytes: 00, 00, 00` (there is no SPI flash model yet); after a 2-second countdown `25963008 bytes read`; then Linux with `psci: Trusted OS migration not required` (BL31 answers through OP-TEE, as on the board) and both CPUs. U-Boot leaves the watchdog running with 60 s: at the shell, feed it first with `watchdog -T 10 -t 2 /dev/watchdog0`, then try CPU1 off and on and `reboot` as above. Two things can go wrong under emulation. A boot that stops at `Waiting for root device /dev/mmcblk0p2...` got the card as `mmcblk1`; the watchdog restarts it after 60 s. A boot that hangs right after OP-TEE's last line or after `DRAM:` lost a console race; quit and start again. Read more: [`units/M7-optee-uboot/spec.md`](units/M7-optee-uboot/spec.md).
+On the console, in order: the BL31 banner; `I/TC: Primary CPU switching to normal world boot` (OP-TEE); `U-Boot 2024.07-g4eebfbaa4e`, `DRAM:  1.9 GiB` and `unrecognized JEDEC id bytes: 00, 00, 00` (there is no SPI flash model yet); after a 2-second countdown `25963008 bytes read`; then Linux with `psci: Trusted OS migration not required` (BL31 answers through OP-TEE, as on the board) and both CPUs. U-Boot leaves the watchdog running with 60 s, but Linux stops its clock when no program uses it, so the board does not reset, as on the real board. At the shell try CPU1 off and on and `reboot` as above. Two things can go wrong under emulation. A boot that stops at `Waiting for root device /dev/mmcblk0p2...` got the card as `mmcblk1` (the vendor device tree does not fix the names); it waits for ever, so quit (Ctrl-A X) and start again. A boot that hangs right after OP-TEE's last line, or in the middle of a U-Boot line, lost a console race; quit and start again. That race is more frequent when the host is busy, so run on an otherwise idle machine; this makes a hang rarer, it does not rule it out. Read more: [`units/M7-optee-uboot/spec.md`](units/M7-optee-uboot/spec.md).
 
 ### Linux and OP-TEE
 
@@ -251,7 +251,7 @@ cp tests/guests/out/sd/sd-tee.img build/sd-try.img
 scripts/run.sh -u --sd build/sd-try.img
 ```
 
-The firmware is the same as above. At the shell (feed the watchdog first, as above):
+The firmware is the same as above. At the shell:
 
 ```bash
 dmesg | grep optee:                # probing, revision 4.8 (82a5cd3b...), initialized driver
