@@ -2,7 +2,7 @@
 # M7 acceptance for rzv2l-smarc: the board's TF-A BL31 as the PSCI
 # firmware, in firmware mode (-bios), with the Renesas kernel (G1) and
 # the root file system on the SD card (docs/units/M7-el3-platform/spec.md);
-# M5 acceptance first (which runs M4 to M1 in direct mode).
+# M6 acceptance first (which runs M5 to M1 in direct mode).
 # Exit 0 only if every check passes.
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
 # Guests: tests/guests/out (BL31: tests/guests/fw/build-tf-a.sh).
@@ -16,12 +16,12 @@ failures=0
 step() { echo "== $*"; }
 result() { [ "$1" -eq 0 ] || failures=$((failures + 1)); }
 
-step "M5 acceptance"
-"$HERE/../m5/run.sh" > "$OUT/m5.txt" 2>&1
+step "M6 acceptance"
+"$HERE/../m6/run.sh" > "$OUT/m6.txt" 2>&1
 if [ $? -eq 0 ]; then
-    echo "PASS M5 acceptance (full output: out/m5.txt)"
+    echo "PASS M6 acceptance (full output: out/m6.txt)"
 else
-    echo "FAIL M5 acceptance (full output: out/m5.txt)"; result 1
+    echo "FAIL M6 acceptance (full output: out/m6.txt)"; result 1
 fi
 
 step "firmware mode: BL31, G1 kernel, root on the SD card"
