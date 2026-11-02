@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * The project's TEE kernel (DR-0006): the /firmware/optee node, applied to
+ * the vendor kernel's r9a07g054l2-smarc.dtb at build time. The vendor 5.10
+ * kernels carried this node in r9a07g054.dtsi (disabled; Renesas's security
+ * package enabled it); the board's product image puts it in U-Boot's device
+ * tree instead, and U-Boot copies it to the kernel's. OP-TEE uses dynamic
+ * shared memory and its region lies below Linux's memory, so no
+ * reserved-memory node is needed.
+ */
+/dts-v1/;
+/plugin/;
+
+&{/} {
+	firmware {
+		optee {
+			compatible = "linaro,optee-tz";
+			method = "smc";
+		};
+	};
+};
