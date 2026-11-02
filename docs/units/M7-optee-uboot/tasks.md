@@ -1,6 +1,6 @@
 # M7-optee-uboot — tasks
 
-Branches `unit/M7-optee-uboot` (project and fork), rebased on M7-el3-platform once it merges.
+Branches `unit/M7-optee-uboot` (project and fork) on M7-el3-platform; merged.
 
 | ID | Task | Files | Test | Status |
 |---|---|---|---|---|

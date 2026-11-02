@@ -1,6 +1,6 @@
 # M7-optee-uboot — spec
 
-**Milestone:** M7 (real firmware; second unit). **Requirements:** REQ-MACH-005, REQ-GUEST-003 (OP-TEE's `CFG_RZ_SCE=n` is the spec's recorded exception, §12). **Status:** planned; implementation follows after M7-el3-platform merges.
+**Milestone:** M7 (real firmware; second unit). **Requirements:** REQ-MACH-005, REQ-GUEST-003 (OP-TEE's `CFG_RZ_SCE=n` is the spec's recorded exception, §12). **Status:** done (merged with M7-optee-linux).
 
 **Acceptance is vendor-only (G1):** the unmodified vendor TF-A, OP-TEE and U-Boot builds and the vendor kernel. OP-TEE running as BL32, and what the secure world changes in PSCI, are this unit's results; Linux using OP-TEE (`/dev/tee0`) is the next unit's ([M7-optee-linux](../M7-optee-linux/spec.md), DR-0006), and this unit's run stays as the vendor baseline.
 

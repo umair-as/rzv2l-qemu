@@ -1,6 +1,6 @@
 # M7-optee-linux — tasks
 
-Project branch `unit/M7-optee-uboot` (on M7-optee-uboot; no fork change).
+Merged with M7-optee-uboot (no fork change).
 
 | ID | Task | Files | Test | Status |
 |---|---|---|---|---|

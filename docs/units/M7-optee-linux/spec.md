@@ -1,6 +1,6 @@
 # M7-optee-linux — spec
 
-**Milestone:** M7 (real firmware; third unit). **Requirements:** REQ-TEE-001, REQ-TEE-002 (proposed); the REQ-GUEST-001 exception of [DR-0006](../../decisions/DR-0006-linux-optee-access-in-m7.md). **Status:** implemented. M7 is complete only with this unit.
+**Milestone:** M7 (real firmware; third unit). **Requirements:** REQ-TEE-001, REQ-TEE-002 (proposed); the REQ-GUEST-001 exception of [DR-0006](../../decisions/DR-0006-linux-optee-access-in-m7.md). **Status:** done. M7 needs this unit (DR-0006) and, still to come, the SPI flash unit.
 
 One page. Facts carry their source; inferences and assumptions are labelled (I) / (A).
 
