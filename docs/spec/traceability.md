@@ -35,6 +35,8 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-ETH-001 | M6 | M6 | M6-ravb | T1-T7 | qtest `rzv2l-gbeth-test`; proofs in `../units/M6-ravb/tasks.md` (statuses at the release) | `../research/ravb.md` | P |
 | REQ-ETH-002 | M6 | M6 | M6-ravb | T8 | M6 acceptance `tests/acceptance/m6/` (statuses at the release) | `../units/M6-ravb/spec.md` | P |
 | REQ-TSIP-001 | M7 | M7 (Stage N negative test) | — | — | — | `../research/boot-chain-firmware.md` | P |
+| REQ-TEE-001 | M7 | M7 | M7-optee-linux | T2-T5 | `tests/acceptance/m7/tee.py` | `../decisions/DR-0006-linux-optee-access-in-m7.md`, `../evidence/EVK-2026-11-02-optee-driver.md` | P |
+| REQ-TEE-002 | M7 | M7 | M7-optee-linux | T5 | `tests/acceptance/m7/tee.py` (NOTE lines) | `../units/M7-optee-linux/spec.md` | P |
 | REQ-GUEST-001 | — (process) | M3 | M1-machine-skeleton; M3b-shell | M1-T07; M3b-shell T3 | acceptance `dumpdtb` vs DTB-U (only listed fixups differ); M3/M4 runs use the stock DTB-U / DTB-V and their own bootargs | spec §8 | V |
 | REQ-GUEST-002 | — (process) | M3 | M3b-shell; M4-vendor-kernel | M3b-shell T1; M4-vendor-kernel T1 | `tests/guests/g0/build-kernel.sh`, `tests/guests/g1/build-kernel.sh` refuse a checkout with local changes; G1 uses its own defconfig | spec §8; `../sources.md` | V |
 | REQ-GUEST-003 | — (process) | M7 | — | — | — | spec §8; `../research/boot-chain-firmware.md` | P |

@@ -302,7 +302,7 @@ Findings are classed BLOCKER / FIDELITY GAP / LATER SCOPE / DOCUMENTATION.
 | **M4** | G1 Linux | vendor kernel + DTB-V + initramfs userspace → shell; probe failures understood and listed; WDT0 behaviour defined |
 | **M5** | Storage | SDHI + SD/eMMC with the real `renesas_sdhi` driver; ext4 read/write/sync verified against the image |
 | **M6** | Networking | ravb + PHY with the stock driver; DHCP and data integrity |
-| **M7** | U-Boot + Stage B | real BL31 + OP-TEE (`CFG_RZ_SCE=n`) + real U-Boot → FIT → Linux from SD/eMMC |
+| **M7** | U-Boot + Stage B | real BL31 + OP-TEE (`CFG_RZ_SCE=n`) + real U-Boot → Linux from SD; Linux reaches OP-TEE (driver, `/dev/tee0`, a trusted-application call; DR-0006). FIT moves to M9 |
 | **M8** | Stage C | real BL2 (DDR stub, SPI boot) → full chain |
 | **M9** | Platform behaviour | A/B selection, bootcount, rollback, FIT signature enforcement and rejection, storage corruption, update failure, within the §12 limits |
 
