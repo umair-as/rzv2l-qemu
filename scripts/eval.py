@@ -62,8 +62,11 @@ def prepare(src, build, sha):
          "git worktree add")
     build.mkdir(parents=True, exist_ok=True)
     if not (build / "build.ninja").exists():
-        must([str(src / "configure"), "--target-list=aarch64-softmmu",
-              "--disable-docs"], build, "configure")
+        configure = [str(src / "configure"), "--target-list=aarch64-softmmu",
+                     "--disable-docs"]
+        if shutil.which("ccache"):
+            configure.append("--cc=ccache " + os.environ.get("CC", "cc"))
+        must(configure, build, "configure")
 
 
 def ninja(build, fatal=True):

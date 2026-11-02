@@ -321,3 +321,40 @@ Checks to try at the prompt:
 | `hexdump -C /proc/device-tree/soc/mmc@11c00000/vqmmc-supply` | `00 00 00 74` (eSD); `00 00 00 18` with `-b 1` | the loader's U-Boot edit for an SD-card boot ([M4-loader-fixups](../units/M4-loader-fixups/spec.md)) |
 | `devmem 0x11020a00` | `0x00010000` in eSD mode; bits 2:0 are the boot mode (`-b`) | `SYS_LSI_MODE`, the boot mode pins. The EVK reads `0x00010200`: its DEBUGEN pin is high (`-M rzv2l-smarc,debugen=on`) |
 | `watchdog -T 3 -t 1000 /dev/watchdog`, then `killall -9 watchdog` | the board resets about 3 s later; after the new boot, `devmem 0x11010b10` reads 1 | WDT0 and the CPG reset flag ([M4-vendor-kernel](../units/M4-vendor-kernel/spec.md)) |
+
+## CI and independent review
+
+The fork's `.github/workflows/rzv2l.yml` runs on pull requests to `rzv2l-dev`,
+pushes to that integration branch, and manual dispatch. Opening or updating a
+PR starts a hosted build and tests; it does not deploy or merge anything.
+The implementer still builds and tests locally before pushing.
+
+CI makes baseline verification visible on the PR and repeatable on a hosted
+runner. Local checks already provide useful evidence, but their logs must be
+collected and matched to the final revision manually. CI repeats the checks
+after each PR update and attaches the revision and results to that update.
+
+A green **Build and qtests** result means the Arm system emulator built and
+the RZ/V2L register tests and the Arm GIC identity test passed; PR runs also check each proposed commit's
+patch style. The run uploads logs and a binary archive, and saves a compiler
+cache for later runs. It does not run the project's guest boot acceptance or
+prove that the model implements the hardware correctly. This first workflow
+lives in the QEMU fork; it does not test project-only changes or the project's
+exact submodule selection.
+
+For review, open the PR's check and inspect its revision records and logs.
+PR runs test GitHub's proposed merge revision; the artifact records that SHA
+alongside the PR head and base. Match those revisions to the review target
+before treating the results as baseline evidence. A successful check supports
+starting independent review; it is not an independent review verdict or merge
+approval. Required-check enforcement is a separate repository setting.
+
+The implementer still prepares an isolated local review build. The reviewer
+changes the model deliberately and rebuilds to see whether the tests detect
+the error, so the downloaded executable cannot replace this build. Compiler
+caching helps repeated compilation, but different worktree and debug paths
+can prevent reuse between builds. Follow the
+[review prompt](../units/templates/review-prompt.md) for the review checks and
+mutation budget; CI does not replace them. After fixes, apply the remaining
+acceptance and regression gates in `AGENTS.md`, then merge on the operator's
+word.

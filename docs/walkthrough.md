@@ -12,7 +12,7 @@ The words used here: **M1, M2, …** are the milestones ([milestones page](miles
 sudo apt install git build-essential ninja-build python3-venv pkg-config \
     libglib2.0-dev libpixman-1-dev flex bison bc libssl-dev cpio \
     gcc-aarch64-linux-gnu device-tree-compiler e2fsprogs fdisk fakeroot \
-    libslirp-dev
+    libslirp-dev ccache
 ```
 
 **QEMU** (the fork is the `qemu/` submodule; a few minutes):
@@ -21,10 +21,18 @@ sudo apt install git build-essential ninja-build python3-venv pkg-config \
 git clone --recurse-submodules https://github.com/umair-as/rzv2l-qemu.git
 cd rzv2l-qemu
 mkdir -p build/qemu && cd build/qemu
-../../qemu/configure --target-list=aarch64-softmmu --disable-docs   # says "slirp support : YES"
+../../qemu/configure --target-list=aarch64-softmmu --disable-docs --cc="ccache cc"
 ninja qemu-system-aarch64
 cd ../..
 ```
+
+Configure should report `slirp support: YES`. ccache caches repeated compilation;
+inspect its counters with `ccache --show-stats`. Different source and debug paths
+can prevent reuse between worktrees. New eval builds
+also use it when installed. For an existing build, add `--cc="ccache cc"` to
+its original configure options when no build is running; preserve the other
+options from `build/qemu/config.status`. Review builds stay separate so their
+mutations cannot affect your working build.
 
 **The guests** (the kernels take a while: each is a full kernel build):
 
@@ -269,6 +277,7 @@ tests/acceptance/m7/run.sh       # several minutes: it boots both kernels severa
 ```
 
 It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, and the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and prints `M7 ACCEPTANCE: PASS`. Then it boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+
 
 ## Options of `scripts/run.sh`
 

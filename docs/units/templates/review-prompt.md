@@ -2,6 +2,17 @@
 
 The validator of spec §15, as a reusable prompt. Give it to a **different model** from the one that wrote the work (AGENTS.md "How work flows"). Fill in the four fields, paste the rest unchanged.
 
+**Build preparation (implementer):** when creating the isolated review build,
+use `--cc="ccache cc"` if ccache is installed. Keep the default shared cache
+(or the operator's `CCACHE_DIR`). This caches repeat compilation, including
+restoring a mutation; different source paths and debug build directories can
+prevent cache hits between worktrees. Existing builds keep their configuration;
+do not reconfigure a running build.
+CI logs must identify the tested revision before they can serve as baseline
+evidence. The reviewer still needs a local build for mutations.
+See the [CI and review workflow](../../learning/building-and-testing.md#ci-and-independent-review)
+for the rationale and the limits of a green check.
+
 ---
 
 **Target:** <exact revisions: project commit and fork commit (or a commit range / PR), never "the current files">
