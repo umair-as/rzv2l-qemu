@@ -78,11 +78,14 @@ def boot_checks(s, start, n):
           "it" % (what, size))
     m = s.wait(READY + "|" + LOST, BOOT_TIMEOUT, start)
     if m is not None and m.group(0).startswith("Waiting"):
-        named = re.search(r"mmcblk(\d): mmc\d+:\S+ QEMU!", s.buf[start:])
-        check(False, "%s: the card's init reaches the shell (lost its root: "
-              "the card is mmcblk%s, U-Boot asks for /dev/mmcblk0p2; device "
-              "map gap 22)" % (what, named.group(1) if named else "?"))
-        return False
+        # Lost only if the card is named mmcblk1; a late card may still come
+        named = s.wait(r"mmcblk(\d): mmc\d+:\S+ QEMU!", 30, start)
+        if named is not None and named.group(1) == "1":
+            check(False, "%s: the card's init reaches the shell (lost its "
+                  "root: the card is mmcblk1, U-Boot asks for "
+                  "/dev/mmcblk0p2; device map gap 22)" % what)
+            return False
+        m = s.wait(READY, BOOT_TIMEOUT, start)
     if not check(m is not None,
                  "%s: the card's init reaches the shell" % what):
         return False
@@ -157,7 +160,8 @@ def main():
                          10, pos) is not None,
                   "hotplug %d: CPU1 online again: CPUs online 0-1" % i)
 
-        pos = len(s.buf)
+        # No reset since boot 1's firmware banner, for 75 s more
+        pos = s.buf.find("NOTICE:  BL31: v2") + 1
         check(s.wait(r"NOTICE:  BL31", 75, pos) is None and
               run(s, "true") is not None,
               "watchdog not fed: no reset in 75 s (Linux stopped WDT0's "

@@ -21,6 +21,13 @@ mkdir -p "$OUT"
 failures=0
 step() { echo "== $*"; }
 result() { [ "$1" -eq 0 ] || failures=$((failures + 1)); }
+# A failed boot run is kept: out/<run> is overwritten by the next run
+keep() {
+    [ "$1" -eq 0 ] && return
+    dest="$OUT/kept/$(date +%Y%m%d-%H%M%S)-$2"
+    mkdir -p "$OUT/kept" && cp -r "$OUT/$2" "$dest"
+    echo "     (failed run kept in out/kept/$(basename "$dest"))"
+}
 
 step "M6 acceptance"
 "$HERE/../m6/run.sh" > "$OUT/m6.txt" 2>&1
@@ -32,15 +39,15 @@ fi
 
 step "firmware mode: BL31, G1 kernel, root on the SD card"
 python3 -I "$HERE/firmware.py" "$OUT/firmware"
-result $?
+rc=$?; result $rc; keep $rc firmware
 
 step "boot loader: BL31, OP-TEE, U-Boot, G1 kernel from the SD card"
 python3 -I "$HERE/bootloader.py" "$OUT/bootloader"
-result $?
+rc=$?; result $rc; keep $rc bootloader
 
 step "Linux and OP-TEE: TEE kernel, driver, devices, a trusted application"
 python3 -I "$HERE/tee.py" "$OUT/tee"
-result $?
+rc=$?; result $rc; keep $rc tee
 
 step "EL3 probe: GICR_PWRR, TZC access by security state, MPIDR"
 "$HERE/../../probes/el3-secure/run.sh" > "$OUT/el3-secure.txt" 2>&1
