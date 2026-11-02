@@ -59,8 +59,8 @@ def tee_checks(s):
 
     # REQ-TEE-002: reported, not checked
     tee_bus = (run(s, "ls /sys/bus/tee/devices/ | wc -l") or "").split()
-    print("NOTE unsupported: hardware crypto (TSIP; OP-TEE built "
-          "CFG_RZ_SCE=n): trusted applications get OP-TEE's software crypto")
+    print("NOTE unsupported: hardware crypto (TSIP), from the build "
+          "configuration (CFG_RZ_SCE=n), not observed in this run")
     print("NOTE unsupported: hardware RNG (CFG_HWRNG_PTA=n, software PRNG): "
           "no RNG service on Linux's TEE bus (%s device(s) listed)"
           % next((w for w in tee_bus if w.isdigit()), "?"))

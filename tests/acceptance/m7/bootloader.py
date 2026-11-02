@@ -19,16 +19,20 @@ serial line:
           reaches the shell; CPU1 boots through BL31 and OP-TEE: both
           CPUs online
   hotplug: CPU1 offline and online again, twice, through BL31 and OP-TEE
-  watchdog fed: U-Boot leaves WDT0 running with 60 s; with BusyBox
+  watchdog not fed: U-Boot leaves WDT0 running with 60 s; nothing feeds
+          it, Linux stops its clock, and the board does not reset for
+          75 s, as on the board (EVK-L14)
+  watchdog fed: with BusyBox
           `watchdog` feeding /dev/watchdog0, the board does not reset
           for 75 s
   reset:  `reboot`: BL31's SYSTEM_RESET; boot 2 through the whole chain
           in the same QEMU, with both CPUs online
 A boot can lose its root: the vendor device tree has no mmc aliases, so
 Linux names the card mmcblk0 or mmcblk1 in probe order, and U-Boot's
-command line says root=/dev/mmcblk0p2 (docs/device-map.md, gap 22). QEMU's
-WDT0 then resets the board after 60 s and the chain boots again. Each
-lost boot is counted and printed with the boot it delays.
+command line says root=/dev/mmcblk0p2 (docs/device-map.md, gap 22). Such a
+boot waits for its root for ever, as on the board (Linux stops WDT0's
+clock, so nothing resets it): it is a FAIL that names the cause, and its
+serial log is kept. There is no retry.
 Writes OUTDIR/serial.log and qemu.log. Exit 0 only if every check
 passes. QEMU binary: $QEMU.
 """
@@ -54,7 +58,6 @@ KERNEL = firmware.KERNEL
 
 
 LOST = r"Waiting for root device /dev/mmcblk0p2"
-MAX_LOST = 3
 
 
 def boot_checks(s, start, n):
@@ -73,17 +76,15 @@ def boot_checks(s, start, n):
           s.wait(r"Starting kernel", 30, start) is not None,
           "%s: U-Boot reads boot/Image (%d bytes) from the card and starts "
           "it" % (what, size))
-    m = s.wait(READY, BOOT_TIMEOUT + MAX_LOST * 100, start)
-    lost = s.buf[start:m.start() if m else len(s.buf)].count(
-        LOST.replace("\\", ""))
-    if lost:
-        print("NOTE %s: %d boot(s) lost the root first (the card named "
-              "mmcblk1), each reset by WDT0 after 60 s" % (what, lost))
-        start = s.buf.rfind("NOTICE:  BL31: v2", start,
-                            m.start() if m else len(s.buf))
-    if not check(m is not None and lost <= MAX_LOST,
-                 "%s: the card's init reaches the shell (%d lost boot(s))"
-                 % (what, lost)):
+    m = s.wait(READY + "|" + LOST, BOOT_TIMEOUT, start)
+    if m is not None and m.group(0).startswith("Waiting"):
+        named = re.search(r"mmcblk(\d): mmc\d+:\S+ QEMU!", s.buf[start:])
+        check(False, "%s: the card's init reaches the shell (lost its root: "
+              "the card is mmcblk%s, U-Boot asks for /dev/mmcblk0p2; device "
+              "map gap 22)" % (what, named.group(1) if named else "?"))
+        return False
+    if not check(m is not None,
+                 "%s: the card's init reaches the shell" % what):
         return False
     log = s.buf[start:]
     check("psci: PSCIv1.1 detected in firmware" in log and
@@ -155,6 +156,12 @@ def main():
                   s.wait(r"CPU1: Booted secondary processor 0x0000000100",
                          10, pos) is not None,
                   "hotplug %d: CPU1 online again: CPUs online 0-1" % i)
+
+        pos = len(s.buf)
+        check(s.wait(r"NOTICE:  BL31", 75, pos) is None and
+              run(s, "true") is not None,
+              "watchdog not fed: no reset in 75 s (Linux stopped WDT0's "
+              "clock)")
 
         pos = len(s.buf)
         run(s, "watchdog -T 10 -t 2 /dev/watchdog0")
