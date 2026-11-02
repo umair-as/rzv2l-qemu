@@ -162,7 +162,7 @@ def main():
 
         # No reset since boot 1's firmware banner, for 75 s more
         pos = s.buf.find("NOTICE:  BL31: v2") + 1
-        check(s.wait(r"NOTICE:  BL31", 75, pos) is None and
+        check(s.wait(r"NOTICE:  BL31: v2", 75, pos) is None and
               run(s, "true") is not None,
               "watchdog not fed: no reset in 75 s (Linux stopped WDT0's "
               "clock)")
