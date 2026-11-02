@@ -144,7 +144,7 @@ sync; umount /mnt
 Stop QEMU (Ctrl-A X) and read the file back from the host. The MD5 matches the one the guest printed:
 
 ```bash
-dd if=build/sd-try.img of=build/p1.img bs=512 skip=2048 count=32768 status=none
+dd if=build/sd-try.img of=build/p1.img bs=512 skip=8192 count=32768 status=none
 debugfs -R "dump /f.bin build/f.bin" build/p1.img; md5sum build/f.bin
 ```
 
@@ -164,13 +164,13 @@ The kernel mounts the card and runs its init:
 VFS: Mounted root (ext4 filesystem) on device 179:2.
 Run /sbin/init as init process
   root file system on /dev/mmcblk0p2, boot 1 from this card
-SD-ROOT: ready, root /dev/mmcblk0p2, boot 1
+SD-ROOT: ready, root /dev/mmcblk0p2, boot 1, partuuid 525a0001-02, card sd
 ```
 
 Write something, then restart the board from inside: `reboot` resets it in the same QEMU, and the card counts boot 2. `poweroff` remounts the root read-only, powers the board down and ends QEMU. Start `run.sh` again with the same image and the count and your file are still there. On the host, the journal needs no recovery and `e2fsck` finds the root clean:
 
 ```bash
-dd if=build/sd-try.img of=build/p2.img bs=512 skip=34816 status=none
+dd if=build/sd-try.img of=build/p2.img bs=512 skip=40960 status=none
 dumpe2fs -h build/p2.img | grep features   # no needs_recovery
 e2fsck -fn build/p2.img
 ```
