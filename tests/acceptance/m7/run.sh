@@ -3,12 +3,15 @@
 # firmware, in firmware mode (-bios), with the Renesas kernel (G1) and
 # the root file system on the SD card (docs/units/M7-el3-platform/spec.md);
 # then BL31, OP-TEE and U-Boot booting the kernel from the card
-# (docs/units/M7-optee-uboot/spec.md); M6 acceptance first (which runs M5
-# to M1 in direct mode).
+# (docs/units/M7-optee-uboot/spec.md); then the project's TEE kernel
+# reaching OP-TEE from Linux (docs/units/M7-optee-linux/spec.md). M6
+# acceptance first (which runs M5 to M1 in direct mode).
 # Exit 0 only if every check passes.
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
 # Guests: tests/guests/out (tests/guests/fw/build-tf-a.sh, build-optee.sh,
-# build-u-boot.sh; the card: tests/guests/sd/build-image.sh).
+# build-u-boot.sh; tests/guests/g1-tee/build-kernel.sh,
+# build-optee-user.sh; the cards: tests/guests/sd/build-image.sh and
+# build-image.sh --tee).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 QEMU="${QEMU:-$HERE/../../../build/qemu/qemu-system-aarch64}"
@@ -35,6 +38,10 @@ step "boot loader: BL31, OP-TEE, U-Boot, G1 kernel from the SD card"
 python3 -I "$HERE/bootloader.py" "$OUT/bootloader"
 result $?
 
+step "Linux and OP-TEE: TEE kernel, driver, devices, a trusted application"
+python3 -I "$HERE/tee.py" "$OUT/tee"
+result $?
+
 step "EL3 probe: GICR_PWRR, TZC access by security state, MPIDR"
 "$HERE/../../probes/el3-secure/run.sh" > "$OUT/el3-secure.txt" 2>&1
 if [ $? -eq 0 ]; then
@@ -48,7 +55,7 @@ step "log gate"
 allow=$(cat "$HERE/../m4/expected/log-allow.txt" \
             "$HERE/../m5/expected/log-allow.txt" \
             "$HERE/expected/log-allow.txt" | grep -v -e '^#' -e '^$')
-for run in firmware bootloader; do
+for run in firmware bootloader tee; do
     log="$OUT/$run/qemu.log"
     if [ ! -s "$log" ]; then
         echo "FAIL $run/qemu.log: missing or empty"; result 1

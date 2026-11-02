@@ -102,12 +102,12 @@ def boot_checks(s, start, n):
     return True
 
 
-def main():
-    out = sys.argv[1]
-    for f in (BL31, BL32, BL33, IMAGE):
+def start(out):
+    """Start QEMU on a fresh copy of IMAGE; return (proc, serial, log)"""
+    for f in (BL31, BL32, BL33, IMAGE, KERNEL):
         if not os.path.exists(f):
             print("FAIL missing %s (tests/guests/*/build-*.sh)" % f)
-            return 1
+            sys.exit(1)
     os.makedirs(out, exist_ok=True)
     img = os.path.join(out, "sd.img")
     shutil.copyfile(IMAGE, img)
@@ -126,7 +126,19 @@ def main():
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
     log = open(os.path.join(out, "serial.log"), "w")
-    s = Serial(sock, log)
+    return proc, Serial(sock, log), log
+
+
+def stop(proc, log):
+    if proc.poll() is None:
+        proc.kill()
+    proc.wait()
+    log.close()
+
+
+def main():
+    out = sys.argv[1]
+    proc, s, log = start(out)
     try:
         if not boot_checks(s, 0, 1):
             return 1
@@ -157,10 +169,7 @@ def main():
         boot_checks(s, pos, 2)
         check(proc.poll() is None, "reset: the same QEMU, the board reset")
     finally:
-        if proc.poll() is None:
-            proc.kill()
-        proc.wait()
-        log.close()
+        stop(proc, log)
     return 1 if firmware.failures else 0
 
 
