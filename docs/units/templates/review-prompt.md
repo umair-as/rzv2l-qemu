@@ -2,13 +2,6 @@
 
 The validator of spec §15, as a reusable prompt. Give it to a **different model** from the one that wrote the work (AGENTS.md "How work flows"). Fill in the four fields, paste the rest unchanged.
 
----
-
-**Target:** <exact revisions: project commit and fork commit (or a commit range / PR), never "the current files">
-**Claims to disprove first:** <the 3–6 load-bearing claims, lettered A, B, C…; name the one everything else rests on>
-**Out of scope:** <what not to review this round>
-**Review build:** `build/review-<short-sha>/{src,build}` at the fork PR head.
-
 **Build preparation (implementer):** when creating the isolated review build,
 use `--cc="ccache cc"` if ccache is installed. Keep the default shared cache
 (or the operator's `CCACHE_DIR`). This caches repeat compilation, including
@@ -17,8 +10,15 @@ prevent cache hits between worktrees. Existing builds keep their configuration;
 do not reconfigure a running build.
 CI logs must identify the tested revision before they can serve as baseline
 evidence. The reviewer still needs a local build for mutations.
-See the [CI and review workflow](../../walkthrough.md#from-a-pull-request-to-independent-review)
+See the [CI and review workflow](../../learning/building-and-testing.md#ci-and-independent-review)
 for the rationale and the limits of a green check.
+
+---
+
+**Target:** <exact revisions: project commit and fork commit (or a commit range / PR), never "the current files">
+**Claims to disprove first:** <the 3–6 load-bearing claims, lettered A, B, C…; name the one everything else rests on>
+**Out of scope:** <what not to review this round>
+**Review build:** `build/review-<short-sha>/{src,build}` at the fork PR head.
 
 **Budget** (AGENTS.md "How work flows"): one round, plus at most one recheck limited to the fixes. First run `ninja` in the review build (it must have nothing to do) and `git status` in its worktree (clean, at the PR SHA). Do not clone, configure or build from scratch, run `scripts/eval.py` or rebuild the G0 kernel. Run the existing qtest binary; make about three mutations of your own with incremental `ninja`, plus follow-ups to any that stays green, and reverse each. The implementer's boot log is the boot evidence; re-run a boot only if you doubt it, and say why. Write the report to the operator's working area.
 
