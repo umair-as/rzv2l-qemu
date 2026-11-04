@@ -60,10 +60,20 @@ semihost:
     hlt     #0xf000
     ret
 
-    /* One 32-bit load. If it aborts, the handler skips it. */
+    /* One load or store. If it aborts, the handler skips it. */
     .globl read32
 read32:
     ldr     w0, [x0]
+    ret
+
+    .globl read16
+read16:
+    ldrh    w0, [x0]
+    ret
+
+    .globl write32
+write32:
+    str     w1, [x0]
     ret
 
     .globl read_currentel

@@ -48,6 +48,11 @@ dev: arm-tzc400 @0000000011070000
 dev: renesas-rzv2l-cpg
   direct-boot = true
   mmio 0000000011010000/0000000000010000
+# DDR controller and PHY stub (M8-ddr-stub; device-map row DDR
+# controller + PHY): the controller's registers, then the PHY's
+dev: renesas-rzv2l-ddr
+  mmio 0000000011410000/0000000000010000
+  mmio 0000000011400000/0000000000010000
 # Stubs: device-map rows TSU (UNIMP), DMAC and USB PHY control
 # (write-retaining STUB).
 dev: unimplemented-device @0000000010059400
@@ -62,12 +67,8 @@ dev: unimplemented-device @0000000011830000
   name = "rz-dmac-ext"
   retain-writes = true
   mmio 0000000011830000/0000000000010000
-# DDR controller and OTP (M7-optee-uboot; device-map rows DDR controller,
-# OTP): U-Boot's ECC read and OP-TEE's chip ID; the chip ID defaults to 0.
-dev: unimplemented-device @0000000011410000
-  name = "ddr-memc"
-  retain-writes = false
-  mmio 0000000011410000/0000000000010000
+# OTP (M7-optee-uboot; device-map row OTP): OP-TEE's chip ID; it defaults
+# to 0.
 dev: renesas-rzg2l-otp
   chip-id0 = 0 (0x0)
   mmio 0000000011860000/0000000000010000

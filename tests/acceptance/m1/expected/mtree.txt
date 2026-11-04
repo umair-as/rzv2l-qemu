@@ -24,7 +24,8 @@
 #   64 KiB each, flash window 0x20000000, 256 MiB
 #   SRAM MCPU 0x00010000, SRAM ACPU 0x00020000, 64 KiB each; SYC 0x11000000, 8 KiB;
 #   TZC0-3 0x11040000 + n * 0x10000, 4 KiB of registers each (M7-el3-platform)
-#   DDR controller 0x11410000 (stub) and OTP 0x11860000, 64 KiB each (M7-optee-uboot)
+#   OTP 0x11860000, 64 KiB (M7-optee-uboot)
+#   DDR PHY 0x11400000 and controller 0x11410000, 64 KiB each (M8-ddr-stub)
 0000000000010000-000000000001ffff (prio 0, ram): sram-mcpu
 0000000000020000-000000000002ffff (prio 0, ram): sram-acpu
 0000000010049c00-0000000010049fff (prio -1000, i/o): ssi0
@@ -56,7 +57,8 @@
 0000000011060000-0000000011060fff (prio 0, i/o): arm-tzc400
 0000000011070000-0000000011070fff (prio 0, i/o): arm-tzc400
 00000000110a0000-00000000110affff (prio 0, i/o): renesas-rzg2l-irqc
-0000000011410000-000000001141ffff (prio -1000, i/o): ddr-memc
+0000000011400000-000000001140ffff (prio 0, i/o): renesas-rzv2l-ddr.phy
+0000000011410000-000000001141ffff (prio 0, i/o): renesas-rzv2l-ddr.memc
 0000000011820000-000000001182ffff (prio -1000, i/o): rz-dmac
 0000000011830000-000000001183ffff (prio -1000, i/o): rz-dmac-ext
 0000000011860000-000000001186ffff (prio 0, i/o): renesas-rzg2l-otp

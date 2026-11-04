@@ -1,6 +1,16 @@
 # Lines allowed in the -d unimp,guest_errors,invalid_mem log of the probe run.
-# Exactly the probe's two deliberate abort reads (M1-T05, AC14, AC13):
-# an unmapped address, and SYS_MSTACCCTL0 from the Non-secure world
-# (Secure only, as on the board).
+# Exactly the probe's deliberate aborts (M1-T05, AC14, AC13): an unmapped
+# address, SYS_MSTACCCTL0 from the Non-secure world (Secure only, as on
+# the board), and the DDR controller and PHY stub's refusals: a hole, past
+# the last register, a PHY offset the boot firmware never uses, a 16-bit
+# read, an unknown training and low-power command (M8-ddr-stub).
 Invalid read at addr 0x10000000, size 4, region '(null)', reason: rejected
 rzg2l_sysc_read: Non-secure read at offset 0x0 refused
+renesas-rzv2l-ddr: 4-byte controller access at 0x70 not supported
+renesas-rzv2l-ddr: 4-byte controller access at 0x7fc not supported
+renesas-rzv2l-ddr: 4-byte PHY access at 0x0 not supported
+renesas-rzv2l-ddr: 2-byte controller access at 0x4 not supported
+renesas-rzv2l-ddr: training command 0x10000000 not supported
+renesas-rzv2l-ddr: low-power command 0x5 not supported
+# The probe's write to a PHY status register: ignored, not a bus error
+renesas-rzv2l-ddr: write to the PHY status register at 0x148 ignored
