@@ -22,7 +22,7 @@ One page. Facts carry their source; inferences and assumptions are labelled (I) 
 
 ## Design choices (operator)
 
-1. **SFDP of the MT25QU512A.** Linux sizes this part from its SFDP tables; with only a 3-byte ID it reports `n25q512a` instead. Options: (a) read the board's SFDP and ID (read-only, under the board's Linux: `/sys/bus/spi/devices/*/spi-nor/{jedec_id,partname,sfdp}`), the recommendation; (b) the table from Micron's public datasheet (A until compared with the board); (c) no SFDP: Linux says `n25q512a`, recorded as a gap.
+1. **SFDP of the MT25QU512A.** Linux sizes this part from its SFDP tables; with only a 3-byte ID it reports `n25q512a` instead. Options: (a) read the board's SFDP and ID (read-only, under the board's Linux: `/sys/bus/spi/devices/*/spi-nor/{jedec_id,partname,sfdp}`), the recommendation; (b) the table from Micron's public datasheet (A until compared with the board); (c) no SFDP: Linux says `n25q512a`, recorded as a gap. Decided: (a); the board's ID and SFDP are recorded as EVK-L16 (`../../evidence/EVK-2026-11-04-spi-flash.md`).
 2. **The data byte-order rule** above: accept the inference, or measure it on the board first.
 
 ## Exit criterion

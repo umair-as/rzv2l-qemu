@@ -88,13 +88,12 @@ QEMU's `m25p80` models the Micron N25Q/MT25Q command set, including the non-vola
 
 | Item | Need | Source |
 |---|---|---|
-| JEDEC ID | `20 BB 20 10 44 00` (6 bytes) | F: Linux `micron-st.c:466`, U-Boot `spi-nor-ids.c:316`; the board's name `mt25qu512a` (O) is consistent; the bytes themselves are not yet read from the board |
+| JEDEC ID | `20 BB 20 10 44 00` (6 bytes) | F: Linux `micron-st.c:466`, U-Boot `spi-nor-ids.c:316`; the board's name `mt25qu512a` (O) is consistent; O: the board returns these bytes (EVK-L16, `../evidence/EVK-2026-11-04-spi-flash.md`) |
 | Size, sectors | 64 MiB, 64 KiB sectors, 4 KiB subsectors | F: U-Boot `INFO6(..., 64 * 1024, 1024, ...)`; O: `total 64 MiB`, `erase size 4 KiB` |
-| SFDP | Linux sizes the `mt25qu512a` from SFDP; without it Linux names the part `n25q512a` | F: `micron-st.c:466-479`; the table content needs a source (§6) |
+| SFDP | Linux sizes the `mt25qu512a` from SFDP; without it Linux names the part `n25q512a` | F: `micron-st.c:466-479`; O: the board's 136 bytes (SFDP 1.6, BFPT and 4-byte address table), EVK-L16 |
 | Contents | `bl2` 0-`0x1D000`, `fip` `0x1D000`-`0x2000000`, `user` `0x2000000`-`0x4000000` (G1 DT); G0 DT: `boot` 32 MiB, `user` 32 MiB | F: DTs |
 
 ## 6. Open items
 
-- **SFDP table and ID bytes of the board's flash.** Proposed read-only EVK measurement (not authorized): under the board's Linux, `cat /sys/bus/spi/devices/spi*/spi-nor/jedec_id` and `partname`, and `xxd /sys/bus/spi/devices/spi*/spi-nor/sfdp`, if the product kernel probes the flash. Until then: the ID from the guests' tables (F) and no SFDP, with the `n25q512a` fallback a recorded gap, or SFDP from Micron's public datasheet (A until compared with the board).
 - **Data byte order** (§4): an EVK read of NVCR before and after U-Boot's rewrite would confirm the rule; it needs a way to read NVCR on the board (no tool in the product image is known).
 - Not modelled: HyperFlash, Octal-SPI, two flashes (BSZ = 01), DDR, the write buffer, DMA high-speed mode (HS), the SPIHF interrupt, wire timing (SSLDR, PHY offsets, timing adjustment, CAL).
