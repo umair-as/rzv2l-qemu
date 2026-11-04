@@ -15,8 +15,9 @@ on-chip RAM. Checks:
           other line of the -d unimp,guest_errors,invalid_mem log is in
           expected/log-allow.txt
   errors: no flash drive, a flash without the loader signature, a loader
-          size of 0 or above 0x1D000, an image shorter than its loader:
-          QEMU stops at once, naming the cause
+          size of 0 or above 0x1D000: QEMU stops at once, naming the
+          cause; a size of exactly 0x1D000 boots; an image shorter than
+          the flash stops QEMU at the flash model's size check
 Writes OUTDIR/boot/{serial.log,qemu.log} and OUTDIR/errors/*.txt. Exit 0
 only if every check passes. QEMU binary: $QEMU.
 """
@@ -129,6 +130,13 @@ def errors(out):
         check(rc not in (None, 0) and re.search(msg, err) is not None,
               "errors: %s: QEMU stops (exit %s) with \"%s\""
               % (what, rc, msg.replace("\\", "")))
+    # A loader of exactly 0x1D000 bytes (BL2 and the 0xFF after it) fits
+    rc, err = qemu(["-serial", "file:" + os.path.join(out, "max.serial"),
+                    "-drive", "if=mtd,format=raw,file=" +
+                    image("max", size_block(0x1d000))], out, 10)
+    text = open(os.path.join(out, "max.serial"), errors="replace").read()
+    check(rc is None and re.search(BANNER[0], text) is not None,
+          "errors: a loader size of exactly 0x1D000 is accepted: BL2 starts")
     # An image shorter than its loader. m25p80 refuses a drive smaller
     # than the part, so the stand-in's own check cannot be reached through
     # the flash model: QEMU must still stop and say why.
