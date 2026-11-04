@@ -35,7 +35,7 @@ extern char _head[];
 #define PSCI_SUCCESS        0
 
 #define UNMAPPED_ADDR       0x10000000UL    /* no device in the M1 map */
-#define SYSC_NON_ID_ADDR    0x11020000UL    /* SYSC offset 0, not an ID reg */
+#define SYSC_NON_ID_ADDR    0x11020000UL    /* SYS_MSTACCCTL0: Secure only */
 
 #define ESR_EC_DABT_CUR     0x25            /* data abort, same EL */
 #define DFSC_SEA            0x10            /* synchronous external abort */
