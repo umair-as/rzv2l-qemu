@@ -360,6 +360,10 @@ RZ/V2L, with hardware available, calibrates the method: build the model, measure
 
 ## 22. Changes
 
+### v0.3 errata (2026-11-04)
+
+- §15 requirements: REQ-RPC-001 added for the SPI multi I/O bus controller and the module's QSPI flash, which §11 has functional by M7 (unit M7-rpc-spinor); statuses and traceability updated at the v1.1 closure.
+
 ### v0.3 errata (2026-10-29)
 
 - §15 work units, from M3b on: one-page `spec.md` (scope, what the guest needs, exit criterion, evidence); `design.md` dropped; `tasks.md` a short table with one mutation line per test; `traceability.md` and requirement statuses updated once at v1.0, not per unit (DR-0004 amendment 2026-10-29).

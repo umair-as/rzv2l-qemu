@@ -16,3 +16,14 @@ Fork tasks go on `unit/M1-machine-skeleton` in `qemu/`; project tasks on `main` 
 ## Closure
 
 Closed: reviewed and merged (`rzv2l-dev`, then `main`). Its traceability rows are updated with the v1.0 closure; the GIC identity it set from the TRM is confirmed on silicon by EVK-R60-R66 (`../../evidence/EVK-2026-10-29-post-firmware.md`).
+
+## Proofs added at the v1.1 closure
+
+The three M1 checks that had no recorded mutation (REQ-TEST-002), each built with a confirmed relink, run alone, then restored:
+
+| # | Mutation | Red line |
+|---|---|---|
+| 1 | `RZG2L_SYSC_BOOT_MODE_MAX` 5 → 6 (boot mode 6 accepted) | `rzv2l-smarc-test.c:144:test_sysc_boot_mode_reserved: child process ... did not fail as expected` |
+| 2 | `R9A07G054_GIC_IIDR` `0x0201743b` → `0x0201743a` | `rzv2l-smarc-test.c:187:test_gic_identity: assertion failed (qtest_readl(qts, GICD_BASE + GICD_IIDR) == GIC600_IIDR): (0x0201743a == 0x0201743b)` |
+| 3 | `R9A07G054_LSI_PRR` `0x0` → `0x1` | `rzv2l-smarc-test.c:96:test_sysc_id: assertion failed (qtest_readl(qts, SYSC_BASE + SYS_LSI_PRR) == LSI_PRR_RZV2L): (0x00000001 == 0x00000000)` |
+| 4 | `R9A07G054_LSI_SEC_EN` `true` → `false` (the default `SYS_LSI_MODE`) | `rzv2l-smarc-test.c:99:test_sysc_id: assertion failed (qtest_readl(qts, SYSC_BASE + SYS_LSI_MODE) == LSI_MODE_SEC_EN): (0x00000000 == 0x00010000)` |
