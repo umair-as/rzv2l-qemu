@@ -14,7 +14,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ tagged `rzv2l-v1.0` |
 | 🎯 | **v1.1** | M4-M7: Renesas's kernel, storage, networking, the board's firmware after BL2, the QSPI flash | ✅ tagged `rzv2l-v1.1` |
-| 🎯 | v2 | M8-M9: the full boot chain, platform behaviour | ⏳ |
+| 🎯 | v2 | M8-M9: the full boot chain, platform behaviour | 🔄 (M8 started) |
 
 ## Milestones
 
@@ -28,7 +28,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M5 | Storage | the SD controller with the real driver; ext4 root file system (real user space); eMMC deferred | G0, G1 |
 | ✅ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP, data checked both ways, link and reset recovery ([walkthrough](walkthrough.md#m6-ethernet)) | G0, G1 |
 | ✅ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage; the QSPI flash | G1 |
-| ⏳ | M8 | Full boot chain | TF-A BL2 from an SPI flash image, with a DDR stub | G1 |
+| 🔄 | M8 | Full boot chain | TF-A BL2 from an SPI flash image, with a DDR stub | G1 |
 | ⏳ | M9 | Platform behaviour | A/B selection, bootcount, rollback, FIT signatures | G1 |
 
 ## Work units
@@ -52,6 +52,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M7-optee-uboot](units/M7-optee-uboot/spec.md) | M7 | OP-TEE (without the closed crypto engine) and the vendor U-Boot after BL31; U-Boot loads Linux from the SD card, the root chosen by PARTUUID ([walkthrough](walkthrough.md#op-tee-and-u-boot-after-bl31)) |
 | ✅ | [M7-optee-linux](units/M7-optee-linux/spec.md) | M7 | Linux reaches OP-TEE: the project's TEE kernel (vendor source, `CONFIG_OPTEE`, a `/firmware/optee` overlay), `/dev/tee0`, a trusted-application call ([walkthrough](walkthrough.md#linux-and-op-tee)) |
 | ✅ | [M7-rpc-spinor](units/M7-rpc-spinor/spec.md) | M7 | the SPI multi I/O bus controller and the module's MT25QU512A flash: U-Boot detects and reads it, Linux registers its partitions and reads and writes them, with the board's ID and SFDP ([walkthrough](walkthrough.md#the-qspi-flash)) |
+| ✅ | [M8-bl2-staging](units/M8-bl2-staging/spec.md) | M8 | the board's TF-A BL2 starts from the QSPI flash: the flash image, a stand-in for the boot ROM's copy, the CPG PLLs and SYSC access control BL2 programs; it runs to its first DDR access ([walkthrough](walkthrough.md#m8-the-boards-bl2-from-the-qspi-flash)) |
 
 ## The SoC blocks
 
@@ -108,4 +109,5 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 1. ✅ **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
 2. ✅ **M6:** networking. [M6-ravb](units/M6-ravb/spec.md): both kernels get a DHCP lease through QEMU user networking and move data both ways with matching hashes.
-3. ✅ **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. [M7-optee-uboot](units/M7-optee-uboot/spec.md): OP-TEE and the vendor U-Boot follow BL31, and U-Boot loads Linux from the card; the root is chosen by PARTUUID (DR-0007), and the vendor's default boot is a separate compatibility check. [M7-optee-linux](units/M7-optee-linux/spec.md): with the project's TEE kernel, Linux calls a trusted application in OP-TEE. [M7-rpc-spinor](units/M7-rpc-spinor/spec.md): the SPI multi I/O bus controller and the module's QSPI flash, which U-Boot and Linux read and write. With this unit M7 is complete (release `rzv2l-v1.1`). ⏭️ Next: M8, the board's BL2 from the QSPI flash.
+3. ✅ **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. [M7-optee-uboot](units/M7-optee-uboot/spec.md): OP-TEE and the vendor U-Boot follow BL31, and U-Boot loads Linux from the card; the root is chosen by PARTUUID (DR-0007), and the vendor's default boot is a separate compatibility check. [M7-optee-linux](units/M7-optee-linux/spec.md): with the project's TEE kernel, Linux calls a trusted application in OP-TEE. [M7-rpc-spinor](units/M7-rpc-spinor/spec.md): the SPI multi I/O bus controller and the module's QSPI flash, which U-Boot and Linux read and write. With this unit M7 is complete (release `rzv2l-v1.1`).
+4. 🔄 **M8:** the full boot chain. [M8-bl2-staging](units/M8-bl2-staging/spec.md): the board's BL2 starts from the QSPI flash and runs to its DDR set-up. ⏭️ Next in M8: a DDR controller and PHY stub that BL2's training completes against, then the full chain from BL2 to the Linux shell.

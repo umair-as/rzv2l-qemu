@@ -293,13 +293,28 @@ echo hello-flash | dd of=/dev/mtdblock2 conv=fsync
 
 Quit (Ctrl-A X) and look at the image: `dd if=build/qspi.img bs=1 skip=$((0x2000000)) count=12` prints `hello-flash`, and a new start reads it back from `/dev/mtdblock2`. Read more: [`units/M7-rpc-spinor/spec.md`](units/M7-rpc-spinor/spec.md).
 
+## M8: the board's BL2 from the QSPI flash
+
+The board can boot from the module's QSPI flash (boot mode 3): its boot ROM copies TF-A's BL2 from the flash into on-chip RAM and starts it. QEMU stands in for the ROM's copy and runs the board's own BL2, built from the vendor source. Build BL2 and the flash image once (the firmware builds of M7 come first):
+
+```bash
+tests/guests/fw/build-tf-a.sh            # now also BL2, bptool and fiptool
+tests/guests/fw/build-spi-image.sh       # 64 MiB: boot parameter block, BL2 at 0x200, FIP at 0x20000
+cp tests/guests/out/spi/spi.img build/spi-try.img
+build/qemu/qemu-system-aarch64 -M rzv2l-smarc,boot-mode=3 -nographic \
+    -drive if=mtd,format=raw,file=build/spi-try.img \
+    -d unimp,guest_errors,invalid_mem -D build/spi-try.log
+```
+
+The console shows BL2's two banner lines, `NOTICE:  BL2: v2.10.5(release):2.10.5/rz_1.1.0` and `NOTICE:  BL2: Built : f59ed5a31`, and then nothing more: BL2 has set up its clocks, pins and the TrustZone controllers and now waits at its DDR set-up, which the model does not have yet. `build/spi-try.log` ends with `Invalid write at addr 0x11400200`, BL2's first write to the DDR PHY. Quit with Ctrl-A X. Without `-drive if=mtd`, or with a flash that holds no BL2, QEMU stops at once and says why. Read more: [`units/M8-bl2-staging/spec.md`](units/M8-bl2-staging/spec.md).
+
 ## Run every check at once
 
 ```bash
-tests/acceptance/m7/run.sh       # several minutes: it boots both kernels several times
+tests/acceptance/m8/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and the QSPI flash under U-Boot and Linux (reads of a random image, a write across a reboot and a QEMU restart), and prints `M7 ACCEPTANCE: PASS`. Then it boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and the QSPI flash under U-Boot and Linux (reads of a random image, a write across a reboot and a QEMU restart): the M7 run, whose report is `tests/acceptance/m8/out/m7.txt`. That report also boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. Then BL2 runs from the QSPI flash to its DDR set-up, the boot ROM stand-in's errors are checked, and the run prints `M8 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 
 ## Options of `scripts/run.sh`

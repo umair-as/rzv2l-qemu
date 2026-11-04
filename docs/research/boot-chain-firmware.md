@@ -43,7 +43,7 @@ Linux @ EL1, memory 0x48000000 + 0x78000000, PSCI via SMC
 
 | Fact | Source |
 |---|---|
-| U-Boot and the kernel run at EL1. `RCAR_BL33_EXECUTION_EL` is undefined under `plat/renesas/rz`, so it reads as 0, which selects EL1. | TF-A `plat/renesas/common/bl2_plat_mem_params_desc.c:18`; EVK boot log `CPU: All CPU(s) started at EL1` |
+| U-Boot and the kernel run at EL1. `RZG2L_BL33_EXECUTION_EL` is not defined for this platform, so it reads as 0, which selects EL1. | TF-A `plat/renesas/rz/common/bl2_plat_mem_params_desc.c:12-16`; EVK boot log `CPU: All CPU(s) started at EL1` |
 | The TZC-400 DDR secure regions exist only under `#if TRUSTED_BOARD_BOOT`, which this build sets to 0 | TF-A `plat/renesas/rz/common/plat_security.c:113-125`, `rz_common.mk:16` |
 | SiP `0x82000011` (chip ID) answers secure-world callers only | TF-A `common/rz_plat_sip_handler.c:34`; `PROTECTED_CHIPID=1` in `rz_common.mk:17` and in the compile log |
 | The PMIC and non-PMIC variants differ only in the DDR parameter table | TF-A V2L DDR tables; the two BL2 binaries differ by 86 bytes |
