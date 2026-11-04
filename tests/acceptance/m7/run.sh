@@ -5,9 +5,10 @@
 # then BL31, OP-TEE and U-Boot booting the kernel from the card
 # (docs/units/M7-optee-uboot/spec.md); then the project's TEE kernel
 # reaching OP-TEE from Linux (docs/units/M7-optee-linux/spec.md); then
-# the root chosen by PARTUUID (DR-0007). M6 acceptance first (which runs
-# M5 to M1 in direct mode). U-Boot boots with the project's boot
-# configuration (tests/guests/sd/boot.env).
+# the root chosen by PARTUUID (DR-0007); then the module's QSPI flash
+# under U-Boot and Linux (docs/units/M7-rpc-spinor/spec.md). M6
+# acceptance first (which runs M5 to M1 in direct mode). U-Boot boots
+# with the project's boot configuration (tests/guests/sd/boot.env).
 # Exit 0 only if every check passes ("M7 ACCEPTANCE").
 # Then, separately, the vendor's unchanged U-Boot boot (compat.py): its
 # own verdict line, "VENDOR-DEFAULT COMPATIBILITY", which does not change
@@ -58,6 +59,10 @@ step "root by PARTUUID: two attached cards, root on the other one; missing root"
 python3 -I "$HERE/rootsel.py" "$OUT/rootsel"
 rc=$?; result $rc; keep $rc rootsel
 
+step "QSPI flash: U-Boot sf probe/read and its NVCR rewrite; Linux ID, SFDP, partitions, reads, a write across reboot and restart"
+python3 -I "$HERE/flash.py" "$OUT/flash"
+rc=$?; result $rc; keep $rc flash
+
 step "EL3 probe: GICR_PWRR, TZC access by security state, MPIDR"
 "$HERE/../../probes/el3-secure/run.sh" > "$OUT/el3-secure.txt" 2>&1
 if [ $? -eq 0 ]; then
@@ -72,7 +77,7 @@ allow=$(cat "$HERE/../m4/expected/log-allow.txt" \
             "$HERE/../m5/expected/log-allow.txt" \
             "$HERE/expected/log-allow.txt" | grep -v -e '^#' -e '^$')
 for run in firmware bootloader tee rootsel/other-medium \
-           rootsel/missing-root; do
+           rootsel/missing-root flash/linux flash/restart; do
     log="$OUT/$run/qemu.log"
     if [ ! -s "$log" ]; then
         echo "FAIL $run/qemu.log: missing or empty"; result 1

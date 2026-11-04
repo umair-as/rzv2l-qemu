@@ -132,6 +132,14 @@ dev: renesas-gbeth @0000000011c30000
   mmio 0000000011c30000/0000000000010000
 dev: ksz9131-phy #0
 dev: ksz9131-phy #1
+# SPI Multi I/O Bus Controller: device-map row RPC / SPIBSC (registers,
+# the flash window); the module's MT25QU512A on QSPI0 at its factory
+# non-volatile configuration (FFFFh)
+dev: renesas-rzv2l-rpc
+  mmio 0000000010060000/0000000000010000
+  mmio 0000000020000000/0000000010000000
+dev: mt25qu512a
+  nonvolatile-cfg = 65535 (0xffff)
 # WDT0-2: device-map rows WDT0, WDT1, WDT2; counter clock 24 MHz (manual 21.1.1)
 dev: renesas-rzg2l-wdt @0000000012800400
   clock-frequency = 24000000 (0x16e3600)
@@ -164,10 +172,6 @@ dev: unimplemented-device @0000000010059000
   name = "adc"
   retain-writes = false
   mmio 0000000010059000/0000000000000400
-dev: unimplemented-device @0000000010060000
-  name = "rpc-if"
-  retain-writes = false
-  mmio 0000000010060000/0000000000010000
 dev: unimplemented-device @0000000010070000
   name = "rpc-if-wbuf"
   retain-writes = false
@@ -192,10 +196,6 @@ dev: unimplemented-device @0000000011c60000
   name = "usb0-func"
   retain-writes = false
   mmio 0000000011c60000/0000000000010000
-dev: unimplemented-device @0000000020000000
-  name = "rpc-if-dirmap"
-  retain-writes = false
-  mmio 0000000020000000/0000000010000000
 dev: arm-gicv3
   num-cpu = 2 (0x2)
   num-irq = 512 (0x200)

@@ -1,6 +1,6 @@
 # M7: the board's own firmware
 
-> **Context.** Milestone M7 (spec [§17](../spec/project.md#17-milestones)): the board's Trusted Firmware-A, OP-TEE and U-Boot in place of QEMU's shortcuts. Unit M7-el3-platform: [spec](../units/M7-el3-platform/spec.md), [tasks](../units/M7-el3-platform/tasks.md), register evidence [`../research/el3-platform.md`](../research/el3-platform.md). The boot chain is in [`../research/boot-chain-firmware.md`](../research/boot-chain-firmware.md). TF-A paths are under `plat/renesas/rz/common/` at commit `f59ed5a31`.
+> **Context.** Milestone M7 (spec [§17](../spec/project.md#17-milestones)): the board's Trusted Firmware-A, OP-TEE and U-Boot in place of QEMU's shortcuts. Unit M7-el3-platform: [spec](../units/M7-el3-platform/spec.md), [tasks](../units/M7-el3-platform/tasks.md), register evidence [`../research/el3-platform.md`](../research/el3-platform.md). The boot chain is in [`../research/boot-chain-firmware.md`](../research/boot-chain-firmware.md). TF-A paths are under `plat/renesas/rz/common/` at commit `f59ed5a31`. Unit M7-rpc-spinor (§7): [spec](../units/M7-rpc-spinor/spec.md), [tasks](../units/M7-rpc-spinor/tasks.md), register evidence [`../research/rpc.md`](../research/rpc.md); QEMU lines in §7 are at fork commit `f66bcc5e26`.
 
 Until M7, QEMU itself answered the kernel's power calls. This page shows what changes when the board's own BL31 does it: what BL31 needs to start, how it starts a second core through the SoC's registers, and how the model was found to be missing pieces one at a time. It is written for two readers. If you know the RZ/V2L boot chain, it shows which parts of it QEMU replaces and which run for real. If you are new to QEMU, it shows how a machine runs firmware at EL3 and how a CPU is powered on by a device model.
 
@@ -118,7 +118,83 @@ The board refused the read. U-Boot runs in the Non-secure world, and the bus ans
 3. **A probe at EL3.** A qtest's accesses carry no security state, and BL31's boot cannot tell some mistakes apart (it reads a `GICR_PWRR` that always reads 0 as "powered up"). `tests/probes/el3-secure/` is a small bare-metal program run as `-bios`. It checks the `GICR_PWRR` rules of the GIC-600 TRM from EL3, then drops to Non-secure EL1, finds `GICR_PWRR` reading 0 and a TZC read aborting, and returns to EL3 with an SMC to confirm the Non-secure writes changed nothing.
 4. **Mutations.** Nineteen plausible mistakes, each seen to turn a check red ([tasks](../units/M7-el3-platform/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)). Two stayed green at first and each got a test: an ignored P-Channel OFF, and a core that ignores one of its two resets.
 
-## 7. Pitfalls
+## 7. The QSPI flash
+
+The SMARC module has a 64 MiB serial NOR flash, a Micron MT25QU512A, on the SoC's SPI Multi I/O Bus Controller (Renesas also calls it RPC or SPIBSC). U-Boot rewrites one of the flash's registers on every boot, and the vendor kernel registers three partitions on it. This section shows how a guest reaches a flash through this controller, how QEMU connects a flash to a controller, and the one-byte error that the flash's own description table found.
+
+### Two ways to reach the flash
+
+The controller has two operating modes (manual §25.5.4):
+
+| Mode | The guest writes | The controller sends | Used for |
+|---|---|---|---|
+| manual mode | the command, address and data registers, then `SMCR.SPIE` | one flash command; the data goes through `SMWDR0` / `SMRDR0` | writes, erases, status and ID reads |
+| external address space read mode | nothing per read: it reads the 256 MiB window at `0x20000000` | one flash read command for each CPU read that misses the read cache | reading the flash's contents |
+
+In the second mode an ordinary load instruction becomes a flash command. The registers `DRCMR`, `DRENR` and `DRDMCR` set the command, which phases are sent, and how many dummy cycles come before the data. A Linux session that reads 16 bytes of a partition with `dd` shows both kinds of read. The trace is `--trace renesas_rzv2l_rpc_read`, counted by command with `uniq -c`, the addresses removed:
+
+```
+4096 renesas_rzv2l_rpc_read command 0xec address X length 4 burst 0
+   2 renesas_rzv2l_rpc_read command 0x9f address X length 256 burst 1
+```
+
+`0xec` is the 4-byte-address Quad I/O Fast Read. Linux reads the flash with it through the window, 4 bytes for each CPU access, without the cache (`burst 0`). `0x9f` is Read ID. The ID command has no address phase, so Linux reads its answer through the window from offset 0 with the cache on, as one burst of 32 lines (`renesas-rpc-if.c:551-578`).
+
+### The read cache
+
+With `DRCR.RBE` = 1 the controller reads through a cache of 32 lines of 8 bytes (manual §25.5.6). A miss reads `RBURST` + 1 lines from the flash, from an 8-byte boundary. A hit reads no flash. So the cache can hold old data after the flash changes, and the guest must flush it with `DRCR.RCF`. The qtest shows this with a page program between two reads (`tests/qtest/rzv2l-rpc-test.c:422`):
+
+1. Read address 4 through the cache: `0xffffffff`, the erased flash.
+2. Program 16 bytes of `0x00` at address 0 in manual mode.
+3. Read address 4 again: still `0xffffffff`, a cache hit.
+4. Write `DRCR.RCF` and read again: `0x00000000`.
+
+A model without the cache returns `0x00000000` at step 3 (proof 7 in the unit's tasks). With `DRCR.SSLE` = 1 the chip select stays asserted after a burst, and the next miss at the following address continues the same flash command. While it waits, `CMNSR.TEND` reads 0 (manual §25.5.12; `qemu/hw/ssi/renesas_rzv2l_rpc.c:776`).
+
+### A flash on an SSI bus
+
+QEMU already has a model of SPI NOR flash: `m25p80` (`qemu/hw/block/m25p80.c`). It is a device on QEMU's SSI bus. The controller owns the bus and drives a chip-select line. The board puts the flash on the bus (`info qtree`):
+
+```
+dev: renesas-rzv2l-rpc, id ""
+  gpio-in "clk" 1
+  gpio-in "rst" 1
+  gpio-out "sysbus-irq" 2
+  mmio 0000000010060000/0000000000010000
+  mmio 0000000020000000/0000000010000000
+  bus: spi
+    type SSI
+    dev: mt25qu512a, id ""
+      nonvolatile-cfg = 65535 (0xffff)
+```
+
+One SSI transfer moves one byte each way. The controller model sends a command as bytes: the command byte, the address bytes, the option bytes, the dummy cycles, then the data (`rpc_build_header`, `qemu/hw/ssi/renesas_rzv2l_rpc.c:314`). The bus has no lines, so the 1-bit or 4-bit width of a phase does not change the bytes. The one place the width counts is the dummy phase: the model sends cycles × lines / 8 bytes, with the width of the address phase (`renesas_rzv2l_rpc.c:400`). `m25p80` counts its dummy bytes in the same way. The `clk` and `rst` inputs come from the CPG (`CPG_CLKON_SPI_MULTI`, `CPG_RST_SPI`). While the reset is applied or the clocks are off, an access to the controller is refused.
+
+### The one-byte shift
+
+The first boot with the flash showed the right ID and partitions, but every read from Linux came one byte early:
+
+```
+image:  76 37 81 99 e4 7a 00 1e 27 f5 ae b5 e6 ab ad 95
+Linux:  37 81 99 e4 7a 00 1e 27 f5 ae b5 e6 ab ad 95 b9
+```
+
+The trace gave the cause: Linux reads with `0xec`, the 1-4-4 command (one line for the command, four lines for the address and the data). Linux takes its dummy cycles from the flash's SFDP table, the parameter table that a flash returns for command `0x5a`. The board's flash says 1 mode clock and 9 wait states for this command, that is 10 cycles (EVK-L16, [`../evidence/EVK-2026-11-04-spi-flash.md`](../evidence/EVK-2026-11-04-spi-flash.md)). On four lines, 10 cycles are 5 bytes. `m25p80` gave Micron parts 10 dummy cycles only in the Quad I/O protocol and 8 in the normal one, which is 4 bytes. So the controller sent 5 dummy bytes, the flash model started its data after 4, and the controller dropped the first data byte. The fix is in the flash model: Quad I/O Fast Read gets 10 cycles in every protocol (`qemu/hw/block/m25p80.c:995`).
+
+The ID read had worked because it has no dummy cycles. A boot that only prints the flash's name proves nothing about its data. The acceptance run reads a random 64 MiB image back through U-Boot and Linux ([`../../tests/acceptance/m7/flash.py`](../../tests/acceptance/m7/flash.py)).
+
+### Where the bytes go in the data registers
+
+Data shorter than 4 bytes in manual mode has two conventions in the guests:
+
+| Guest | 1- or 2-byte write | 1- or 2-byte read |
+|---|---|---|
+| U-Boot, TF-A | a 32-bit write, data in the top bytes (`<< 24`, `<< 16`) | TF-A: a 32-bit read, data in bits 7:0 |
+| Linux | `writeb`/`writew` at offset 0 | `readb`/`readw` at offset 0 |
+
+The manual puts a short transfer in bits 7:0 or 15:0 of `SMRDR0` and `SMWDR0` (Figure 25.32). Reads agree with all guests, so the model fills `SMRDR0` from bit 0 (`renesas_rzv2l_rpc.c:495`). Writes disagree: U-Boot's top-byte writes work on the board. U-Boot writes the flash's non-volatile configuration register with them on every boot, and the flash still answers normal SPI commands afterwards (EVK-L16). If those bytes came from bits 15:0, U-Boot would write `0x0000`, which selects the flash's quad-only protocol. So the model sends the top bytes of `SMWDR0`, and a 1- or 2-byte write at offset 0 lands there (`renesas_rzv2l_rpc.c:492`). This is an inference, recorded in [`../research/rpc.md`](../research/rpc.md) §4. The acceptance run checks the result: U-Boot reads `FFFFh` from the register and writes `FFEFh` back, as its code intends.
+
+## 8. Pitfalls
 
 - **Two structures, one name.** A firmware tree can hold a platform family's copy of a structure next to another family's. Take the layout from the header the platform builds with, and confirm it in the binary (TF-A `include/rz_private.h:42`).
 - **A release firmware panics in silence.** BL31 built with `DEBUG=0` prints nothing when it panics. Read the PC from the QEMU monitor and the exception from `-d int` before you guess.
@@ -127,3 +203,8 @@ The board refused the read. U-Boot runs in the Non-secure world, and the bus ans
 - **QEMU's own PSCI must step aside.** If the CPUs' PSCI conduit is set, QEMU answers the kernel's SMCs, and a firmware boot "works" without BL31 doing anything. Check the SMC Calling Convention version the kernel prints: v1.4 is BL31, v1.0 is QEMU.
 - **Secure-only registers fail loudly on silicon.** A Non-secure read of a TZC register aborts on the board; a model that answers it hides the mistake from whoever wrote the access. Ask the board from the Non-secure world (U-Boot `md`) before assuming a register is readable there, and expect a reset if it is not.
 - **`poweroff` does not end the run.** This BL31 has no `SYSTEM_OFF` (`plat_pm.c:109`): it waits, as the board does. A test that waits for QEMU to exit will hang in firmware mode.
+- **A controller's reset values can select another kind of flash.** After reset, `CMNCR.BSZ` says two flash memories, `PHYCNT.PHYMEM` says HyperFlash and `DRDRENR` says DDR (manual Table 25.2). The guest must set all three before a serial flash works. A model that ignores them hides a guest that forgets one.
+- **A flash's own table beats a model's defaults.** QEMU's `m25p80` default for Micron dummy cycles did not match the part's SFDP table, and Linux follows the table. Read the part's SFDP on the board (`/sys/bus/spi/devices/*/spi-nor/sfdp`) and give the model those bytes (EVK-L16).
+- **Dummy cycles are not bytes on every line count.** On a byte-wide SSI bus a dummy phase is cycles × lines / 8 bytes. A count of cycles that is not a whole number of bytes cannot be sent. The model refuses such a setting and logs it (`renesas_rzv2l_rpc.c:400`).
+- **A read cache returns old data until it is flushed.** After a manual-mode write, a read through the window can come from the cache (manual §25.5.6). The guest flushes with `DRCR.RCF` and reads `DRCR` once before the next window read (manual §25.4.3).
+- **The flash keeps state that the image file does not.** The non-volatile configuration register lives in the flash, not in its array. On the board U-Boot's write stays; in the model each QEMU start begins at the factory `FFFFh` ([`../device-map.md`](../device-map.md), gap 25).

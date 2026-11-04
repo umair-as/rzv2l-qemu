@@ -8,12 +8,12 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M3 is done: the plain upstream Linux kernel boots to a shell on the board's serial console, on both CPUs.** That completes the v1.0 target (M2 + M3). Traceability and requirement statuses are updated: 20 of 27 requirements verified, the rest planned for M4-M7 or noted ([traceability](spec/traceability.md)). **Tagged `rzv2l-v1.0`** (QEMU fork `rzv2l-dev` `aa1764973d`); the tag message lists the scope and the open requirements.
 
-**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 is done: both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs** ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)). An eMMC for boot mode 1 is deferred. **M6 is done: both kernels reach the network through the board's Gigabit Ethernet and PHY, get a DHCP lease, and move data both ways with matching hashes, through link and reset changes** ([walkthrough](walkthrough.md#m6-ethernet)).
+**M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 is done: both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs** ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)). An eMMC for boot mode 1 is deferred. **M6 is done: both kernels reach the network through the board's Gigabit Ethernet and PHY, get a DHCP lease, and move data both ways with matching hashes, through link and reset changes** ([walkthrough](walkthrough.md#m6-ethernet)). **M7 is done: the board's own firmware after BL2 (TF-A BL31, OP-TEE without the closed crypto engine, the vendor U-Boot) boots Renesas's kernel from the SD card, Linux calls a trusted application in OP-TEE, and U-Boot and Linux read and write the module's QSPI flash** ([walkthrough](walkthrough.md#m7-the-boards-own-firmware)).
 
 | | Release | Milestones | State |
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ tagged `rzv2l-v1.0` |
-| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 (M4, M5, M6 done) |
+| 🎯 | v2 | M4-M9: vendor software, storage, networking, real firmware | 🔄 (M4-M7 done) |
 
 ## Milestones
 
@@ -26,7 +26,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M4 | Vendor kernel | Renesas's own kernel and device tree to the same shell; the watchdog; U-Boot's device-tree edits | G1 |
 | ✅ | M5 | Storage | the SD controller with the real driver; ext4 root file system (real user space); eMMC deferred | G0, G1 |
 | ✅ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP, data checked both ways, link and reset recovery ([walkthrough](walkthrough.md#m6-ethernet)) | G0, G1 |
-| 🔄 | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage | G1 |
+| ✅ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage; the QSPI flash | G1 |
 | ⏳ | M8 | Full boot chain | TF-A BL2 from an SPI flash image, with a DDR stub | G1 |
 | ⏳ | M9 | Platform behaviour | A/B selection, bootcount, rollback, FIT signatures | G1 |
 
@@ -50,6 +50,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M7-el3-platform](units/M7-el3-platform/spec.md) | M7 | the board's TF-A BL31 as the PSCI firmware (firmware mode): CPU1 on and off, reset through WDT0 |
 | ✅ | [M7-optee-uboot](units/M7-optee-uboot/spec.md) | M7 | OP-TEE (without the closed crypto engine) and the vendor U-Boot after BL31; U-Boot loads Linux from the SD card, the root chosen by PARTUUID ([walkthrough](walkthrough.md#op-tee-and-u-boot-after-bl31)) |
 | ✅ | [M7-optee-linux](units/M7-optee-linux/spec.md) | M7 | Linux reaches OP-TEE: the project's TEE kernel (vendor source, `CONFIG_OPTEE`, a `/firmware/optee` overlay), `/dev/tee0`, a trusted-application call ([walkthrough](walkthrough.md#linux-and-op-tee)) |
+| ✅ | [M7-rpc-spinor](units/M7-rpc-spinor/spec.md) | M7 | the SPI multi I/O bus controller and the module's MT25QU512A flash: U-Boot detects and reads it, Linux registers its partitions and reads and writes them, with the board's ID and SFDP ([walkthrough](walkthrough.md#the-qspi-flash)) |
 
 ## The SoC blocks
 
@@ -68,7 +69,8 @@ What the model does with each block the guest touches. Classes: [`device-map.md`
 | 🟡 | DMAC, USB PHY control | stubs that keep written values | later |
 | ✅ | ETH0/1 (Gigabit Ethernet) + KSZ9131 PHYs | modelled: descriptor DMA, MDIO, checksum offload, link interrupts; the first `-nic` is ETH0 | M6 |
 | 🟡 | I2C, USB host, thermal sensor | stubs: the drivers fail within a bound | later |
-| 🟡 | display, CAN-FD, QSPI, USB function, SSI, RSPI, ADC | stubs for the drivers the vendor kernel builds in | later (QSPI: M7) |
+| 🟡 | display, CAN-FD, USB function, SSI, RSPI, ADC | stubs for the drivers the vendor kernel builds in | later |
+| ✅ | QSPI (SPI multi I/O bus controller) + MT25QU512A flash | modelled: manual mode, the read window with its read cache; `-drive if=mtd`; HyperFlash, Octal-SPI and the write buffer not supported | M7 |
 | ✅ | WDT0-2 (watchdog) | modelled; a watchdog reset resets the board through the CPG | M4 |
 | ✅ | SDHI0/1 (SD/MMC host) | modelled with the built-in DMA engine, for SD cards; bus tuning (SCC) not modelled | M5 |
 | ⏳ | TSIP (closed crypto) | fails visibly; OP-TEE is rebuilt without it | M7 |
@@ -105,4 +107,4 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 
 1. ✅ **M5:** storage. [M5-sdhi](units/M5-sdhi/spec.md): both kernels read and write ext4 on an SD card. [M5-sd-rootfs](units/M5-sd-rootfs/spec.md): both boot user space from an ext4 root on the card, without an initramfs, and keep their files across power-off and reset. With this unit M5 is complete. An eMMC behind SDHI0 for boot mode 1 is deferred (operator's decision): nothing planned needs it yet.
 2. ✅ **M6:** networking. [M6-ravb](units/M6-ravb/spec.md): both kernels get a DHCP lease through QEMU user networking and move data both ways with matching hashes.
-3. 🔄 **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. [M7-optee-uboot](units/M7-optee-uboot/spec.md): OP-TEE and the vendor U-Boot follow BL31, and U-Boot loads Linux from the card; the root is chosen by PARTUUID (DR-0007), and the vendor's default boot is a separate compatibility check. [M7-optee-linux](units/M7-optee-linux/spec.md): with the project's TEE kernel, Linux calls a trusted application in OP-TEE. ⏭️ Next in M7: the SPI flash controller and its flash.
+3. ✅ **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. [M7-optee-uboot](units/M7-optee-uboot/spec.md): OP-TEE and the vendor U-Boot follow BL31, and U-Boot loads Linux from the card; the root is chosen by PARTUUID (DR-0007), and the vendor's default boot is a separate compatibility check. [M7-optee-linux](units/M7-optee-linux/spec.md): with the project's TEE kernel, Linux calls a trusted application in OP-TEE. [M7-rpc-spinor](units/M7-rpc-spinor/spec.md): the SPI multi I/O bus controller and the module's QSPI flash, which U-Boot and Linux read and write. With this unit M7 is complete. ⏭️ Next: the release `rzv2l-v1.1`, then M8.

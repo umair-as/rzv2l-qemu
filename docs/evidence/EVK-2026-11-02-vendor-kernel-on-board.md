@@ -44,7 +44,7 @@
 
 **Questions:** (1) is WDT0 running and its system reset enabled at the U-Boot prompt, before `booti`? (2) after Linux's unused-clock sweep, do WDT0's clocks stay off and does the board stay up for 3 minutes unfed? (3) which names do the SD hosts get on a second boot?
 
-**Observations (O):** at the U-Boot prompt (`md.l`, reads only):
+**Observations (O):** the product U-Boot's start (both resets): `SF: Detected mt25qu512a with page size 256 Bytes, erase size 4 KiB, total 64 MiB` (the product U-Boot, not the project's vendor build). At the U-Boot prompt (`md.l`, reads only):
 
 ```
 11010548: 000000ff     CPG_CLKON_WDT

@@ -245,7 +245,7 @@ cp tests/guests/out/sd/sd.img build/sd-try.img
 scripts/run.sh -u --sd build/sd-try.img
 ```
 
-On the console, in order: the BL31 banner; `I/TC: Primary CPU switching to normal world boot` (OP-TEE); `U-Boot 2024.07-g4eebfbaa4e`, `DRAM:  1.9 GiB` and `unrecognized JEDEC id bytes: 00, 00, 00` (there is no SPI flash model yet); `Loading Environment from MMC... Reading from MMC(0)... OK`: the card carries the project's boot configuration in U-Boot's environment block (`tests/guests/sd/boot.env`); after a 2-second countdown `25963008 bytes read`; then Linux with `psci: Trusted OS migration not required` (BL31 answers through OP-TEE, as on the board) and both CPUs. The configuration names the root by the partition's identifier, `root=PARTUUID=525a0001-02`, not by its Linux name, so the shell comes up whichever name Linux gives the card; the prompt line says both, e.g. `SD-ROOT: ready, root /dev/mmcblk1p2, boot 1, partuuid 525a0001-02, card sd`. U-Boot leaves the watchdog running with 60 s, but Linux stops its clock when no program uses it, so the board does not reset, as on the real board. At the shell try CPU1 off and on and `reboot` as above. To see the vendor's own boot instead, clear the card's saved environment: `python3 tests/guests/sd/uboot-env.py clear build/sd-try.img`. U-Boot then says `bad CRC, using default environment` and passes `root=/dev/mmcblk0p2`; about half such boots get the card as `mmcblk1` (the vendor device tree does not fix the names) and stop at `Waiting for root device /dev/mmcblk0p2...` for ever, so quit (Ctrl-A X). One thing can go wrong under emulation either way: a boot that hangs right after OP-TEE's last line, or in the middle of a U-Boot line, lost a console race; quit and start again. That race is more frequent when the host is busy, so run on an otherwise idle machine; this makes a hang rarer, it does not rule it out. Read more: [`units/M7-optee-uboot/spec.md`](units/M7-optee-uboot/spec.md).
+On the console, in order: the BL31 banner; `I/TC: Primary CPU switching to normal world boot` (OP-TEE); `U-Boot 2024.07-g4eebfbaa4e`, `DRAM:  1.9 GiB` and `SF: Detected mt25qu512a with page size 256 Bytes, erase size 4 KiB, total 64 MiB` (the module's QSPI flash, the same line as on the board); `Loading Environment from MMC... Reading from MMC(0)... OK`: the card carries the project's boot configuration in U-Boot's environment block (`tests/guests/sd/boot.env`); after a 2-second countdown `25963008 bytes read`; then Linux with `psci: Trusted OS migration not required` (BL31 answers through OP-TEE, as on the board) and both CPUs. The configuration names the root by the partition's identifier, `root=PARTUUID=525a0001-02`, not by its Linux name, so the shell comes up whichever name Linux gives the card; the prompt line says both, e.g. `SD-ROOT: ready, root /dev/mmcblk1p2, boot 1, partuuid 525a0001-02, card sd`. U-Boot leaves the watchdog running with 60 s, but Linux stops its clock when no program uses it, so the board does not reset, as on the real board. At the shell try CPU1 off and on and `reboot` as above. To see the vendor's own boot instead, clear the card's saved environment: `python3 tests/guests/sd/uboot-env.py clear build/sd-try.img`. U-Boot then says `bad CRC, using default environment` and passes `root=/dev/mmcblk0p2`; about half such boots get the card as `mmcblk1` (the vendor device tree does not fix the names) and stop at `Waiting for root device /dev/mmcblk0p2...` for ever, so quit (Ctrl-A X). One thing can go wrong under emulation either way: a boot that hangs right after OP-TEE's last line, or in the middle of a U-Boot line, lost a console race; quit and start again. That race is more frequent when the host is busy, so run on an otherwise idle machine; this makes a hang rarer, it does not rule it out. Read more: [`units/M7-optee-uboot/spec.md`](units/M7-optee-uboot/spec.md).
 
 ### Linux and OP-TEE
 
@@ -270,13 +270,36 @@ optee_example_hello_world          # Invoking TA to increment 42 ... TA incremen
 
 The trusted application runs in OP-TEE, in the secure world, and logs `I/TA: Hello World!` on the console itself. OP-TEE warns `Failed to get monotonic counter for REE FS`: there is no RPMB, so its secure storage has no rollback counter. There is no hardware crypto or random number generator either: the board's TSIP is closed, and OP-TEE is built without it. Read more: [`units/M7-optee-linux/spec.md`](units/M7-optee-linux/spec.md).
 
+### The QSPI flash
+
+The SMARC module carries a 64 MiB QSPI NOR flash on the SoC's SPI multi I/O bus controller. U-Boot finds it at every start (the `SF: Detected` line above), and the vendor kernel registers the three partitions of its device tree. Give it an image to keep what is written; without one it starts erased and forgets at exit. Start erased, then stop U-Boot within its 2-second countdown (any key):
+
+```bash
+head -c 64M /dev/zero | tr '\000' '\377' > build/qspi.img
+cp tests/guests/out/sd/sd.img build/sd-try.img
+scripts/run.sh -u --sd build/sd-try.img -- -drive if=mtd,format=raw,file=build/qspi.img
+```
+
+At the U-Boot prompt and then in Linux:
+
+```bash
+sf probe                           # SF: Detected mt25qu512a ... total 64 MiB
+sf read 0x48000000 0 0x100; md.b 0x48000000 0x10    # ff ff ...: erased
+boot                               # on to Linux
+cat /proc/mtd                      # mtd0 "bl2", mtd1 "fip", mtd2 "user"
+cat /sys/bus/spi/devices/spi1.0/spi-nor/partname     # mt25qu512a
+echo hello-flash | dd of=/dev/mtdblock2 conv=fsync
+```
+
+Quit (Ctrl-A X) and look at the image: `dd if=build/qspi.img bs=1 skip=$((0x2000000)) count=12` prints `hello-flash`, and a new start reads it back from `/dev/mtdblock2`. Read more: [`units/M7-rpc-spinor/spec.md`](units/M7-rpc-spinor/spec.md).
+
 ## Run every check at once
 
 ```bash
 tests/acceptance/m7/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, and the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and prints `M7 ACCEPTANCE: PASS`. Then it boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and the QSPI flash under U-Boot and Linux (reads of a random image, a write across a reboot and a QEMU restart), and prints `M7 ACCEPTANCE: PASS`. Then it boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 
 ## Options of `scripts/run.sh`
