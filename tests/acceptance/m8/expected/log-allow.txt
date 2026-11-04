@@ -1,5 +1,5 @@
 # Lines allowed in the -d unimp,guest_errors,invalid_mem log of BL2's run
-# from the QSPI flash, before its first DDR access. One extended regex per
+# from the QSPI flash, to "Booting BL31". One extended regex per
 # line, each with the reason it is not a gap.
 #
 # BL2's pfc_setup() writes the drive strength, slew rate, pull and input

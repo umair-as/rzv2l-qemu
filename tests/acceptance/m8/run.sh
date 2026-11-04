@@ -2,7 +2,8 @@
 # M8 acceptance for rzv2l-smarc: the board's TF-A BL2 from the QSPI flash
 # in boot mode 3, with the machine standing in for the boot ROM
 # (docs/units/M8-bl2-staging/spec.md); M7 acceptance first (which runs
-# M6 to M1). BL2 runs to its DDR set-up, the next unit's work.
+# M6 to M1). BL2 sets up the DDR, reads the FIP and starts BL31; what
+# BL31 and the rest of the chain do is the next unit's check.
 # Exit 0 only if every check passes ("M8 ACCEPTANCE").
 # QEMU binary: $QEMU or ../../../build/qemu/qemu-system-aarch64
 # Guests: tests/guests/out (tests/guests/fw/build-tf-a.sh,
@@ -26,7 +27,7 @@ else
     echo "FAIL M7 acceptance (full output: out/m7.txt)"; result 1
 fi
 
-step "BL2 from the QSPI flash: banner, the stop at the DDR set-up, the boot ROM stand-in's errors"
+step "BL2 from the QSPI flash: banner, DDR set-up to Booting BL31, the boot ROM stand-in's errors"
 python3 -I "$HERE/bl2.py" "$OUT/bl2"
 result $?
 

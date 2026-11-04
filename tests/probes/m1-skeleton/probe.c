@@ -4,7 +4,8 @@
  * exits 0 when every check passes, 1 otherwise.
  *
  * Expected values and their sources: docs/units/M1-machine-skeleton/
- * spec.md (AC03-AC06, AC13, AC14) and design.md "Probe payload".
+ * spec.md (AC03-AC06, AC13, AC14) and design.md "Probe payload"; the
+ * DDR stub's refusals: docs/units/M8-ddr-stub/spec.md.
  */
 #include <stdint.h>
 
@@ -12,6 +13,8 @@
 uint64_t smc_call(uint64_t fid, uint64_t a1, uint64_t a2, uint64_t a3);
 uint64_t semihost(uint64_t op, const void *param);
 uint32_t read32(uint64_t addr);
+uint32_t read16(uint64_t addr);
+void write32(uint64_t addr, uint32_t val);
 uint64_t read_currentel(void);
 void secondary_entry(void);
 extern char _head[];
@@ -36,6 +39,13 @@ extern char _head[];
 
 #define UNMAPPED_ADDR       0x10000000UL    /* no device in the M1 map */
 #define SYSC_NON_ID_ADDR    0x11020000UL    /* SYS_MSTACCCTL0: Secure only */
+/*
+ * DDR controller and PHY stub (docs/units/M8-ddr-stub/spec.md): offsets
+ * outside the boot firmware's set, other widths and unknown commands
+ * are bus errors; a write to a PHY status register is ignored
+ */
+#define DDR_MC_ADDR         0x11410000UL
+#define DDR_PHY_ADDR        0x11400000UL
 
 #define ESR_EC_DABT_CUR     0x25            /* data abort, same EL */
 #define DFSC_SEA            0x10            /* synchronous external abort */
@@ -153,11 +163,25 @@ void exc_handler(void)
     }
     abort_esr = esr;
     expect_abort = 0;
-    /* Skip the faulting load */
+    /* Skip the faulting load or store */
     WRITE_SYSREG(elr_el1, READ_SYSREG(elr_el1) + 4);
 }
 
-static void check_aborts(const char *name, uint64_t addr)
+enum access { RD32, RD16, WR32 };
+
+static void access(enum access how, uint64_t addr, uint32_t val)
+{
+    if (how == RD32) {
+        (void)read32(addr);
+    } else if (how == RD16) {
+        (void)read16(addr);
+    } else {
+        write32(addr, val);
+    }
+}
+
+static void check_aborts_on(const char *name, enum access how,
+                            uint64_t addr, uint32_t val)
 {
     uint64_t esr;
     char ec_name[64], dfsc_name[64];
@@ -165,13 +189,13 @@ static void check_aborts(const char *name, uint64_t addr)
 
     abort_esr = 0;
     expect_abort = 1;
-    (void)read32(addr);
+    access(how, addr, val);
     if (expect_abort) {
-        /* No exception: the read returned data */
+        /* No exception: the access completed */
         expect_abort = 0;
         puts_("FAIL ");
         puts_(name);
-        puts_(": read completed without an abort\n");
+        puts_(": access completed without an abort\n");
         failures++;
         return;
     }
@@ -189,6 +213,37 @@ static void check_aborts(const char *name, uint64_t addr)
     dfsc_name[n + i] = 0;
     check(ec_name, esr >> 26, ESR_EC_DABT_CUR, 0);
     check(dfsc_name, esr & 0x3f, DFSC_SEA, 0);
+}
+
+static void check_aborts(const char *name, uint64_t addr)
+{
+    check_aborts_on(name, RD32, addr, 0);
+}
+
+/* A write the model ignores: it completes, no abort, and changes nothing */
+static void check_ignored(const char *name, uint64_t addr, uint32_t val,
+                          uint32_t reads)
+{
+    char esr_name[64], rd_name[64];
+    int i, n;
+
+    for (n = 0; name[n] && n < 48; n++) {
+        esr_name[n] = rd_name[n] = name[n];
+    }
+    for (i = 0; " ESR"[i]; i++) {
+        esr_name[n + i] = " ESR"[i];
+    }
+    esr_name[n + i] = 0;
+    for (i = 0; " read-back"[i]; i++) {
+        rd_name[n + i] = " read-back"[i];
+    }
+    rd_name[n + i] = 0;
+    abort_esr = 0;
+    expect_abort = 1;
+    write32(addr, val);
+    check(esr_name, expect_abort ? 0 : abort_esr, 0, 0);
+    expect_abort = 0;
+    check(rd_name, read32(addr), reads, 0);
 }
 
 /* ---------------- CPUs ---------------- */
@@ -266,6 +321,17 @@ void probe_main(void)
     puts_("-- aborts\n");
     check_aborts("unmapped 0x10000000", UNMAPPED_ADDR);
     check_aborts("SYSC offset 0x0", SYSC_NON_ID_ADDR);
+    check_aborts("DDR controller hole 0x070", DDR_MC_ADDR + 0x070);
+    check_aborts("DDR controller 0x7fc", DDR_MC_ADDR + 0x7fc);
+    check_aborts("DDR PHY 0x000", DDR_PHY_ADDR + 0x000);
+    check_aborts_on("DDR controller 16-bit read", RD16, DDR_MC_ADDR + 0x004,
+                    0);
+    check_aborts_on("DDR PHY unknown training command", WR32,
+                    DDR_PHY_ADDR + 0x100, 0x10000000);
+    check_aborts_on("DDR controller unknown low-power command", WR32,
+                    DDR_MC_ADDR + 0x0e8, 0x00000500);
+    check_ignored("DDR PHY status write ignored", DDR_PHY_ADDR + 0x148, 0,
+                  0x3);
 
     puts_(failures ? "RESULT: FAIL (" : "RESULT: PASS (");
     putdec(failures);

@@ -295,7 +295,7 @@ Quit (Ctrl-A X) and look at the image: `dd if=build/qspi.img bs=1 skip=$((0x2000
 
 ## M8: the board's BL2 from the QSPI flash
 
-The board can boot from the module's QSPI flash (boot mode 3): its boot ROM copies TF-A's BL2 from the flash into on-chip RAM and starts it. QEMU stands in for the ROM's copy and runs the board's own BL2, built from the vendor source. Build BL2 and the flash image once (the firmware builds of M7 come first):
+The board can boot from the module's QSPI flash (boot mode 3): its boot ROM copies TF-A's BL2 from the flash into on-chip RAM and starts it. QEMU stands in for the ROM's copy and runs the board's own BL2, built from the vendor source. BL2 sets up the DDR against a stub of the DDR controller and PHY, then loads BL31, OP-TEE and U-Boot from the flash. Build BL2 and the flash image once (the firmware builds of M7 come first):
 
 ```bash
 tests/guests/fw/build-tf-a.sh            # now also BL2, bptool and fiptool
@@ -306,7 +306,7 @@ build/qemu/qemu-system-aarch64 -M rzv2l-smarc,boot-mode=3 -nographic \
     -d unimp,guest_errors,invalid_mem -D build/spi-try.log
 ```
 
-The console shows BL2's two banner lines, `NOTICE:  BL2: v2.10.5(release):2.10.5/rz_1.1.0` and `NOTICE:  BL2: Built : f59ed5a31`, and then nothing more: BL2 has set up its clocks, pins and the TrustZone controllers and now waits at its DDR set-up, which the model does not have yet. `build/spi-try.log` ends with `Invalid write at addr 0x11400200`, BL2's first write to the DDR PHY. Quit with Ctrl-A X. Without `-drive if=mtd`, or with a flash that holds no BL2, QEMU stops at once and says why. Read more: [`units/M8-bl2-staging/spec.md`](units/M8-bl2-staging/spec.md).
+The console shows BL2's banner, then `NOTICE:  BL2: RZ/V2L`, `SYS_LSI_MODE: 0x10003`, `SYS_LSI_DEVID: 0x18447447`, `SYS_LSI_PRR: 0x0` and `NOTICE:  BL2: Booting BL31`: the DDR set-up and the FIP read are done. BL31's and OP-TEE's banners follow, then U-Boot, which finds no kernel without an SD card and stops at its `=>` prompt; that part of the chain is the next unit's to check. `build/spi-try.log` has no line for the DDR controller (`0x11410000`) or PHY (`0x11400000`). Add `-trace 'renesas_rzv2l_ddr_event'` to see the stub's events in the same log: two initialisations, 40 mode-register writes, 81 training commands and their acknowledgements. Quit with Ctrl-A X. Without `-drive if=mtd`, or with a flash that holds no BL2, QEMU stops at once and says why. Read more: [`units/M8-bl2-staging/spec.md`](units/M8-bl2-staging/spec.md), [`units/M8-ddr-stub/spec.md`](units/M8-ddr-stub/spec.md).
 
 ## Run every check at once
 
