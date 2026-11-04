@@ -31,3 +31,6 @@ Branches `unit/M7-rpc-spinor` (project and fork).
 | 13 | CPG `spi-clk` from CLK1_ON alone (`!!(on & 0x2)`) | `test_gates: assertion failed (rd(qts, SMADR) == 0x12345678): (0x9abcdef0 == 0x12345678)` |
 | 14 | mt25qu512a JEDEC ID `0x20bb20` → `0x20ba20` | `test_manual_read: assertion failed (rd(qts, SMRDR0) == 0x1020bb20): (0x1020ba20 == 0x1020bb20)` |
 | 15 | a manual write sends SMWDR0 from bit 0 (`>> (8 * i)`) | `flash.py`: `FAIL U-Boot: reads the non-volatile configuration register as FFFFh and writes 0000h (the factory FFFFh with bit 4 cleared)` |
+| 16 | a manual transfer with a prohibited SPIDE accepted (`return true`: logged, nothing sent) | U-Boot `sf write 0x48000000 0x3000000 3`: `SF: 3 bytes @ 0x3000000 Written: OK`, the flash still `ff ff ff ff` (with the fix: `"Synchronous Abort" handler, esr 0x96000050, far 0x10060020`) |
+| 17 | no QSPI0_SSL negation after a normal read | `test_normal_read: assertion failed (rd(qts, CMNSR) == CMNSR_TEND): (0x00000003 == 0x00000001)` |
+| 18 | SMWDR0 read back unshifted at 1 or 2 bytes | `test_manual_write: assertion failed (qtest_readw(qts, RPC_BASE + SMWDR0) == 0x8877): (0x00000000 == 0x00008877)` |
