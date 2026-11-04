@@ -1,0 +1,18 @@
+# Lines allowed in the -d unimp,guest_errors,invalid_mem log of BL2's run
+# from the QSPI flash, before its first DDR access. One extended regex per
+# line, each with the reason it is not a gap.
+#
+# BL2's pfc_setup() writes the drive strength, slew rate, pull and input
+# enable registers of each port with one 64-bit store (TF-A
+# plat/renesas/rz/common/drivers/pfc.c:168-257, mmio_write_64), where the
+# manual gives these registers 8-, 16- and 32-bit access (41.2.7-41.2.9);
+# the same code runs on every board boot, so the silicon takes the store.
+# The PFC model writes both 32-bit halves and logs the access; for a port
+# with fewer than five pins the upper half holds no register.
+^renesas_rzg2l_pfc: 8-byte access at 0x1[0-9a-f]{3} to the 4-byte register at 0x1[0-9a-f]{3}$
+^renesas_rzg2l_pfc: 8-byte write at 0x1[0-9a-f]{3} covers undefined bytes$
+# BL2's pfc_sd_setup() writes SD_ch0 and SD_ch1 (8-bit registers,
+# 41.2.17-41.2.18) with mmio_write_32; the PFC takes the low byte, as for
+# U-Boot's Ethernet pin registers (../../m7/expected/log-allow.txt).
+^renesas_rzg2l_pfc: 4-byte access at 0x300[04] to the 1-byte register at 0x300[04]$
+^renesas_rzg2l_pfc: 4-byte write at 0x300[04] covers undefined bytes$

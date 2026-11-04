@@ -1,6 +1,6 @@
 # M8-bl2-staging — spec
 
-**Milestone:** M8 (the full boot chain, stage C; first unit). **Requirements:** REQ-SYSC-002 (boot source from `SYS_LSI_MODE`, proven when the real BL2 reads it), REQ-GUEST-003 (unmodified firmware). **Status:** written; implementation follows.
+**Milestone:** M8 (the full boot chain, stage C; first unit). **Requirements:** REQ-SYSC-002 (boot source from `SYS_LSI_MODE`, proven when the real BL2 reads it), REQ-GUEST-003 (unmodified firmware). **Status:** implemented.
 
 One page. Facts carry their source; inferences and assumptions are labelled (I) / (A). The contract, the image layout and BL2's accesses are in [`research/bl2.md`](../../research/bl2.md).
 
@@ -30,3 +30,7 @@ BL2 (TF-A `f59ed5a31`), in order: EL3 entry at `0x12000` (`bl2/aarch64/bl2_el3_e
 ## Evidence
 
 Manual Table 4.1 p.105, §4.2.4 p.124-130, §6.3.1 p.169 and Table 6.1 p.167-168, Table 7.5 p.246, §7.2.4.4 p.258-259. [`research/bl2.md`](../../research/bl2.md) §1-§5. TF-A's V2L platform guide `rz-v2l.rst:170-180` (flash procedure). EVK: the board boots from the SD card (`SYS_LSI_MODE` `0x10200`, EVK-L15), so no board observation of a QSPI boot exists; EVK-L17 (requested) would show the layout of the board's own flash.
+
+## Next blocker (fork `74752923ce`)
+
+BL2 prints its banner (`NOTICE:  BL2: v2.10.5(release):2.10.5/rz_1.1.0`, `NOTICE:  BL2: Built : f59ed5a31`), passes its CPG, pin and security set-up (no log line from the TZC or SYSC), and its first DDR access stops it: `Invalid write at addr 0x11400200, size 4` in the `-d invalid_mem` log, a write to the DDR PHY, which has no window (layer verified: the memory map; the write is `disable_phy_clk()`, initialisation step 9, which `ddr_setup()` hands to `cpg_active_ddr()` before any controller access: `P/drivers/ddr/ddr.c:83`, `:482-487`). BL2 then waits without a print (its crash console is empty). The next unit, M8-ddr-stub, models the PHY and the memory controller (`research/bl2.md` §6). Coverage before the stop (`-d unimp,guest_errors,invalid_mem`): the PFC logs BL2's 64-bit stores to its drive, slew, pull and input-enable registers and 32-bit stores to `SD_ch0`/`SD_ch1` (wider than the manual's access sizes; the silicon takes them; listed in `tests/acceptance/m8/expected/log-allow.txt`); nothing else.

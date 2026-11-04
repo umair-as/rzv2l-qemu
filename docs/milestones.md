@@ -52,7 +52,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M7-optee-uboot](units/M7-optee-uboot/spec.md) | M7 | OP-TEE (without the closed crypto engine) and the vendor U-Boot after BL31; U-Boot loads Linux from the SD card, the root chosen by PARTUUID ([walkthrough](walkthrough.md#op-tee-and-u-boot-after-bl31)) |
 | ✅ | [M7-optee-linux](units/M7-optee-linux/spec.md) | M7 | Linux reaches OP-TEE: the project's TEE kernel (vendor source, `CONFIG_OPTEE`, a `/firmware/optee` overlay), `/dev/tee0`, a trusted-application call ([walkthrough](walkthrough.md#linux-and-op-tee)) |
 | ✅ | [M7-rpc-spinor](units/M7-rpc-spinor/spec.md) | M7 | the SPI multi I/O bus controller and the module's MT25QU512A flash: U-Boot detects and reads it, Linux registers its partitions and reads and writes them, with the board's ID and SFDP ([walkthrough](walkthrough.md#the-qspi-flash)) |
-| 🔄 | [M8-bl2-staging](units/M8-bl2-staging/spec.md) | M8 | the board's TF-A BL2 starts from the QSPI flash: the flash image, a stand-in for the boot ROM's copy, the CPG PLLs and SYSC access control BL2 programs; it runs to its first DDR access |
+| ✅ | [M8-bl2-staging](units/M8-bl2-staging/spec.md) | M8 | the board's TF-A BL2 starts from the QSPI flash: the flash image, a stand-in for the boot ROM's copy, the CPG PLLs and SYSC access control BL2 programs; it runs to its first DDR access ([walkthrough](walkthrough.md#m8-the-boards-bl2-from-the-qspi-flash)) |
 
 ## The SoC blocks
 
