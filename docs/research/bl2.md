@@ -67,18 +67,44 @@ BL2 reads, masks and writes back `SYS_MSTACCCTL0`-`5` (`0x000`-`0x014`) and `SYS
 
 ## 6. The DDR controller and PHY
 
-BL2 programs and trains a DDR4-1600 memory system: the `smarc_2` build selects `param_mc_C-010_D4-01-2.c` and `param_swizzle_T1c.c` (F, board makefile), two chip selects of 1 GiB. The manual has no register chapter for either block (§9, p.578-581: features and pins only; Table 5.1 p.144: the windows). The oracle is TF-A's code and the EVK.
+BL2 programs and trains a DDR4-1600 memory system. The manual has no register chapter for either block (§9, p.578-581: features, pins and a usage note; Table 5.1 p.144: the two windows), so there is no hardware truth for the registers beyond the EVK's one read (EVK-R80). The model is a deliberate **STUB** (spec §11): what it stores and computes is the contract BL2's code needs, each item labelled as such. Every TF-A citation below is `P/drivers/ddr/ddr.c` unless named; register offsets are from V2L's own headers (`soc/v2l/include/ddr_mc_regs.h`, `ddr_mc_if.h`, `ddr_phy_regs.h`; the G2L and G2UL headers number some of them differently).
 
-| Item | Value | Label, cite |
-|---|---|---|
-| Windows | PHY `0x11400000`, controller `0x11410000`, 64 KiB each | F: TF-A `P/include/ddr_internal.h:22-77`, manual Table 5.1 p.144 |
-| Registers written | 507 controller registers (`0x000`-`0x7F8`, 32-bit; `program_mc1` writes them twice), 48 PHY registers (`0x058`-`0x240`) | F: `ddr.c`, the parameter table |
-| Polls | every loop unbounded; seven `panic()` sites (`ddr.c:657`, `:677`, `:880`, `:1001`, `:1187`, `:1203`, `:1349`); 81 PHY training starts, 40 mode-register-write completions | F |
-| Must be computed (a store-only register file hangs or panics) | controller `0x260` bit 25 (init done, set by START, cleared by its ack at `0x280`); `0x264` bit 3 (mode-register write done, ack `0x284`); `LP_STATE` `0xF4` from `LP_CMD` `0xE8`; PHY `0x100` bit 28 busy (clears at once) and bits 1:0 = 3; PHY `0x148`, `0x160` bits 1:0 = 3; PHY `0x14C` bits 1:0 = 0 after BL2 writes 3; PHY `0x170` bits 3:2 mirror bits 1:0 | I: from the poll masks and register names; to be checked line by line in the DDR unit |
-| `0x1141018C` (`ECC_ENABLE`) | U-Boot reads `0x00000FFF` on the board although BL2 writes 0 there | O: EVK-R80 |
-| What would detect a stub | nothing in this build: no memory test, no training result check, ECC off | F |
+**Effective configuration (F, the build):** BL2's build compiles `soc/v2l/drivers/ddr/param_mc_C-010_D4-01-2.c` (507 entries, `MC_INIT_NUM`) and `common/drivers/ddr/param_swizzle_T1c.c` (`board/smarc_2/rz_board.mk:7-8`; objects in `build/v2l/release/bl2/`); `DDR_PLL4 := 1600`; `DDR_ECC_ENABLE := 0` (`common/rz_common.mk:37`), and the linked BL2 has no ECC function; `DEBUG_FPGA := 0`, so `ddr_setup()` runs (`P/bl2_plat_setup.c:222-225`). The table describes two chip selects of 1 GiB (I, from `CS_MAP` and the chip-select bounds).
 
-The stub is a deliberate STUB class (spec §11): each computed bit is labelled as what BL2 waits for, not as the silicon's behaviour.
+**Windows and accesses (F):** controller `0x11410000`, PHY `0x11400000`, 64 KiB each, 32-bit word accesses only (`read_mc_reg`/`read_phy_reg` are `mmio_read_32`). The controller: BL2 writes 507 registers (the table, twice) in `0x000`-`0x7F8` (`DENALI_CTL_00`-`_510`) and reads 61, all of them written ones. The PHY: BL2 writes 48 registers and reads 21; three of the reads are registers it never writes (`0x148`, `0x160`, `0x1D4`). The supported offsets are therefore the controller's `0x000`-`0x7F8` and the PHY's 51 offsets (derived from the read and write sites of `ddr.c`, `ddr_v2l.c` and `param_swizzle_T1c.c` at `f59ed5a31`; another TF-A revision may touch others, which would be a scope change, not a model regression): `0x058 0x060 0x09C 0x0A8 0x0C0 0x0C4 0x0C8 0x100 0x104 0x108 0x10C 0x118 0x11C 0x120 0x124 0x128 0x12C 0x130 0x134 0x138 0x140 0x148 0x14C 0x150 0x154 0x15C 0x160 0x164 0x168 0x16C 0x170 0x174 0x188 0x194 0x19C 0x1A0 0x1A4 0x1AC 0x1B4 0x1B8 0x1BC 0x1C0 0x1C4 0x1C8 0x1CC 0x1D4 0x1E0 0x1E8 0x200 0x204 0x240`.
+
+**Polls and checks (F):** every poll is an unbounded loop; seven `panic()` sites (`:657`, `:677` from the MR2 value; `:880`, `:1001`, `:1187`, `:1203`, `:1349` result checks); nothing else in BL2 reads these blocks, and nothing tests the memory, compares training results or checks ECC.
+
+### 6.1 The stub contract
+
+Unless a row says otherwise: a supported register stores every bit written and resets to 0 (A: no reset values are documented; BL2 writes every register it later reads, except the three read-only PHY ones). "Reset" is the system reset; the CPG's DDR reset lines are not wired (BL2 rewrites the whole table after its controller reset, `:119-123`, so it cannot see the difference; I).
+
+| Register | Read | Write | Trigger, completion, acknowledgement | Label, cite |
+|---|---|---|---|---|
+| controller `0x000` `DENALI_CTL_00` bit 0 START | stored | stored | a write that sets START sets the init-done status (below) at once; a write that clears it clears that status | A (stub contract); BL2 sets START by read-modify-write (`:108`, `:134`) and rewrites the table with START = 0 between (`:123`) |
+| controller `0x260` `INT_STATUS_INIT` (`DDRMC_R021`) | bit 25 = init done, other bits 0 | ignored (the table writes 0) | set by START, cleared by the acknowledgement or by START = 0 | F: BL2 polls bit 25 (`:109`, `:137`); A: the meaning and the other bits |
+| controller `0x280` `INT_ACK_INIT` (`DDRMC_R023`) | 0 | a 1 in bit 25 clears the init-done status; other bits ignored | — | F: BL2 writes bit 25 (`:141`); A: write-1-to-clear, reads 0 |
+| controller `0x114` `DENALI_CTL_69` (`DDRMC_R008`, mode-register write) | stored | stored; a write with bit 25 set requests a mode-register write, completed at once: the mode-register status is set | — | F: BL2 writes `0x02800000 | ...` (`:1155`); A: bit 25 (not bit 23) as the request |
+| controller `0x264` `INT_STATUS_MODE` (`DDRMC_R022`) | bit 3 = mode-register write done, other bits 0 | ignored | set by the request above, cleared by its acknowledgement | F: polled (`:1159`); A: the meaning |
+| controller `0x284` `INT_ACK_MODE` (`DDRMC_R024`) | 0 | a 1 in bit 3 clears that status | — | F: BL2 writes bit 3 (`:1163`); A |
+| controller `0x0E8` `LP_CMD` bits 14:8 | stored | stored; 0x11 enters the low-power state the poll waits for, 0x02 leaves it; 0 does nothing; any other non-zero command is not supported: logged and refused with a bus error | completed at once | F: BL2 writes 0x11 and 0x02 only (`:1244`, `:1294`); A: the rest |
+| controller `0x0F4` `LP_STATE` bits 30:24 | 0x48 after command 0x11, 0x40 after 0x02, 0 after reset; the other bits stored | bits 30:24 ignored (the table writes `0x00010004`), the rest stored | — | F: the values BL2 polls for (`:1246`, `:1296`); A: the reset value |
+| controller `0x24C` `INT_STATUS_LOWPOWER` bits 31:16 | 0 | ignored | — | F: BL2 waits for 0 (`:1305`) after acknowledging `0x0009` at `0x26C`; A: that no low-power event is ever pending |
+| controller `0x26C`, `0x27C` (acknowledgements) | 0 | ignored | — | A |
+| controller `0x18C` `ECC_ENABLE` bits 11:0 | read 1 | stored only in the other bits | — | O: U-Boot reads `0x00000FFF` on the board after BL2 wrote 0 (EVK-R80); A: the reset value and the write rule, which no read establishes |
+| PHY `0x100` `SCL_START` (`DDRPHY_R18`) | bit 28 (busy) 0; bits 1:0 = 3; the rest as written | one of BL2's seven commands (`0x50200000`, `0x30800000`, `0x30500000`, `0x30A00000`, `0x30700000`, `0x11200000`, `0x34200000`) starts a training step, completed at once; any other value with bit 28 set is not supported: logged and refused with a bus error; a value with bit 28 clear is stored | `0x50200000` (write leveling) also clears PHY `0x14C` bits 1:0 | F: the commands (`:871`-`:1341`), the busy poll (`:874` and the others), bits 1:0 checked after the last command (`:1348`); A: the meanings |
+| PHY `0x148` `WRLVL_CTRL` (`DDRPHY_R36`) | bits 1:0 = 3, other bits 0 | not written by BL2: logged and ignored | — | F: checked after write leveling (`:878`); A: per-lane done flags |
+| PHY `0x14C` `WRLVL_AUTOINC_TRIM` (`DDRPHY_R37`) | stored | stored | write leveling clears bits 1:0 | F: BL2 writes 3 (`:865`) and, after the command, panics unless bits 1:0 read 0 (`:879-880`); A: that leveling clears them |
+| PHY `0x160` `UNQ_ANALOG_DLL_2` (`DDRPHY_R42`) | bits 1:0 = 3, other bits 0 | not written by BL2: logged and ignored | — | F: polled for `sl_lanes` = 3 (`:101`, `:1310`); A: DLLs locked |
+| PHY `0x170` `UNIQUIFY_IO_1` (`DDRPHY_R46`) | bits 3:2 computed: bit 3 = stored bit 1, bit 2 = stored bit 0; the rest stored | bits 3:2 ignored, the rest stored: BL2's read-modify-writes of bit 4 write the computed bits back, which leaves the mirror as it was | — | F: write 2, poll bit 3; write 1, poll bit 2; then read-modify-writes of bit 4 (`:561-588`); A: calibration done flags |
+| PHY `0x1D4` `VREF_TRAINING_WINDOWS` (`DDRPHY_R69`) | 0 | not written by BL2: logged and ignored | — | F: read for the VREF choice, no check (`:951-952`, `:1059-1060`); A: 0 (any value passes) |
+| PHY `0x1AC`, `0x1C0` (training failure flags in bits 15:14, 21:20) | stored | stored | — | F: BL2 writes them with those bits 0 and panics if they read 1 (`:999-1001`, `:1185-1203`); A: training never fails |
+| any other supported offset | stored | stored | — | A |
+| an unsupported offset, or an access that is not 32 bits | — | — | logged and refused with a bus error | — |
+
+**Not modelled:** the training itself (results are BL2's own constants; `SCL_LATENCY` `0x10C` reads what BL2 wrote, A), the PHY's lane banking through `0x12C` (one flat file: no check reads a banked register, I), ECC, BIST and every other controller command, DDR timing, refresh, the controller's interrupts, the CPG's DDR reset lines.
+
+**Verification (stub-contract tests, not manual values):** each computed behaviour is checked against BL2's sequence in a qtest: the completions (START, the mode-register request, the training commands, the low-power commands), the acknowledgements, the stored configuration (a written value reads back), the read-only and refused accesses; each seen red under a mutation (completion missing, acknowledgement broken, storage lost). The boot is the consumer check: BL2 completes `ddr_setup()` and goes on.
 
 ## 7. Open items
 
