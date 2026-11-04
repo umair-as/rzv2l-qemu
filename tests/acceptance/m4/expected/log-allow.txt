@@ -11,4 +11,4 @@
 ^tsu: unimplemented device (read|write) 
 ^(mipi-dsi|vspd|fcpvd|du): unimplemented device (read|write) 
 ^(ssi[01]|rspi1|canfd|adc|usb0-func): unimplemented device (read|write) 
-^rpc-if(-wbuf|-dirmap)?: unimplemented device (read|write) 
+^rpc-if-wbuf: unimplemented device (read|write) 

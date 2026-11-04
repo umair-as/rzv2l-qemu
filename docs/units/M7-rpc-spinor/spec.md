@@ -1,6 +1,6 @@
 # M7-rpc-spinor — spec
 
-**Milestone:** M7 (real firmware; fourth unit, which completes M7). **Requirements:** REQ-MACH-005 (SoC blocks the boot touches), spec §11 ("RPC / SPIBSC: functional by M7"). **Status:** written; implementation follows.
+**Milestone:** M7 (real firmware; fourth unit, which completes M7). **Requirements:** REQ-MACH-005 (SoC blocks the boot touches), spec §11 ("RPC / SPIBSC: functional by M7"). **Status:** implemented.
 
 One page. Facts carry their source; inferences and assumptions are labelled (I) / (A). The register contract, guest sequences and citations are in [`research/rpc.md`](../../research/rpc.md).
 
@@ -11,8 +11,8 @@ One page. Facts carry their source; inferences and assumptions are labelled (I) 
 - **New model `renesas-rzv2l-rpc`** (FUNCTIONAL / faithful), fork `hw/ssi/`: the 27 registers of Table 25.2 (p.1477) with their reset values and read-only bits; **manual mode** (SMCR.SPIE starts a transfer: command, optional command, address, option data, dummy, data; TEND, SSLF; SSLKP keeps SSL asserted); **external address space read mode** (normal read; burst read through the 32-line read cache, RBURST, RCF, SSLE; DREAR's 32-bit address); the flash on an SSI bus with one chip select. Transfers complete at once (TEND reads 1 again on the next read). Both start states: the manual reset values (BL2 sets the controller up only for SPI boot, `research/rpc.md` §3).
 - **The flash:** QEMU's `m25p80` with a new part `mt25qu512a`: ID `20 BB 20 10 44 00`, 64 MiB, 64 KiB sectors and 4 KiB subsectors, the Micron command set and non-volatile configuration register `m25p80` already models. Its contents come from `-drive if=mtd,format=raw,file=<64 MiB image>`; without one the flash is erased (all `0xFF`) and holds writes until QEMU exits.
 - **SoC and board wiring:** the controller in the SoC with its clocks and reset (CPG `CLK_ON 0x550` b0-1, `RST 0x850` b0: a held reset or stopped clock fails visibly, as for SDHI), SPI 41; the flash on the board (`hw/arm/rzv2l-smarc.c`).
-- **Source conflict, recorded (`research/rpc.md` §4):** which bits of SMWDR0/SMRDR0 carry 1- and 2-byte data. TF-A and U-Boot use the top bytes of a 32-bit access; Linux uses byte and halfword accesses at offset 0. The model follows the one rule that serves all three (I): an N-byte transfer uses the top N bytes, lowest first, and an N-byte access at offset 0 reaches them.
-- **Not modelled** (each fails visibly or is recorded): HyperFlash and Octal-SPI (PHYCNT.PHYMEM 11, HYPE ≠ 0: logged, transfer not done), two flashes (BSZ = 01: logged), DDR (data as SDR, logged once), the write buffer (window and WBUF: `-d unimp`), DMA high-speed mode (HS), the SPIHF interrupt, wire timing (SSLDR, PHY offsets, timing adjustment, CAL), 1-bit vs 4-bit lanes (data is bytes on the SSI bus).
+- **Source conflict, recorded (`research/rpc.md` §4):** which bits of SMWDR0/SMRDR0 carry 1- and 2-byte data. Reads follow the manual (Figure 25.32): byte 0 at bits 7:0, as Linux's `readb`/`readw` and TF-A's 32-bit status read expect. Writes: TF-A and U-Boot put the data in the top bytes of a 32-bit write, Linux writes at the transfer size at offset 0; the model sends the top N bytes, lowest first, and an N-byte write at offset 0 reaches them (I).
+- **Not modelled** (each fails visibly or is recorded): HyperFlash and Octal-SPI (PHYCNT.PHYMEM 11, HYPE ≠ 0), two flashes (BSZ = 01), the write buffer (WBUF; its window stays a stub) and DMA high-speed mode (HS): logged under unimp, the access refused with a bus error; DDR (data as SDR, logged once); the SPIHF interrupt; wire timing (SSLDR, PHY offsets, timing adjustment, CAL); 1-bit vs 4-bit lanes (data is bytes on the SSI bus; dummy cycles become bytes at the address phase's width); QSPI_RESET# to the flash (`m25p80` has no reset input); the flash's NVCR across QEMU starts (it begins at `FFFFh` each time).
 
 ## What the guest needs
 
@@ -23,7 +23,7 @@ One page. Facts carry their source; inferences and assumptions are labelled (I) 
 ## Design choices (operator)
 
 1. **SFDP of the MT25QU512A.** Linux sizes this part from its SFDP tables; with only a 3-byte ID it reports `n25q512a` instead. Options: (a) read the board's SFDP and ID (read-only, under the board's Linux: `/sys/bus/spi/devices/*/spi-nor/{jedec_id,partname,sfdp}`), the recommendation; (b) the table from Micron's public datasheet (A until compared with the board); (c) no SFDP: Linux says `n25q512a`, recorded as a gap. Decided: (a); the board's ID and SFDP are recorded as EVK-L16 (`../../evidence/EVK-2026-11-04-spi-flash.md`).
-2. **The data byte-order rule** above: accept the inference, or measure it on the board first.
+2. **The data byte-order rule** above: accepted as an inference (2026-11-02); the read half then followed the manual's Figure 25.32 and TF-A's read path (`research/rpc.md` §4).
 
 ## Exit criterion
 
