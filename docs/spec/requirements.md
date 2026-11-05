@@ -60,6 +60,10 @@ The format and states are defined in `project.md` §15. Evidence paths are relat
 |---|---|---|---|---|---|
 | REQ-BOOT-001 | On the automatic boot path of the M9 profile, U-Boot SHALL boot a FIT configuration only if a signature by the profile's required key covers it and every image hash in it matches. | decisions/DR-0008; spec §12 | M9 acceptance (`fit.py`): the signed FIT reaches the shell | M9 | P |
 | REQ-BOOT-002 | A FIT with a changed kernel, a changed DTB, no configuration signature, a signature by another key, a signature that covers only some of the configuration's images, or one of upstream U-Boot's crafted layouts (`fakeroot`, `kernel@`) SHALL be refused before kernel entry, also with `verify=n` stored; each refusal SHALL spend one attempt of the slot, and no other boot route SHALL run. | decisions/DR-0008 | M9 acceptance (`fit.py`): each case to the prompt with its counter at 0 | M9 | P |
+| REQ-BOOT-003 | U-Boot SHALL boot the first slot in `BOOT_ORDER` with an attempt left, after saving that attempt; the counters SHALL survive resets and a new QEMU process on the same card. | decisions/DR-0008 | M9 acceptance (`ab.py`): selection, rollback with a restart | M9 | P |
+| REQ-BOOT-004 | Linux SHALL commit only the slot it runs from, and only after its root partition, the PARTUUID the kernel was given and its health checks pass; a pending update SHALL be committed by its first healthy boot. | decisions/DR-0008 | M9 acceptance (`ab.py`): selection, good update | M9 | P |
+| REQ-BOOT-005 | A pending slot that exhausts its attempts SHALL give way to the other slot, which records the rollback; when both slots are exhausted, U-Boot SHALL stop at its prompt with the counters printed and SHALL NOT replenish them. | decisions/DR-0008 | M9 acceptance (`ab.py`): bad update, both exhausted | M9 | P |
+| REQ-BOOT-006 | With one environment copy damaged, U-Boot SHALL use the other and the next save SHALL repair it; with both damaged, U-Boot SHALL warn and run the M9 policy from its default environment, never the vendor's unsigned boot command. | decisions/DR-0008 | M9 acceptance (`ab.py`): damaged copies | M9 | P |
 
 ## Tests and process
 

@@ -49,3 +49,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-TEST-003 | M3+ | M3+ | M1-machine-skeleton; M3b-shell; M4-vendor-kernel | M1-T06; M3b-shell T2; M4-vendor-kernel T5 | acceptance log gates (`-d unimp,guest_errors,invalid_mem`): only recorded stub windows, an empty log fails | spec §13 | V |
 | REQ-BOOT-001 | M9 | M9 | M9-fit | T1-T5 | acceptance `m9/fit.py` (accepted case) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
 | REQ-BOOT-002 | M9 | M9 | M9-fit | T3, T5 | acceptance `m9/fit.py` (eight refused cases, counter to 0) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-003 | M9 | M9 | M9-ab | T3 | acceptance `m9/ab.py` (selection; rollback with a restart) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-004 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (selection; good update) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-005 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (bad update; both exhausted) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-006 | M9 | M9 | M9-ab | T3 | acceptance `m9/ab.py` (damaged copies) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
