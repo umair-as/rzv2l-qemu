@@ -18,8 +18,12 @@ Project branch `unit/M9-ab` from `unit/M9-fit` `2b2d791`. No fork branch: no QEM
 | 3 | the bad update without `M9_PENDING` | `FAIL bad update, new QEMU: in order: M9-HEALTH: rollback: slot B gave up, slot A runs`; no `M9_ROLLBACK` on the card |
 | 4 | copy 2 damaged, checked as the copy-1 case | `FAIL proof 4: in order: Reading from redundant MMC(0)... OK` |
 
+| 5 | slot B's health service expects the swapped partitions (A: 3, B: 2) | `FAIL selection: in order: M9-HEALTH: slot B committed, …`; the service printed `U-Boot booted slot B (partition 2), but / is partition 3` |
+| 6 | slot B's health service reads a command line naming `root=PARTUUID=525a0003-02` | `FAIL selection: in order: M9-HEALTH: slot B committed, …`; the service printed `the kernel's root=PARTUUID=525a0003-02 is not / (525a0003-03); not committed; rebooting` |
+
+Proofs 5 and 6 change the service under test on a copy of the card. That is the only way to drive these checks: U-Boot sets the partition and the command line together.
 Each break is made on a copy of the card; the outputs are kept in the working area's proof log.
 
 ## Boot evidence (fork `176d418966`)
 
-`tests/acceptance/m9/ab.py`: 61 checks pass; `fit.py` passes again on the card with the health service. The bad update's second QEMU printed `M9-HEALTH: slot B: health check 90-fail failed; not committed; rebooting`, then `M9-HEALTH: slot A committed, / is 525a0003-02: BOOT_A_LEFT 3;M9_GOOD A;M9_ROLLBACK B;M9_PENDING;BOOT_ORDER A B;` and `M9-HEALTH: rollback: slot B gave up, slot A runs`. With both copies damaged, U-Boot printed `Loading Environment from MMC... *** Warning - bad CRC, using default environment`, then `M9: slot A: attempt saved: BOOT_A_LEFT=2 BOOT_B_LEFT=3`, and booted the signed FIT.
+`tests/acceptance/m9/ab.py`: 65 checks pass (after the review fixes); `fit.py` passes again on the card with the health service. The bad update's second QEMU printed `M9-HEALTH: slot B: health check 90-fail failed; not committed; rebooting`, then `M9-HEALTH: slot A committed, / is 525a0003-02: BOOT_A_LEFT 3;M9_GOOD A;M9_ROLLBACK B;M9_PENDING;BOOT_ORDER A B;` and `M9-HEALTH: rollback: slot B gave up, slot A runs`. With both copies damaged, U-Boot printed `Loading Environment from MMC... *** Warning - bad CRC, using default environment`, then `M9: slot A: attempt saved: BOOT_A_LEFT=2 BOOT_B_LEFT=3`, and booted the signed FIT.

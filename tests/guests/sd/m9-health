@@ -3,7 +3,8 @@
 # each slot's rcS. It commits only the slot that is running:
 #   1. the slot U-Boot booted: m9_slot, which U-Boot saved before booting
 #   2. / must be that slot's partition (A: 2, B: 3), found through the
-#      root's parent device, and /etc/m9-slot must name the same slot
+#      root's parent device; its PARTUUID must be the one on the kernel's
+#      command line (root=PARTUUID=); /etc/m9-slot must name the same slot
 #   3. every executable in /etc/m9-health.d/ must succeed
 #   4. then one fw_setenv call: BOOT_<slot>_LEFT=3, M9_GOOD=<slot>;
 #      M9_PENDING cleared if it names this slot (the update is
@@ -38,6 +39,10 @@ id=$(od -A n -t x4 -j 440 -N 4 "/dev/$disk" | tr -d ' ')
 puuid=$(printf '%s-%02x' "$id" "$part")
 [ "$part" = "$want" ] ||
     fail "U-Boot booted slot $slot (partition $want), but / is partition $part ($puuid)"
+# The kernel must have been told this root: root=PARTUUID= on its command line
+kroot=$(sed -n 's/.*root=PARTUUID=\([^ ]*\).*/\1/p' /proc/cmdline)
+[ "$kroot" = "$puuid" ] ||
+    fail "the kernel's root=PARTUUID=$kroot is not / ($puuid)"
 [ "$(cat /etc/m9-slot)" = "$slot" ] ||
     fail "/etc/m9-slot names $(cat /etc/m9-slot), U-Boot booted $slot"
 for c in /etc/m9-health.d/*; do

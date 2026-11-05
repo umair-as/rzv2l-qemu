@@ -139,6 +139,11 @@ def good_update(out):
             committed(s, pos, "B", "525a0003-03", "good update, new QEMU")
     finally:
         bootloader.stop(proc, log)
+    env = newest(os.path.join(out, "2"), left(os.path.join(out, "1"), img))
+    check("M9_PENDING" not in env and env.get("M9_GOOD") == "B" and
+          env.get("BOOT_B_LEFT") == "3",
+          "good update, new QEMU: M9_PENDING still gone, B committed again "
+          "(%s)" % env)
 
 
 def bad_update(out):
@@ -207,6 +212,13 @@ def damaged(out, which):
     for n in which.split("+"):
         subprocess.run([sys.executable, "-I", fit.UENV, "m9-damage", img, n],
                        check=True)
+    before = subprocess.run([sys.executable, "-I", fit.UENV, "m9-read", img],
+                            capture_output=True, text=True).stdout
+    check(all(re.search(r"copy %d: (in)?valid" % n, before) and
+              ("copy %d: invalid" % n in before) == (str(n) in which)
+              for n in (1, 2)),
+          "%s: before the boot, exactly copy %s is invalid (%s)"
+          % (what, which, " | ".join(before.splitlines())))
     first = {"1": r"Reading from redundant MMC\(0\)\.\.\. OK",
              "2": r"Loading Environment from MMC\.\.\. Reading from MMC\(0\)"
                   r"\.\.\. OK",
