@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 """Colour tokens in bench/static/style.css: WCAG AA in both themes.
 
 Every text colour the page draws on a surface is a token pair here; each must

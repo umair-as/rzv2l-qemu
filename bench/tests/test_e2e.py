@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 """End-to-end test of the bench through its web UI, on stock QEMU virt.
 
     python3 -m pytest bench/tests/test_e2e.py

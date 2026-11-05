@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 """Map and Devices tabs, and profile readiness, without QEMU.
 
 The fixtures are `info mtree -f` and `info qtree` from rzv2l-smarc (M1 probe

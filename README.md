@@ -108,3 +108,14 @@ The QEMU port lives in a fork, included as the `qemu/` submodule. It carries onl
 > Specifications, designs and reviews are human-led. Much of the research and code is written by AI agents under that review; all model code on the fork's `rzv2l-dev` branch is agent-assisted. QEMU's contribution policy declines AI-generated code, so the device models here serve as a working prototype and test oracle and cannot go upstream as they are. Whether an upstream path exists at all is an open question.
 
 Agent instructions are in [AGENTS.md](AGENTS.md).
+
+## ⚖️ License
+
+This repository is licensed under the [Apache License 2.0](LICENSE), except:
+
+- `qemu/`, the QEMU fork (a submodule): GPL-2.0-or-later, as QEMU (`qemu/COPYING`, `qemu/LICENSE`).
+- `tests/eval/m2/mutations/*.patch`: changes to QEMU source, GPL-2.0-or-later, as the code they change.
+- `tests/guests/g1-tee/optee.dtso`: a device-tree overlay for the Linux kernel's GPL-2.0 device tree, GPL-2.0 (its SPDX header).
+- `bench/static/vendor/`: xterm.js and its fit add-on, MIT ([`LICENSE-xterm`](bench/static/vendor/LICENSE-xterm)).
+
+Guest software the scripts fetch or build (Linux, TF-A, OP-TEE, U-Boot, BusyBox) keeps its own licenses and is not part of this repository.

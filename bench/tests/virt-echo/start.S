@@ -2,7 +2,7 @@
  * Bench self-test program for QEMU virt: entry, vectors, helpers.
  * Every exception skips the faulting instruction, so a read of a hole
  * (key 'u') aborts once and the program carries on.
- * SPDX-License-Identifier: GPL-2.0-or-later
+ * SPDX-License-Identifier: Apache-2.0
  */
     .text
     .globl _start

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 """The coverage list must count every -d log line, in the right row.
 
 The lines are the formats QEMU prints (qemu v11.1.2): system/memory.c,

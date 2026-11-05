@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 """A QMP reply that arrives after its caller timed out must not kill the client."""
 
 import asyncio

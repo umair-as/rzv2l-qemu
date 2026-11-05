@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: Apache-2.0
 """Verdict rules: markers come from the console stream only, may straddle
 reads, and combine with expect_exit as documented in bench/README.md."""
 

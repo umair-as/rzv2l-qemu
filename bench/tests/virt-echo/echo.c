@@ -4,7 +4,7 @@
  * Backspace/DEL as "\b \b"; any other byte, \n included, as is), and on:
  *   'u'  reads an unmapped address (0x0c000000) once: an invalid_mem log line
  *   'q'  exits QEMU with status 0 through semihosting
- * SPDX-License-Identifier: GPL-2.0-or-later
+ * SPDX-License-Identifier: Apache-2.0
  */
 #include <stdint.h>
 
