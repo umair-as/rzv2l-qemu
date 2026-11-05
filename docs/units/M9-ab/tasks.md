@@ -13,7 +13,7 @@ Project branch `unit/M9-ab` from `unit/M9-fit` `2b2d791`. No fork branch: no QEM
 
 | # | Break | Red line |
 |---|---|---|
-| 1 | slot B's `/etc/m9-slot` says `A` (selection case) | `FAIL selection: in order: M9-HEALTH: slot B committed, / is 525a0003-03`; the service printed `/etc/m9-slot names A, U-Boot booted B; not committed; rebooting`, and the card ends with `BOOT_B_LEFT=0`, `M9_GOOD=A` |
+| 1 | (removed) slot B's `/etc/m9-slot` naming the wrong slot: the check went with M9-update-failure, whose payload does not name its slot; proofs 5 and 6 cover the two identity checks that remain | — |
 | 2 | no `/sbin/m9-health` in slot B (selection case) | `FAIL selection: in order: M9-HEALTH: slot B committed, …`; the card keeps `BOOT_B_LEFT=2` |
 | 3 | the bad update without `M9_PENDING` | `FAIL bad update, new QEMU: in order: M9-HEALTH: rollback: slot B gave up, slot A runs`; no `M9_ROLLBACK` on the card |
 | 4 | copy 2 damaged, checked as the copy-1 case | `FAIL proof 4: in order: Reading from redundant MMC(0)... OK` |

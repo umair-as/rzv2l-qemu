@@ -2,7 +2,8 @@
 # M9 acceptance for rzv2l-smarc: the M9 boot-policy profile
 # (docs/decisions/DR-0008) on the whole chain from the QSPI flash: signed
 # FIT images (docs/units/M9-fit/spec.md); A/B slots, Linux's commit,
-# rollback and damaged environment copies (docs/units/M9-ab/spec.md).
+# rollback and damaged environment copies (docs/units/M9-ab/spec.md); a
+# slot update and its interruptions (docs/units/M9-update-failure/spec.md).
 # M8 acceptance first (which runs M7 to M1, and the vendor-default U-Boot
 # on the same chain).
 # Exit 0 only if every check passes ("M9 ACCEPTANCE").
@@ -36,6 +37,10 @@ step "A/B slots: selection, a good and a bad update (with a QEMU restart), both 
 python3 -I "$HERE/ab.py" "$OUT/ab"
 result $?
 
+step "slot update: success, a refused payload, interruptions while writing, after verifying and while saving the selection"
+python3 -I "$HERE/update.py" "$OUT/update"
+result $?
+
 # Log gate: every -d line is a recorded stub window, one of BL2's lines,
 # a line of the M8 chain's list or of M9's own
 step "log gate"
@@ -44,7 +49,8 @@ allow=$(cat "$HERE/../m4/expected/log-allow.txt" \
             "$HERE/../m8/expected/log-allow.txt" \
             "$HERE/../m8/expected/log-allow-chain.txt" \
             "$HERE/expected/log-allow.txt" | grep -v -e '^#' -e '^$')
-for log in "$OUT"/fit/*/qemu.log "$OUT"/ab/*/qemu.log "$OUT"/ab/*/*/qemu.log; do
+for log in "$OUT"/fit/*/qemu.log "$OUT"/ab/*/qemu.log "$OUT"/ab/*/*/qemu.log \
+           "$OUT"/update/*/qemu.log "$OUT"/update/*/*/qemu.log; do
     [ -e "$log" ] || continue
     run=${log#"$OUT"/}; run=${run%/qemu.log}
     if [ ! -s "$log" ]; then

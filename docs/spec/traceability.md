@@ -53,3 +53,5 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-BOOT-004 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (selection; good update) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
 | REQ-BOOT-005 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (bad update; both exhausted) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
 | REQ-BOOT-006 | M9 | M9 | M9-ab | T3 | acceptance `m9/ab.py` (damaged copies) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-007 | M9 | M9 | M9-update-failure | T2, T4 | acceptance `m9/update.py` (success; refused payload) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-008 | M9 | M9 | M9-update-failure | T4 | acceptance `m9/update.py` (interrupted while writing, after verifying, while saving the selection) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |

@@ -14,7 +14,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ tagged `rzv2l-v1.0` |
 | 🎯 | **v1.1** | M4-M7: Renesas's kernel, storage, networking, the board's firmware after BL2, the QSPI flash | ✅ tagged `rzv2l-v1.1` |
-| 🎯 | v2 | M8-M9: the full boot chain, platform behaviour | 🔄 (M8 done, M9 started) |
+| 🎯 | v2 | M8-M9: the full boot chain, platform behaviour | 🔄 (M8 and M9 done; release closure next) |
 
 ## Milestones
 
@@ -29,7 +29,7 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 | ✅ | M6 | Networking | Ethernet (ravb) and its PHY; DHCP, data checked both ways, link and reset recovery ([walkthrough](walkthrough.md#m6-ethernet)) | G0, G1 |
 | ✅ | M7 | Real firmware | TF-A BL31 + OP-TEE (rebuilt without TSIP) + U-Boot, loading Linux from storage; the QSPI flash | G1 |
 | ✅ | M8 | Full boot chain | the board's firmware from the QSPI flash, BL2 to the Linux shell: a boot ROM stand-in, a DDR stub, BL31, OP-TEE and U-Boot from the firmware package ([walkthrough](walkthrough.md#m8-the-boards-bl2-from-the-qspi-flash)) | G1 |
-| 🔄 | M9 | Platform behaviour | A/B selection, bootcount, rollback, FIT signatures, on a project U-Boot profile ([DR-0008](decisions/DR-0008-m9-boot-policy-profile.md)) | G1 |
+| ✅ | M9 | Platform behaviour | A/B selection, bootcount, rollback, FIT signatures, on a project U-Boot profile ([DR-0008](decisions/DR-0008-m9-boot-policy-profile.md)) | G1 |
 
 ## Work units
 
@@ -57,6 +57,7 @@ Each milestone is built in units; each unit has a one-page spec and its proofs i
 | ✅ | [M8-full-chain](units/M8-full-chain/spec.md) | M8 | no model change: the board's BL2 loads BL31, OP-TEE and U-Boot from the flash's firmware package (no image staged by QEMU), and U-Boot boots Linux from the SD card to the shell; OP-TEE from Linux, a reboot back through BL2, boot mode 4, firmware packages missing BL31 or BL33 ([walkthrough](walkthrough.md#m8-the-boards-bl2-from-the-qspi-flash)) |
 | ✅ | [M9-fit](units/M9-fit/spec.md) | M9 | the M9 U-Boot profile (FIT signatures, two environment copies, an upstream FIT-signature fix) and its key; a signed FIT boots slot A on the chain from the flash, each attempt saved first; eight refused cases each spend the slot's attempts and stop at the prompt ([walkthrough](walkthrough.md#m9-signed-fit-images)) |
 | ✅ | [M9-ab](units/M9-ab/spec.md) | M9 | Linux's half of the policy: a health service commits only the slot it runs from (root PARTUUID and checks), a pending update is committed or rolled back; slot selection and attempts across a QEMU restart, both slots exhausted to the prompt, damaged environment copies ([walkthrough](walkthrough.md#m9-signed-fit-images)) |
+| ✅ | [M9-update-failure](units/M9-update-failure/spec.md) | M9 | the update tool in the slots' Linux (protects the running slot, marks the target unbootable, verifies by read-back before selecting); a successful update, a refused payload, and QEMU stopped while writing, after verifying and while saving the selection, each recovering on the media it left (process interruption, not power loss) ([walkthrough](walkthrough.md#m9-signed-fit-images)) |
 
 ## The SoC blocks
 
@@ -115,4 +116,4 @@ The full list is [`device-map.md` §4](device-map.md#4-known-fidelity-gaps-req-g
 2. ✅ **M6:** networking. [M6-ravb](units/M6-ravb/spec.md): both kernels get a DHCP lease through QEMU user networking and move data both ways with matching hashes.
 3. ✅ **M7:** real firmware. [M7-el3-platform](units/M7-el3-platform/spec.md): the board's TF-A BL31 is the PSCI firmware for the vendor kernel, which boots from the SD card with both CPUs, takes CPU1 down and up, and resets the board. [M7-optee-uboot](units/M7-optee-uboot/spec.md): OP-TEE and the vendor U-Boot follow BL31, and U-Boot loads Linux from the card; the root is chosen by PARTUUID (DR-0007), and the vendor's default boot is a separate compatibility check. [M7-optee-linux](units/M7-optee-linux/spec.md): with the project's TEE kernel, Linux calls a trusted application in OP-TEE. [M7-rpc-spinor](units/M7-rpc-spinor/spec.md): the SPI multi I/O bus controller and the module's QSPI flash, which U-Boot and Linux read and write. With this unit M7 is complete (release `rzv2l-v1.1`).
 4. ✅ **M8:** the full boot chain. [M8-bl2-staging](units/M8-bl2-staging/spec.md): the board's BL2 starts from the QSPI flash; [M8-ddr-stub](units/M8-ddr-stub/spec.md): it sets up the DDR, loads the FIP and starts BL31; [M8-full-chain](units/M8-full-chain/spec.md): BL31, OP-TEE and U-Boot from that FIP boot Linux from the SD card to the shell, with OP-TEE reachable from Linux, through a reboot, in boot modes 3 and 4. With this unit M8 is complete.
-5. 🔄 **M9:** platform behaviour, on the M9 U-Boot profile ([DR-0008](decisions/DR-0008-m9-boot-policy-profile.md)). [M9-fit](units/M9-fit/spec.md): U-Boot boots a slot only from a FIT image signed with the profile's key, and spends and saves an attempt before each try. [M9-ab](units/M9-ab/spec.md): Linux commits the slot it runs from after its health checks; a failed update rolls back to the other slot, and damaged environment copies recover. ⏭️ Next: M9-update-failure (the update tool, interruptions).
+5. ✅ **M9:** platform behaviour, on the M9 U-Boot profile ([DR-0008](decisions/DR-0008-m9-boot-policy-profile.md)). [M9-fit](units/M9-fit/spec.md): U-Boot boots a slot only from a FIT image signed with the profile's key, and spends and saves an attempt before each try. [M9-ab](units/M9-ab/spec.md): Linux commits the slot it runs from after its health checks; a failed update rolls back to the other slot, and damaged environment copies recover. [M9-update-failure](units/M9-update-failure/spec.md): the update tool writes and verifies the other slot before selecting it, and an update interrupted by stopping QEMU leaves the board bootable (process interruption, not a card's power loss). With this unit M9 is complete ([learning page](learning/m9-boot-policy.md)).

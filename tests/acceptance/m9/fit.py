@@ -144,9 +144,12 @@ def parse(text):
     for line in text.splitlines():
         m = re.match(r"copy \d: (valid|invalid) flag (\d+) ?(.*)$", line)
         if m:
+            # NAME=VALUE pairs, split before each NAME=: a value may hold
+            # a space (BOOT_ORDER=A B), a name never does
+            pairs = [v for v in re.split(r" (?=[A-Za-z0-9_]+=)", m.group(3))
+                     if v]
             res.append((m.group(1) == "valid", int(m.group(2)),
-                        dict(v.split("=", 1) for v in
-                             re.findall(r"(\w+=(?:A B|B A|\S+))", m.group(3)))))
+                        dict(v.split("=", 1) for v in pairs)))
     return res
 
 

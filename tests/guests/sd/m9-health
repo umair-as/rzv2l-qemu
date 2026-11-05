@@ -4,7 +4,8 @@
 #   1. the slot U-Boot booted: m9_slot, which U-Boot saved before booting
 #   2. / must be that slot's partition (A: 2, B: 3), found through the
 #      root's parent device; its PARTUUID must be the one on the kernel's
-#      command line (root=PARTUUID=); /etc/m9-slot must name the same slot
+#      command line (root=PARTUUID=). A root does not name its own slot,
+#      so one update image fits either slot (M9-update-failure).
 #   3. every executable in /etc/m9-health.d/ must succeed
 #   4. then one fw_setenv call: BOOT_<slot>_LEFT=3, M9_GOOD=<slot>;
 #      M9_PENDING cleared if it names this slot (the update is
@@ -43,8 +44,6 @@ puuid=$(printf '%s-%02x' "$id" "$part")
 kroot=$(sed -n 's/.*root=PARTUUID=\([^ ]*\).*/\1/p' /proc/cmdline)
 [ "$kroot" = "$puuid" ] ||
     fail "the kernel's root=PARTUUID=$kroot is not / ($puuid)"
-[ "$(cat /etc/m9-slot)" = "$slot" ] ||
-    fail "/etc/m9-slot names $(cat /etc/m9-slot), U-Boot booted $slot"
 for c in /etc/m9-health.d/*; do
     [ -x "$c" ] || continue
     "$c" || fail "health check $(basename "$c") failed"

@@ -15,6 +15,7 @@ How this project's QEMU model works, explained from real monitor output, code an
 | [`m6-network.md`](m6-network.md) | M6: Gigabit Ethernet descriptors, bit-banged MDIO, the PHY and its interrupt, checksum offload, the QEMU NIC; their pitfalls |
 | [`m7-firmware.md`](m7-firmware.md) | M7: the board's TF-A BL31 as the PSCI firmware: what BL2 hands it, starting a core through the SoC's registers, the failure loop that found the missing pieces; the QSPI flash: the two read paths, the read cache, a flash on QEMU's SSI bus, the one-byte shift that SFDP explained; their pitfalls |
 | [`m8-boot-chain.md`](m8-boot-chain.md) | M8: the full boot chain from the QSPI flash: the boot ROM stand-in, what BL2 needs, the DDR stub and what it cannot prove, how BL2 finds the firmware package and reads it through the flash window; their pitfalls |
+| [`m9-boot-policy.md`](m9-boot-policy.md) | M9: a boot policy on the whole chain: a second U-Boot build, the trust anchor, what a FIT signature covers, attempts saved before each try, two environment copies, Linux's commit and rollback, updating a slot and stopping in the middle; their pitfalls |
 | [`testing.md`](testing.md) | qtests, the guest probe, the acceptance run, the device-tree check |
 | [`building-and-testing.md`](building-and-testing.md) | the commands: building, running tests, style check, tracing, editor setup |
 | [`glossary.md`](glossary.md) | the terms |
