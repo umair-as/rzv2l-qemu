@@ -81,7 +81,7 @@ Seven lines cover clock set-up, DDR training, the FIP read and three image loads
 M8's first unit found the missing pieces that way. BL2 needs these from the model:
 
 - **two more PLLs in the CPG** (PLL4 and PLL6): BL2 starts them and polls their lock bits;
-- **the SPI clock's on and reset registers** (`SRC`): the manual's revision history lists them as deleted, but BL2 writes and polls them (`P/drivers/cpg.c:254-255`);
+- **the clock-on and reset registers of the sampling rate converter** (`SRC`, TF-A's name in `P/drivers/cpg.c:253`): the manual's revision history lists them as deleted, but BL2 writes and polls them (`P/drivers/cpg.c:254-255`);
 - **the SYSC access-control registers**: BL2 reads and writes back 22 of them.
 
 Each one is in [`../research/bl2.md` §4-5](../research/bl2.md#4-the-cpg-registers-bl2-needs). After those, BL2 stopped at its first write to the DDR PHY. That is the subject of §3.
@@ -149,7 +149,7 @@ NOTICE:  BL2: SYS_LSI_PRR: 0x0
 ERROR:   BL2: Failed to load image id 5 (-2)
 ```
 
-Image id 5 is BL33. The acceptance run builds such a FIP with `fiptool remove --nt-fw` and checks that nothing runs after this line (`tests/acceptance/m8/chain.py`). The same check without BL31 stops at image id 3. These two cases show that the images come from the flash. QEMU loads no image on this path: the command line has no `-bios`, `-kernel`, `bl32=` or `bl33=`.
+Image id 5 is BL33. The acceptance run builds such a FIP with `fiptool remove --nt-fw` and checks that nothing runs after this line (`tests/acceptance/m8/chain.py`). The same check without BL31 stops at image id 3. These two cases show that the images come from the flash. On this path QEMU loads BL2 only, as the boot ROM would (§1). BL2 loads BL31, OP-TEE and U-Boot from the FIP. The command line has no `-bios`, `-kernel`, `bl32=` or `bl33=`.
 
 ## 5. Reading the flash through the window
 
@@ -167,7 +167,7 @@ $ grep -c 'command 0xeb' trace.log
 5223
 ```
 
-Each command fills one 256-byte line of the read cache (`burst 1`). The reads run from `0x20000` to `0x166300`. The FIP is `0x1463B0` bytes long, so it ends at `0x1663B0`, inside the last line. That is 5221 different lines. The first line, the FIP's table of contents, is read three times: once for each image that BL2 opens (I). BL2's FIP read is this path's first use at volume. The M8-ddr-stub unit's qtest therefore reads several kilobytes across many burst boundaries first, and compares every byte with the image.
+Each command is one burst that fills the whole read cache: 32 lines of 8 bytes, 256 bytes (`burst 1`; `qemu/include/hw/ssi/renesas_rzv2l_rpc.h:40-41`). The reads run from `0x20000` to `0x166300`. The FIP is `0x1463B0` bytes long, so it ends at `0x1663B0`, inside the last 256-byte region. That is 5223 bursts over 5221 different 256-byte regions. The first region, the FIP's table of contents, is read three times: once for each image that BL2 opens (I). BL2's FIP read is this path's first use at volume. The M8-ddr-stub unit's qtest therefore reads several kilobytes across many burst boundaries first, and compares every byte with the image.
 
 ## 6. How we know it works
 
