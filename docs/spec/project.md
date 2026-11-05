@@ -364,6 +364,7 @@ RZ/V2L, with hardware available, calibrates the method: build the model, measure
 ### v0.3 → v0.4
 
 - §8: REQ-GUEST-003 gets a second exception, a project boot-policy profile with a listed configuration fragment and listed upstream source patches (DR-0008), for M9.
+- §15 requirements, at the v2.0 closure: REQ-BOOT-001 to REQ-BOOT-008 added for M9 (signed FIT images, slot selection, commit, rollback, damaged environment copies, updates and their interruptions); REQ-SYSC-002's verification moves from U-Boot, which prints no boot source, to BL2's own output and its choice of the FIP's device (M8). 45 of 46 requirements verified; REQ-TSIP-001 still needs a production OP-TEE that public sources cannot build.
 
 ### v0.3 errata (2026-11-04)
 

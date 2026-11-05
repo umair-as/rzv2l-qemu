@@ -6,7 +6,7 @@
 ![SoC](https://img.shields.io/badge/SoC-R9A07G054L2-6f42c1)
 ![CPU](https://img.shields.io/badge/CPU-2%C3%97%20Cortex--A55-2ea44f)
 ![QEMU](https://img.shields.io/badge/QEMU-aarch64--softmmu-ff6f00)
-![Status](https://img.shields.io/badge/status-v1.1%3A%20M7%20done%2C%20M8%20next-0a5ad4)
+![Status](https://img.shields.io/badge/status-v2.0%3A%20M0--M9%20done-0a5ad4)
 [![RZ/V2L CI](https://github.com/umair-as/qemu/actions/workflows/rzv2l.yml/badge.svg?branch=rzv2l-dev)](https://github.com/umair-as/qemu/actions/workflows/rzv2l.yml?query=branch%3Arzv2l-dev)
 
 ---
@@ -66,7 +66,7 @@ flowchart LR
     class M7,M8,M9 fw
 ```
 
-🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** ✅ M0-M6: mainline Linux and Renesas's own kernel boot to a shell on both CPUs, from an ext4 root on the SD card, with Gigabit Ethernet. ✅ M7: the board's TF-A BL31, OP-TEE and U-Boot boot Linux from the card, Linux calls a trusted application in OP-TEE, and U-Boot and Linux read and write the module's QSPI flash (release `rzv2l-v1.1`). ⏭️ M8: the board's BL2 from the flash. **To run each milestone yourself, follow the [walkthrough](docs/walkthrough.md).** Progress, units and blocks: [Milestones](docs/milestones.md). Exit criteria: the [specification](docs/spec/project.md).
+🟧 bring-up · 🟩 Linux · 🟪 firmware and platform. **Where it stands:** ✅ M0-M6: mainline Linux and Renesas's own kernel boot to a shell on both CPUs, from an ext4 root on the SD card, with Gigabit Ethernet. ✅ M7: the board's TF-A BL31, OP-TEE and U-Boot boot Linux from the card, Linux calls a trusted application in OP-TEE, and U-Boot and Linux read and write the module's QSPI flash (release `rzv2l-v1.1`). ✅ M8: the board's own BL2 from the QSPI flash runs the whole chain to Linux. ✅ M9: a boot policy on that chain: signed FIT images, A/B slots with attempts and rollback, and slot updates that survive a stopped QEMU (release `rzv2l-v2.0`). **To run each milestone yourself, follow the [walkthrough](docs/walkthrough.md).** Progress, units and blocks: [Milestones](docs/milestones.md). Exit criteria: the [specification](docs/spec/project.md).
 
 ## 🚀 Building
 
