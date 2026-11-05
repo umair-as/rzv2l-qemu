@@ -340,7 +340,27 @@ debugfs -w -R "sif /etc/m9-health.d/90-fail mode 0100755" build/slot-b.img
 dd if=build/slot-b.img of=build/sd-m9-try.img bs=512 seek=139264 conv=notrunc status=none
 ```
 
-Boot with the same command as before. Slot B boots three times, and each time its health check fails and Linux reboots. Then U-Boot boots slot A, which commits and records the rollback: `M9-HEALTH: rollback: slot B gave up, slot A runs`. Read more: [`units/M9-fit/spec.md`](units/M9-fit/spec.md), [`units/M9-ab/spec.md`](units/M9-ab/spec.md).
+Boot with the same command as before. Slot B boots three times, and each time its health check fails and Linux reboots. Then U-Boot boots slot A, which commits and records the rollback: `M9-HEALTH: rollback: slot B gave up, slot A runs`.
+
+To update a slot, start from a fresh card and add the update card in the carrier slot. `build-image-m9.sh` builds the update card too: version 2 of the root and its SHA-256.
+
+```bash
+cp tests/guests/out/sd/sd-m9.img build/sd-m9-try.img
+cp tests/guests/out/sd/sd-m9-update.img build/sd-m9-update-try.img
+build/qemu/qemu-system-aarch64 -M rzv2l-smarc,boot-mode=3 -nographic \
+    -drive if=mtd,format=raw,file=build/spi-m9-try.img \
+    -drive if=sd,index=0,format=raw,file=build/sd-m9-try.img \
+    -drive if=sd,index=1,format=raw,file=build/sd-m9-update-try.img
+```
+
+At the shell of slot A (`M9 slot A, version 1`), run `m9-update`. Each step prints one line:
+1. `marking slot B not bootable`
+2. `writing slot B`
+3. `verifying slot B`, then `slot B verified <sha256>`
+4. `saving the selection`
+5. `slot B selected as a pending update`
+
+Then run `reboot`. U-Boot boots slot B, Linux prints `M9 slot B, version 2`, and the health service commits the update (`M9-HEALTH: the update of slot B is committed`). To see a stopped update recover, quit QEMU with Ctrl-A X while it writes slot B, then start QEMU again with the same command: slot A boots, nothing is pending, and `m9-update` can run again. That shows a stopped QEMU process. It does not show what a real card does when it loses power during a write. Read more: [`units/M9-fit/spec.md`](units/M9-fit/spec.md), [`units/M9-ab/spec.md`](units/M9-ab/spec.md), [`units/M9-update-failure/spec.md`](units/M9-update-failure/spec.md).
 
 ## Run every check at once
 
@@ -348,7 +368,7 @@ Boot with the same command as before. Slot B boots three times, and each time it
 tests/acceptance/m8/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and the QSPI flash under U-Boot and Linux (reads of a random image, a write across a reboot and a QEMU restart): the M7 run, whose report is `tests/acceptance/m8/out/m7.txt`. That report also boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. Then BL2 runs from the QSPI flash to its DDR set-up, and the boot ROM stand-in's errors are checked. Last comes the whole chain from the flash to the Linux shell: through a reboot, with OP-TEE called from Linux, in boot mode 4, and with firmware packages missing BL31 or BL33, where BL2 stops. The run prints `M8 ACCEPTANCE: PASS`. `tests/acceptance/m9/run.sh` runs all of that first, then the M9 checks: the signed FIT boots slot A, and eight refused cases each spend slot A's three attempts and end at U-Boot's prompt, without a kernel. Then it checks the slots: B selected, a good update committed, a bad update rolled back across a QEMU restart, both slots exhausted to the prompt, and damaged environment copies. It prints `M9 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and the QSPI flash under U-Boot and Linux (reads of a random image, a write across a reboot and a QEMU restart): the M7 run, whose report is `tests/acceptance/m8/out/m7.txt`. That report also boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. Then BL2 runs from the QSPI flash to its DDR set-up, and the boot ROM stand-in's errors are checked. Last comes the whole chain from the flash to the Linux shell: through a reboot, with OP-TEE called from Linux, in boot mode 4, and with firmware packages missing BL31 or BL33, where BL2 stops. The run prints `M8 ACCEPTANCE: PASS`. `tests/acceptance/m9/run.sh` runs all of that first, then the M9 checks: the signed FIT boots slot A, and eight refused cases each spend slot A's three attempts and end at U-Boot's prompt, without a kernel. Then it checks the slots: B selected, a good update committed, a bad update rolled back across a QEMU restart, both slots exhausted to the prompt, and damaged environment copies. Last come the slot updates: a successful one, a refused payload, and QEMU stopped while writing, after verifying and while saving the selection. It prints `M9 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 
 ## Options of `scripts/run.sh`
