@@ -45,6 +45,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -143,6 +144,12 @@ def start(out, env=None, carrier=None, flash=None, boot_mode=3):
     if carrier:
         drives += card_copy(out, carrier, 1)
     sock = os.path.join(out, "serial.sock")
+    # A Unix socket path holds at most 107 bytes (sun_path); a deep run
+    # directory moves the socket to a short temporary directory instead
+    if len(os.path.abspath(sock).encode()) > 100:
+        sock = os.path.join(tempfile.mkdtemp(prefix="rzv2l-"), "serial.sock")
+        with open(os.path.join(out, "serial.sock.path"), "w") as f:
+            f.write(sock + "\n")
     for f in (sock, os.path.join(out, "qemu.log")):
         if os.path.exists(f):
             os.unlink(f)
