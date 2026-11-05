@@ -1,0 +1,32 @@
+# Lines allowed in the -d unimp,guest_errors,invalid_mem log of the
+# chain runs (chain.py: BL2 from the QSPI flash, then BL31, OP-TEE,
+# U-Boot and Linux), besides BL2's own (log-allow.txt) and the stub
+# windows of ../../m4 and ../../m5. One extended regex per line, each
+# with the reason it is not a gap, checked at its source with BL2 in
+# front: M7's staged run (../../m7/expected/log-allow.txt) had the same
+# lines, but they enter here only after that check.
+#
+# U-Boot's board_init writes the Ethernet pin registers ETH_ch0, ETH_ch1
+# and ETH_MII_RGMII (1 byte each) with 32-bit stores
+# (U-Boot 4eebfbaa4e board/renesas/rzv2l-dev/rzv2l-dev.c:108-112); the
+# PFC takes the low byte. TF-A names them (pfc_regs.h) but writes none.
+^renesas_rzg2l_pfc: 4-byte (access|read|write) at 0x30(0c|10|18) 
+# U-Boot starts WDT0 and rewrites WDTSET at each ping while it runs
+# (drivers/watchdog/rzg2l_wdt.c:94-114); Linux's rzg2l_wdt_start writes
+# WDTSET and WDTTIM to the watchdog U-Boot left running (vendor kernel
+# drivers/watchdog/rzg2l_wdt.c:96, 118). Neither can change while the
+# counter runs (manual 21.3.1), so U-Boot's 60 s stays. The firmware
+# does not start WDT0: BL31's only write is PEEN, for a system reset
+# (TF-A plat/renesas/rz/common/drivers/wdt.c:12-14).
+^renesas_rzg2l_wdt: write at offset 0x[48] while running is ignored$
+# BL2's and BL31's console set-up (TF-A f59ed5a31
+# plat/renesas/rz/common/drivers/scifa.S:154-156, 171-172, linked in both)
+# leaves SCIF0's SEMR with MDDRS set and TE/RE on; U-Boot's SCIF driver
+# then writes SCBRR at offset 0x04 (drivers/serial/serial_sh.c:80), which lands
+# on MDDR and is ignored while TE or RE is set (device map, SCIF0).
+^rz_scifa_write: MDDR write ignored while TE or RE is set$
+# U-Boot's SD driver writes SDHI_PORTSEL (USE_1PORT) at offset 0x8
+# (drivers/mmc/sh_sdhi.c:709), a register of older hosts of this family
+# that the RZ/V2L's SD host does not have (manual Table 40.2: nothing
+# between SD_CMD and SD_ARG); the model ignores it.
+^sdhi_write: undefined offset 0x8$
