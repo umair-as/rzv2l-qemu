@@ -59,7 +59,7 @@ The format and states are defined in `project.md` §15. Evidence paths are relat
 | ID | Statement | Evidence | Verification | M | Status |
 |---|---|---|---|---|---|
 | REQ-BOOT-001 | On the automatic boot path of the M9 profile, U-Boot SHALL boot a FIT configuration only if a signature by the profile's required key covers it and every image hash in it matches. | decisions/DR-0008; spec §12 | M9 acceptance (`fit.py`): the signed FIT reaches the shell | M9 | P |
-| REQ-BOOT-002 | A FIT with a changed kernel, a changed DTB, no configuration signature, a signature by another key, or one of upstream U-Boot's crafted layouts (`fakeroot`, `kernel@`) SHALL be refused before kernel entry; each refusal SHALL spend one attempt of the slot, and no other boot route SHALL run. | decisions/DR-0008 | M9 acceptance (`fit.py`): each case to the prompt with its counter at 0 | M9 | P |
+| REQ-BOOT-002 | A FIT with a changed kernel, a changed DTB, no configuration signature, a signature by another key, a signature that covers only some of the configuration's images, or one of upstream U-Boot's crafted layouts (`fakeroot`, `kernel@`) SHALL be refused before kernel entry, also with `verify=n` stored; each refusal SHALL spend one attempt of the slot, and no other boot route SHALL run. | decisions/DR-0008 | M9 acceptance (`fit.py`): each case to the prompt with its counter at 0 | M9 | P |
 
 ## Tests and process
 

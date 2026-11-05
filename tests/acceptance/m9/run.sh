@@ -26,7 +26,7 @@ else
     echo "FAIL M8 acceptance (full output: out/m8.txt)"; result 1
 fi
 
-step "signed FIT: accepted on slot A; six refused FIT images, each to the prompt"
+step "signed FIT: accepted on slot A; eight refused cases, each to the prompt"
 python3 -I "$HERE/fit.py" "$OUT/fit"
 result $?
 

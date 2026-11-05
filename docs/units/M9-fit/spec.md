@@ -21,7 +21,7 @@ Upstream U-Boot commit `2092322b31cc` ("boot: Add fit_config_get_hash_list() to 
 
 The M9 profile carries it as its one source patch (`tests/guests/fw/patches/u-boot-m9/`): the code and doc hunks, with `FIT_COMPAT_PROP`, which this tree lacks, written as its upstream value `"compatible"`. The hunk for U-Boot's own Python test is dropped, because it does not apply here and is not built.
 
-**What the tests show about it, and what they do not.** The commit does not describe how to build a FIT that exploits the old code, and the report it closes was not readable here. The project therefore has no case that the old code accepts and the patched code refuses. Upstream's two crafted FITs (`test/py/tests/vboot_evil.py`: `fakeroot`, `kernel@`) are negative cases below, but the pinned code already refused them before the patch: U-Boot's format check stops them before any signature check (`boot/image-fit.c:2082-2086`). The tests show that the patched U-Boot still accepts the signed FIT and refuses every negative. They do not show the patch's own effect (A: it closes the reported bypass, on upstream's word).
+**What the tests show about it.** One case separates the two codes (found by the independent review): a FIT signed with the profile key whose signature covers only the kernel (`sign-images = "kernel"`), so its DTB could be swapped. The pinned code builds the signed region from the signature's `hashed-nodes` list and accepts it. The patched code builds the list from the configuration, which names the DTB too, and refuses it. `build-fit-m9.sh` checks both with the host `fit_check_sign` of each build, and `fit.py` boots it on the target, where it must be refused. Upstream's two crafted FITs (`test/py/tests/vboot_evil.py`: `fakeroot`, `kernel@`) do not separate them: U-Boot's format check refuses both before any signature check (`boot/image-fit.c:2082-2086`), with or without the patch.
 
 ## What the guest needs
 
@@ -37,12 +37,14 @@ New acceptance script `tests/acceptance/m9/fit.py`. It runs from the QSPI flash,
 
 1. **Accepted:** U-Boot prints the FIT's configuration check as passed for the project key (`sha256,rsa2048:<key name>+`) and each image's hash as OK, then starts the kernel. Linux reaches the shell with `/` on slot A's PARTUUID. `BOOT_A_LEFT` went from 3 to 2 and was saved before `bootm` (the order of the lines shows it).
 2. **Rejected, each before kernel entry**, with `Starting kernel` never printed. In each case U-Boot prints its reason, resets, and tries again until the counter is 0. It then stops at the prompt and prints the slot and its counter. Nothing boots by another route. The cases:
-   - a kernel byte changed after signing (the image hash fails);
-   - one byte of the DTB's data changed after signing (the image hash fails; the configuration signature still verifies, because it covers no image data);
+   - a kernel byte changed after signing (the image hash fails: `Bad hash value for 'hash-1' hash node in 'kernel' image node`);
+   - one byte of the DTB's data changed after signing (the image hash fails: `... in 'fdt' image node`; the configuration signature still verifies, because it covers no image data);
    - a FIT with no configuration signature (the required key finds none);
    - a FIT signed with a second key (the required key does not verify it);
+   - a FIT signed with the profile key whose signature covers only the kernel (the patched code refuses it; the pinned code would boot it);
+   - the unsigned FIT with `verify=n` stored: the boot command sets `verify` itself before `bootm`, so the stored value cannot turn the checks off (`boot/bootm.c:262`);
    - upstream's two crafted FITs, `fakeroot` and `kernel@`: U-Boot's format check refuses them before the signature check (`Bad FIT kernel image format`; for `kernel@` also `Signature checking prevents use of unit addresses (@) in nodes`).
-3. **Trust anchor:** each run records the SHA-256 of the public key, of each control DTB that carries it, of each FIT, and of the flash and card images it used. Every negative case uses the same U-Boot binary and key as the accepted case, and the hashes show it.
+3. **Trust anchor:** each run directory records the SHA-256 of the flash and card images it used and of the FIT in slot A (`images.sha256`, `fit.sha256`), and keeps a copy of the two build records with the public key, each control DTB that carries it, U-Boot and every FIT (`u-boot-m9.txt`, `fit-m9.txt`). Every negative case uses the same U-Boot binary and key as the accepted case, and the hashes show it.
 4. **Profiles side by side:** M8 acceptance (the vendor-default profile) runs unchanged.
 5. **Log gate:** the `-d unimp,guest_errors,invalid_mem` lines of each run are those of M8's chain list, or new lines checked at their source.
 

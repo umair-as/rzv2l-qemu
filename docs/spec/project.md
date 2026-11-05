@@ -132,7 +132,7 @@ What a powered-down or clock-stopped module does on silicon (hang, zero, abort) 
 - **REQ-GUEST-001.** Acceptance guests use their stock DTB, **unmodified before loader fixups**.
 - **REQ-GUEST-002.** Guest drivers are never patched to suit the emulator.
 - **REQ-GUEST-003.** Firmware contains no QEMU-specific changes for acceptance. *Exception:* a firmware **build configuration** may be changed when a closed hardware dependency cannot be emulated honestly. Such a change is recorded as a fidelity gap. Example: OP-TEE `CFG_RZ_SCE=n`, §12.
-  *Second exception:* a project **boot-policy profile** may build a pinned firmware source with a listed configuration fragment, to demonstrate a software decision of §12 (FIT signatures, slot selection, rollback). The vendor-default build stays as the regression profile, and the fragment is listed as a fidelity gap (`../decisions/DR-0008-m9-boot-policy-profile.md`).
+  *Second exception:* a project **boot-policy profile** may build a pinned firmware source with a listed configuration fragment and listed upstream source patches, to demonstrate a software decision of §12 (FIT signatures, slot selection, rollback). The vendor-default build stays as the regression profile, and the fragment is listed as a fidelity gap (`../decisions/DR-0008-m9-boot-policy-profile.md`).
 - **REQ-GUEST-004.** Any boot argument, injected DT node or loader behaviour present in an acceptance run is listed as a fidelity gap.
 
 **Acceptance DTBs**
@@ -363,7 +363,7 @@ RZ/V2L, with hardware available, calibrates the method: build the model, measure
 
 ### v0.3 → v0.4
 
-- §8: REQ-GUEST-003 gets a second exception, a project boot-policy profile with a listed configuration fragment (DR-0008), for M9.
+- §8: REQ-GUEST-003 gets a second exception, a project boot-policy profile with a listed configuration fragment and listed upstream source patches (DR-0008), for M9.
 
 ### v0.3 errata (2026-11-04)
 

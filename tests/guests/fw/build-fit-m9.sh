@@ -7,6 +7,13 @@
 #   dtb-changed     one byte of the DTB's data changed after signing
 #   unsigned        the same images, no configuration signature
 #   other-key       signed with keys/m9-other, which U-Boot does not hold
+#   kernel-only     signed with the profile key, but the signature covers
+#                   only the kernel: the DTB could be swapped. The pinned
+#                   U-Boot trusts the signature's hashed-nodes list and
+#                   accepts it; with the backport (patches/u-boot-m9/) the
+#                   signed nodes come from the configuration, and U-Boot
+#                   refuses it. The build checks both, with the host
+#                   fit_check_sign of each build.
 #   fakeroot, kernel-at
 #                   upstream U-Boot's two crafted-FIT attacks
 #                   (test/py/tests/vboot_evil.py of the M9 source): an
@@ -34,8 +41,14 @@ done
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-# its KEY: the FIT source; KEY empty = no signature node
+VENDOR_CHECK="$HERE/../dl/u-boot-build/tools/fit_check_sign"
+[ -e "$VENDOR_CHECK" ] || {
+    echo "build-fit-m9.sh: missing $VENDOR_CHECK (build-u-boot.sh)" >&2; exit 1; }
+
+# its KEY [IMAGES]: the FIT source; KEY empty = no signature node;
+# IMAGES the signed images (default kernel and fdt)
 its() {
+    local images=${2:-'"kernel", "fdt"'}
     cat <<EOF
 /dts-v1/;
 / {
@@ -74,7 +87,7 @@ EOF
 			signature-1 {
 				algo = "sha256,rsa2048";
 				key-name-hint = "$1";
-				sign-images = "kernel", "fdt";
+				sign-images = $images;
 			};
 EOF
     fi
@@ -87,6 +100,8 @@ its "" > "$OUT/unsigned.its"
 "$MKIMAGE" -q -f "$OUT/unsigned.its" "$OUT/fitImage-unsigned"
 its m9-other > "$OUT/other-key.its"
 "$MKIMAGE" -q -f "$OUT/other-key.its" -k "$KEYS" "$OUT/fitImage-other-key"
+its m9-dev '"kernel"' > "$OUT/kernel-only.its"
+"$MKIMAGE" -q -f "$OUT/kernel-only.its" -k "$KEYS" "$OUT/fitImage-kernel-only"
 
 # One byte changed inside an image's data: found by a 64-byte run of that
 # image, which must occur once in the FIT
@@ -123,13 +138,19 @@ check() {   # check FIT WANT(0 accept, 1 refuse)
         cat "$1.check" >&2; exit 1; }
 }
 check "$OUT/fitImage" 0
-for n in kernel-changed dtb-changed unsigned other-key fakeroot kernel-at; do
+for n in kernel-changed dtb-changed unsigned other-key kernel-only fakeroot \
+         kernel-at; do
     check "$OUT/fitImage-$n" 1
 done
+# The backport's effect: the pinned, unpatched tool accepts kernel-only
+"$VENDOR_CHECK" -f "$OUT/fitImage-kernel-only" -k "$M9/smarc-rzv2l.dtb" \
+    > "$OUT/fitImage-kernel-only.vendor-check" 2>&1 || {
+    echo "build-fit-m9.sh: the unpatched fit_check_sign refuses kernel-only;" \
+         "the case no longer shows the backport's effect" >&2; exit 1; }
 
 {
     echo "key: keys/m9-dev ($(sha256sum < "$KEYS/m9-dev.crt" | cut -c1-64) m9-dev.crt)"
-    (cd "$OUT" && sha256sum fitImage fitImage-*[!k] evil-kernel)
+    (cd "$OUT" && sha256sum fitImage $(cd "$OUT" && ls fitImage-* | grep -v '\.') evil-kernel)
     (cd "$(dirname "$KERNEL")" && sha256sum Image)
     (cd "$(dirname "$DTB")" && sha256sum "$(basename "$DTB")")
 } > "$OUT/build.txt"

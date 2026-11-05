@@ -12,7 +12,8 @@ for a negative case, slot A's /boot/fitImage is replaced with that
 negative image (tests/guests/fw/build-fit-m9.sh) and both environment
 copies get BOOT_ORDER=A, so that only slot A is tried. Each run
 directory has command.txt and images.sha256 (the flash and card it
-used) and fit.sha256 (the FIT in slot A).
+used), fit.sha256 (the FIT in slot A), and u-boot-m9.txt and
+fit-m9.txt (the builds' records: key, control DTBs, U-Boot, FITs).
 Checks, on the serial line, each line searched from the end of the one
 before:
   accepted: U-Boot 2024.07-m9; the environment from MMC; the attempt
@@ -23,7 +24,8 @@ before:
           QEMU stops, a valid environment copy on the card holds
           BOOT_A_LEFT=2
   each negative (kernel-changed, dtb-changed, unsigned, other-key,
-          fakeroot, kernel-at): three attempts, each saved (2, 1, 0),
+          kernel-only, fakeroot, kernel-at, and unsigned with verify=n
+          stored): three attempts, each saved (2, 1, 0),
           each refused with its reason and followed by a reset, then
           "no slot has an attempt left" with the counters and the
           U-Boot prompt; "Starting kernel" never appears
@@ -55,10 +57,13 @@ ENV_OK = r"Loading Environment from MMC\.\.\. Reading from MMC\(0\)\.\.\. OK"
 # crafted FITs fail U-Boot's format check before any signature check
 # (boot/image-fit.c:2082-2086 fit_image_load, fit_check_format)
 REASON = {
-    "kernel-changed": r"Bad Data Hash",
-    "dtb-changed": r"Bad Data Hash",
+    "kernel-changed": r"Bad hash value for 'hash-1' hash node in 'kernel' "
+                      r"image node",
+    "dtb-changed": r"Bad hash value for 'hash-1' hash node in 'fdt' "
+                   r"image node",
     "unsigned": r"Failed to verify required signature 'key-m9-dev'",
     "other-key": r"Failed to verify required signature 'key-m9-dev'",
+    "kernel-only": r"Failed to verify required signature 'key-m9-dev'",
     "fakeroot": r"Bad FIT kernel image format! \(err=-22\)",
     "kernel-at": r"Signature checking prevents use of unit addresses \(@\) "
                  r"in nodes",
@@ -95,6 +100,11 @@ def card(out, fit, env=()):
     if env:
         subprocess.run([sys.executable, "-I", UENV, "m9-write", img, ENV]
                        + list(env), check=True)
+    # The trust anchor and the builds this run used: key, control DTBs,
+    # U-Boot, every FIT (build-u-boot-m9.sh, build-fit-m9.sh records)
+    for src, dst in ((os.path.join(FITS, "..", "build.txt"), "u-boot-m9.txt"),
+                     (os.path.join(FITS, "build.txt"), "fit-m9.txt")):
+        shutil.copyfile(src, os.path.join(out, dst))
     with open(os.path.join(out, "fit.sha256"), "w") as f:
         f.write("%s  %s\n" % (sha256(fit or os.path.join(FITS, "fitImage")),
                               os.path.basename(fit or "fitImage")))
@@ -153,10 +163,16 @@ def accepted(out):
           " (%s)" % " | ".join(state.splitlines()))
 
 
+# Extra stored variables per case: verify=n would turn bootm's checks off
+# if the boot command did not set verify itself (boot/bootm.c:262)
+EXTRA = {"unsigned-verify-n": ("unsigned", ["verify=n"])}
+
+
 def negative(out, name):
     what = "refused %s" % name
-    img = card(out, os.path.join(FITS, "fitImage-" + name),
-               ["BOOT_ORDER=A"])
+    fit, extra = EXTRA.get(name, (name, []))
+    img = card(out, os.path.join(FITS, "fitImage-" + fit),
+               ["BOOT_ORDER=A"] + extra)
     proc, s, log = start(out, img)
     try:
         pos = 0
@@ -164,7 +180,7 @@ def negative(out, name):
             pos = in_order(s, [BANNER,
                                r"M9: slot A: attempt saved: BOOT_A_LEFT=%d "
                                % left,
-                               REASON[name],
+                               REASON[fit],
                                r"M9: slot A: bootm returned",
                                r"M9: slot A: resetting"], pos,
                            "%s, attempt %d" % (what, 3 - left))
@@ -189,7 +205,7 @@ def main():
             return 1
     shutil.rmtree(out, ignore_errors=True)
     accepted(os.path.join(out, "accepted"))
-    for name in REASON:
+    for name in list(REASON) + list(EXTRA):
         negative(os.path.join(out, name), name)
     return 1 if firmware.failures else 0
 
