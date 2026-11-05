@@ -54,6 +54,13 @@ The format and states are defined in `project.md` §15. Evidence paths are relat
 | REQ-IRQC-001 | The IRQC (IA55) window SHALL be mapped so the `rzg2l-irqc` driver probes. | boot-dependency-graph.md §1(b) | M3b probe log | M3b | V |
 | REQ-MAP-001 | Every register window enabled in DTB-U SHALL have a per-window classification in `device-map.md` (model / honest-fault stub / read-as-zero stub with evidence that zero is faithful or harmless / unmapped) and the milestone at which it becomes a model or an honest failure. Mapping a window is **not** a fidelity claim: a stub must not cause a hang, a false success or a frozen clock (e.g. OSTM). | research/boot-dependency-graph.md §4; device-map.md | per-window review + `-d unimp` log review at M3b | M3b | V |
 
+## Boot policy (M9)
+
+| ID | Statement | Evidence | Verification | M | Status |
+|---|---|---|---|---|---|
+| REQ-BOOT-001 | On the automatic boot path of the M9 profile, U-Boot SHALL boot a FIT configuration only if a signature by the profile's required key covers it and every image hash in it matches. | decisions/DR-0008; spec §12 | M9 acceptance (`fit.py`): the signed FIT reaches the shell | M9 | P |
+| REQ-BOOT-002 | A FIT with a changed kernel, a replaced DTB, no configuration signature, or a signature by another key SHALL be refused before kernel entry; each refusal SHALL spend one attempt of the slot, and no other boot route SHALL run. | decisions/DR-0008 | M9 acceptance (`fit.py`): each case to the prompt with its counter at 0 | M9 | P |
+
 ## Tests and process
 
 | ID | Statement | Evidence | Verification | M | Status |
