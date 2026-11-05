@@ -48,7 +48,7 @@ New acceptance script `tests/acceptance/m9/update.py`, on the chain from the QSP
    - A new QEMU on the same media boots A, which commits.
    - The tool then runs again to completion, and B boots version 2: the update can be retried.
 4. **Interrupted after verification, before the selection** (stopped at `M9-UPDATE: slot B verified`). The same outcome as case 3: A boots and nothing is pending.
-5. **Interrupted during the environment write** (stopped at `M9-UPDATE: saving the selection`, four runs: 0, 0.05, 0.3 and 1.0 s after the line). Which state the short delays find depends on timing. At 1.0 s the save has finished, so every run checks both the old-state and the new-state path.
+5. **Interrupted during the environment write** (stopped at `M9-UPDATE: saving the selection`, four runs: 0, 0.05, 0.3 and 1.0 s after the line). Which state the three short stops find depends on timing (in the retained run: old, old, new). At 1.0 s the save has finished, so that stop always reaches the new state, and every run checks both paths.
    - Each time, the active copy is either the whole old state or the whole new state.
    - The boot follows it: A with version 1, or B pending, then committed.
    - Each run's outcome is recorded.
