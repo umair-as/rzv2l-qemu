@@ -18,7 +18,7 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-MACH-007 | M1 | M1 (placement + GICD/GICR identity == EVK, DR-0003 option A; TRM values; EVK-R60–R66 confirm on silicon) | M1-machine-skeleton | M1-T01, T03 | qtest `arm-gicv3-iidr-test`; qtest `rzv2l-smarc-test` `/gic/layout`, `/gic/identity` | `../research/cpu-gic.md`; EVK boot log; `../evidence/EVK-2026-10-29-post-firmware.md` (R60-R66) | V |
 | REQ-MACH-008 | M1+ (per device) | each device's milestone | every unit | M1-T03, T06; each unit's SoC task | acceptance `info mtree -f`, `info qtree` (vs `device-map.md`); qtests per device; M3/M4 boots | `../device-map.md`; `../evidence/EVK-2026-10-30-linux.md` §1-2 (EVK `/proc/iomem` and IRQ numbers match) | V |
 | REQ-SYSC-001 | M1 | M1 | M1-machine-skeleton | M1-T02, T05 | qtest `rzv2l-smarc-test` `/sysc/id`; probe (abort on a non-ID offset) | `../research/sysc.md`; EVK BL2 print `0x18447447` | V |
-| REQ-SYSC-002 | M1 (board property) | M7 (BL2/U-Boot boot-device selection) | M1-machine-skeleton | M1-T02 | qtest `rzv2l-smarc-test` `/sysc/boot-pins`, `/sysc/boot-mode-reserved` | `../research/sysc.md`; EVK BL2 LSI_MODE values | D |
+| REQ-SYSC-002 | M1 (board property) | M8 (BL2 boot-device selection) | M1-machine-skeleton; M8-full-chain | M1-T02; M8-full-chain T2, T5 | qtest `rzv2l-smarc-test` `/sysc/boot-pins`, `/sysc/boot-mode-reserved`; acceptance `m8/chain.py` (`SYS_LSI_MODE: 0x10003` / `0x10004`, FIP from the flash; FIPs without BL31 or BL33 stop at BL2) | `../research/sysc.md`; `../research/bl2.md`; EVK BL2 LSI_MODE values | V |
 | REQ-SYC-001 | M7 | M7 | M7-el3-platform | T3 | qtest `rzv2l-smarc-test` `/syc` (proof 6); M7 acceptance (BL31 boot, `arch_timer` 24 MHz) | `../research/el3-platform.md` §2 | V |
 | REQ-CPUPWR-001 | M7 | M7 | M7-el3-platform | T5-T7 | qtests `/sysc/ca55`, `/cpg/pchannel`, `/cpg/ca55-run`; M7 acceptance `firmware.py`, `bootloader.py` (CPU1 online, hotplug, `reboot`); EL3 probe; proofs in `../units/M7-el3-platform/tasks.md` | `../units/M7-el3-platform/spec.md` | V |
 | REQ-TZC-001 | M7 | M7 | M7-el3-platform | T4 | qtest `/tzc` (proofs 4, 5); EL3 probe (Non-secure access aborts, proof 14); M7 acceptance (BL31 boot) | `../research/el3-platform.md` §2; `../evidence/EVK-2026-11-01-firmware.md` (R79) | V |
@@ -47,11 +47,11 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-TEST-001 | M2 | M2 | M2-first-character | M2-T08, T09, T13 | `tests/acceptance/m2/run.sh` (A01: exact serial bytes); eval A01–A06 with mutations | spec §17; review and recheck | V |
 | REQ-TEST-002 | M1+ | every unit | every unit | M1-T01–T07; each unit's proofs | a qtest per device model with recorded mutations (each unit's `tasks.md`); the three M1 checks without one got theirs at the v1.1 closure (`../units/M1-machine-skeleton/tasks.md`) | spec §13 | V |
 | REQ-TEST-003 | M3+ | M3+ | M1-machine-skeleton; M3b-shell; M4-vendor-kernel | M1-T06; M3b-shell T2; M4-vendor-kernel T5 | acceptance log gates (`-d unimp,guest_errors,invalid_mem`): only recorded stub windows, an empty log fails | spec §13 | V |
-| REQ-BOOT-001 | M9 | M9 | M9-fit | T1-T5 | acceptance `m9/fit.py` (accepted case) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-002 | M9 | M9 | M9-fit | T3, T5 | acceptance `m9/fit.py` (eight refused cases, counter to 0) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-003 | M9 | M9 | M9-ab | T3 | acceptance `m9/ab.py` (selection; rollback with a restart) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-004 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (selection; good update) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-005 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (bad update; both exhausted) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-006 | M9 | M9 | M9-ab | T3 | acceptance `m9/ab.py` (damaged copies) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-007 | M9 | M9 | M9-update-failure | T2, T4 | acceptance `m9/update.py` (success; refused payload) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-008 | M9 | M9 | M9-update-failure | T4 | acceptance `m9/update.py` (interrupted while writing, after verifying, while saving the selection) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-001 | M9 | M9 | M9-fit | T1-T5 | acceptance `m9/fit.py` (accepted case) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |
+| REQ-BOOT-002 | M9 | M9 | M9-fit | T3, T5 | acceptance `m9/fit.py` (eight refused cases, counter to 0) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |
+| REQ-BOOT-003 | M9 | M9 | M9-ab | T3 | acceptance `m9/ab.py` (selection; rollback with a restart) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |
+| REQ-BOOT-004 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (selection; good update) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |
+| REQ-BOOT-005 | M9 | M9 | M9-ab | T2, T3 | acceptance `m9/ab.py` (bad update; both exhausted) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |
+| REQ-BOOT-006 | M9 | M9 | M9-ab | T3 | acceptance `m9/ab.py` (damaged copies) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |
+| REQ-BOOT-007 | M9 | M9 | M9-update-failure | T2, T4 | acceptance `m9/update.py` (success; refused payload) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |
+| REQ-BOOT-008 | M9 | M9 | M9-update-failure | T4 | acceptance `m9/update.py` (interrupted while writing, after verifying, while saving the selection) | `../decisions/DR-0008-m9-boot-policy-profile.md` | V |

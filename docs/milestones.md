@@ -10,11 +10,13 @@ Where the project stands, what each milestone delivers, and what comes next. Exi
 
 **M4 is done: Renesas's own kernel boots to the same shell, the watchdog resets the board, and QEMU's loader makes the vendor U-Boot's device-tree edit for an SD-card boot** (the edits it does not make are listed). **M5 is done: both kernels read and write ext4 on an SD card, and boot user space from a root file system on it, without an initramfs** ([walkthrough](walkthrough.md#m5-an-sd-card-with-ext4)). An eMMC for boot mode 1 is deferred. **M6 is done: both kernels reach the network through the board's Gigabit Ethernet and PHY, get a DHCP lease, and move data both ways with matching hashes, through link and reset changes** ([walkthrough](walkthrough.md#m6-ethernet)). **M7 is done: the board's own firmware after BL2 (TF-A BL31, OP-TEE without the closed crypto engine, the vendor U-Boot) boots Renesas's kernel from the SD card, Linux calls a trusted application in OP-TEE, and U-Boot and Linux read and write the module's QSPI flash** ([walkthrough](walkthrough.md#m7-the-boards-own-firmware)). That completes the v1.1 target (M4-M7). Requirement statuses and traceability are updated: 36 of 38 requirements verified; the boot-source register waits for the real BL2 (M8), and the TSIP negative test needs a production OP-TEE that cannot be built from public sources ([traceability](spec/traceability.md)). **Tagged `rzv2l-v1.1`**.
 
+**M8 is done: the board's own BL2 starts from the QSPI flash, sets up the DDR against a stub of its controller, and loads BL31, OP-TEE and U-Boot from the flash's firmware package; U-Boot boots Linux from the SD card, with no image staged by QEMU** ([walkthrough](walkthrough.md#m8-the-boards-bl2-from-the-qspi-flash)). **M9 is done: a second U-Boot build boots only FIT images signed with the project's test key, counts each attempt before trying, and falls back to the other slot; Linux commits only the slot it runs from, and an update writes and verifies the other slot before selecting it, and recovers from a stopped QEMU** ([walkthrough](walkthrough.md#m9-signed-fit-images)). The emulator shows these software decisions; it does not prove a hardware root of trust or a card's behaviour on power loss (spec §12). That completes the v2.0 target (M8-M9): 45 of 46 requirements verified ([traceability](spec/traceability.md)). **Release `rzv2l-v2.0`**.
+
 | | Release | Milestones | State |
 |---|---|---|---|
 | 🎯 | **v1.0** | M0-M3: upstream Linux to a shell | ✅ tagged `rzv2l-v1.0` |
 | 🎯 | **v1.1** | M4-M7: Renesas's kernel, storage, networking, the board's firmware after BL2, the QSPI flash | ✅ tagged `rzv2l-v1.1` |
-| 🎯 | v2 | M8-M9: the full boot chain, platform behaviour | 🔄 (M8 and M9 done; release closure next) |
+| 🎯 | **v2.0** | M8-M9: the full boot chain from the QSPI flash, a boot policy (signed FIT images, A/B slots, rollback, updates) | ✅ `rzv2l-v2.0` |
 
 ## Milestones
 
