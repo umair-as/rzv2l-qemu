@@ -10,10 +10,17 @@
 # which checks the copies' places against the M9 build's effective
 # configuration and that p1 starts at or above 0x400000.
 # Each root is the BusyBox root of build-image.sh with the signed FIT
-# (../fw/build-fit-m9.sh) in /boot, its slot name in /etc/m9-slot, the
-# static fw_printenv/fw_setenv of the M9 build, and the health service
-# m9-health with its checks in /etc/m9-health.d/, run last by rcS.
-# Output: ../out/sd/sd-m9.img (prints its partition table).
+# (../fw/build-fit-m9.sh) in /boot, its version in /etc/m9-version, the
+# static fw_printenv/fw_setenv of the M9 build, the health service
+# m9-health with its checks in /etc/m9-health.d/ (run last by rcS) and
+# the update tool m9-update. A root does not know its slot: rcS and
+# m9-health take the slot from the partition / is on, so one image fits
+# either slot.
+# Also built: the update payload m9-payload.img (the same root at
+# version 2, ext4, 40 MiB, with m9-payload.img.sha256) and the update
+# card sd-m9-update.img for the carrier slot (disk identifier 0x525a0004,
+# p1 ext4 "m9-update" holding the payload and its checksum).
+# Output: ../out/sd/sd-m9.img, m9-payload.img(.sha256), sd-m9-update.img.
 # Host tools: sfdisk, mkfs.ext4, fakeroot, python3.
 set -euo pipefail
 umask 022
@@ -45,6 +52,7 @@ echo "rzv2l-smarc M9 SD card (tests/guests/sd/build-image-m9.sh)" \
     > "$work/data/README"
 
 # root SLOT DIR: a slot's root file system
+# root VERSION DIR: a slot root file system
 root() {
     local r="$2"
     mkdir -p "$r"/{bin,sbin,usr/bin,usr/sbin,etc/init.d,dev,proc,sys,tmp,run,mnt,root,var,boot}
@@ -55,12 +63,12 @@ root() {
     done
     echo 0 > "$r/var/boot-count"
     echo sd-m9 > "$r/etc/rzv2l-card"
-    echo "$1" > "$r/etc/m9-slot"
+    echo "$1" > "$r/etc/m9-version"
     cp "$FIT" "$r/boot/fitImage"
     cp "$FWENV" "$r/sbin/fw_printenv"
     ln -s fw_printenv "$r/sbin/fw_setenv"
-    cp "$HERE/m9-health" "$r/sbin/m9-health"
-    chmod 755 "$r/sbin/m9-health"
+    cp "$HERE/m9-health" "$HERE/m9-update" "$r/sbin/"
+    chmod 755 "$r/sbin/m9-health" "$r/sbin/m9-update"
     mkdir -p "$r/etc/m9-health.d"
     printf '#!/bin/sh\n# the root file system is writable\ntouch /var/.m9-rw && rm /var/.m9-rw\n' \
         > "$r/etc/m9-health.d/10-root-rw"
@@ -83,8 +91,13 @@ mount -t tmpfs tmpfs /run
 n=$(( $(cat /var/boot-count) + 1 ))
 echo "$n" > /var/boot-count
 sync
-printf '\n  M9 slot %s, Linux %s, boot %d of this slot\n\n' \
-    "$(cat /etc/m9-slot)" "$(uname -r)" "$n"
+# The slot is the partition / is on: 2 is A, 3 is B
+dev=$(sed -n 's/^DEVNAME=//p' "/sys/dev/block/$(mountpoint -d /)/uevent")
+case "$(cat "/sys/class/block/$dev/partition")" in
+    2) slot=A ;; 3) slot=B ;; *) slot=? ;;
+esac
+printf '\n  M9 slot %s, version %s, Linux %s, boot %d of this root\n\n' \
+    "$slot" "$(cat /etc/m9-version)" "$(uname -r)" "$n"
 /sbin/m9-health
 EOF
     chmod 755 "$r/etc/init.d/rcS"
@@ -99,8 +112,9 @@ echo "SD-ROOT: ready, root /dev/$dev, boot $(cat /var/boot-count)," \
     "partuuid $puuid, card $(cat /etc/rzv2l-card)"
 EOF
 }
-root A "$work/a"
-root B "$work/b"
+root 1 "$work/a"
+root 1 "$work/b"
+root 2 "$work/payload"
 
 rm -f "$OUT/$IMG"
 truncate -s "$SIZE" "$OUT/$IMG"
@@ -122,3 +136,25 @@ dd if="$work/p-b.img" of="$OUT/$IMG" bs=512 seek="$P3_START" conv=notrunc status
 python3 -I "$HERE/uboot-env.py" m9-write "$OUT/$IMG" "$ENV"
 python3 -I "$HERE/uboot-env.py" m9-read "$OUT/$IMG"
 sfdisk -l "$OUT/$IMG"
+
+# The update payload: version 2 of the root, slot-independent, 40 MiB
+# (it fits slot A's 48 MiB and slot B's 60 MiB)
+rm -f "$OUT/m9-payload.img"
+truncate -s $((40 * 1024 * 1024)) "$OUT/m9-payload.img"
+fakeroot sh -c "chown -R 0:0 '$work/payload' &&
+    mknod -m 600 '$work/payload/dev/console' c 5 1 &&
+    mkfs.ext4 -q -F -L m9-root -d '$work/payload' '$OUT/m9-payload.img'"
+(cd "$OUT" && sha256sum m9-payload.img > m9-payload.img.sha256)
+
+# The update card: p1 holds the payload and its checksum
+UPD=sd-m9-update.img
+mkdir "$work/update"
+cp "$OUT/m9-payload.img" "$OUT/m9-payload.img.sha256" "$work/update/"
+rm -f "$OUT/$UPD"
+truncate -s $((64 * 1024 * 1024)) "$OUT/$UPD"
+printf 'label: dos\nlabel-id: 0x525a0004\nstart=8192, type=83\n' |
+    sfdisk -q "$OUT/$UPD"
+truncate -s $(((64 * 1024 * 1024) - 8192 * 512)) "$work/upd.img"
+mkfs.ext4 -q -F -L m9-update -d "$work/update" "$work/upd.img"
+dd if="$work/upd.img" of="$OUT/$UPD" bs=512 seek=8192 conv=notrunc status=none
+cat "$OUT/m9-payload.img.sha256"

@@ -1,0 +1,76 @@
+#!/bin/sh
+# The M9 update tool (docs/decisions/DR-0008 decision 8;
+# docs/units/M9-update-failure/spec.md). Usage: m9-update
+# It writes the update payload from the update card (the carrier-slot
+# card with disk identifier 525a0004: m9-payload.img and
+# m9-payload.img.sha256 on its partition 1) to the slot that is not
+# running, in this order:
+#   1. target = the slot whose partition is not /; stop if it is / or
+#      mounted (the active slot is never written)
+#   2. one fw_setenv: BOOT_<target>_LEFT=0, M9_PENDING and M9_ROLLBACK
+#      cleared: the target cannot boot while it is being written
+#   3. dd the payload to the target partition, conv=fsync
+#   4. read the bytes back and compare their SHA-256 with the checksum
+#      file; on a mismatch stop, the target staying unbootable
+#   5. one fw_setenv: M9_PENDING=<target>, BOOT_<target>_LEFT=3,
+#      BOOT_ORDER="<target> <running>"
+# One "M9-UPDATE:" line before each step. A reboot then boots the target
+# as a pending update; m9-health commits it or it rolls back.
+say() { echo "M9-UPDATE: $*"; }
+die() { say "stopped: $*"; exit 1; }
+
+dev=$(sed -n 's/^DEVNAME=//p' "/sys/dev/block/$(mountpoint -d /)/uevent")
+disk=$(basename "$(readlink -f "/sys/class/block/$dev/..")")
+case "$(cat "/sys/class/block/$dev/partition")" in
+    2) running=A; target=B; tpart=3 ;;
+    3) running=B; target=A; tpart=2 ;;
+    *) die "/ is /dev/$dev, not a slot partition" ;;
+esac
+tdev=/dev/${disk}p$tpart
+[ "$tdev" != "/dev/$dev" ] || die "the target $tdev is /"
+grep -q "^$tdev " /proc/mounts && die "the target $tdev is mounted"
+printf '/dev/%s 0x1F0000 0x20000\n/dev/%s 0x210000 0x20000\n' \
+    "$disk" "$disk" > /tmp/fw_env.config
+setenv() { fw_setenv -c /tmp/fw_env.config -s "$1"; }
+
+# The update card, by its disk identifier
+src=
+for d in /sys/block/mmcblk*; do
+    d=$(basename "$d")
+    [ "$(od -A n -t x4 -j 440 -N 4 "/dev/$d" | tr -d ' ')" = 525a0004 ] &&
+        src=/dev/${d}p1
+done
+[ -n "$src" ] || die "no update card (disk identifier 525a0004)"
+mkdir -p /mnt/update
+mountpoint -q /mnt/update || mount -o ro "$src" /mnt/update ||
+    die "cannot mount $src"
+payload=/mnt/update/m9-payload.img
+[ -f "$payload" ] && [ -f "$payload.sha256" ] ||
+    die "no m9-payload.img and m9-payload.img.sha256 on $src"
+want=$(cut -d' ' -f1 "$payload.sha256")
+size=$(wc -c < "$payload")
+say "slot $running runs from /dev/$dev; updating slot $target ($tdev) from $src, $size bytes"
+
+say "marking slot $target not bootable"
+printf 'BOOT_%s_LEFT 0\nM9_PENDING\nM9_ROLLBACK\n' "$target" > /tmp/m9-mark
+setenv /tmp/m9-mark || die "fw_setenv could not mark slot $target"
+
+say "writing slot $target"
+dd if="$payload" of="$tdev" bs=1M conv=fsync 2>/dev/null ||
+    die "writing $tdev failed"
+sync
+
+say "verifying slot $target"
+echo 3 > /proc/sys/vm/drop_caches
+got=$(head -c "$size" "$tdev" | sha256sum | cut -d' ' -f1)
+[ "$got" = "$want" ] ||
+    die "slot $target holds $got, the payload's checksum is $want; nothing selected"
+say "slot $target verified $got"
+
+say "saving the selection"
+printf 'M9_PENDING %s\nBOOT_%s_LEFT 3\nBOOT_ORDER %s %s\n' \
+    "$target" "$target" "$target" "$running" > /tmp/m9-select
+setenv /tmp/m9-select || die "fw_setenv could not save the selection"
+say "slot $target selected as a pending update; reboot to try it"
+umount /mnt/update
+exit 0
