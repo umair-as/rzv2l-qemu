@@ -1,0 +1,67 @@
+#!/bin/sh
+# The M9 health service (docs/decisions/DR-0008 decision 7), run last by
+# each slot's rcS. It commits only the slot that is running:
+#   1. the slot U-Boot booted: m9_slot, which U-Boot saved before booting
+#   2. / must be that slot's partition (A: 2, B: 3), found through the
+#      root's parent device, and /etc/m9-slot must name the same slot
+#   3. every executable in /etc/m9-health.d/ must succeed
+#   4. then one fw_setenv call: BOOT_<slot>_LEFT=3, M9_GOOD=<slot>;
+#      M9_PENDING cleared if it names this slot (the update is
+#      committed); if it names the other slot and that slot has no
+#      attempt left: M9_ROLLBACK=<other>, M9_PENDING cleared,
+#      BOOT_ORDER="<slot> <other>"
+# If a step fails, it writes nothing and reboots: the slot's attempts run
+# down. Each result is one "M9-HEALTH:" line on the console.
+say() { echo "M9-HEALTH: $*"; }
+fail() {
+    say "slot ${slot:-?}: $*; not committed; rebooting"
+    sync
+    reboot
+    exit 1
+}
+
+dev=$(sed -n 's/^DEVNAME=//p' "/sys/dev/block/$(mountpoint -d /)/uevent")
+disk=$(basename "$(readlink -f "/sys/class/block/$dev/..")")
+part=$(cat "/sys/class/block/$dev/partition")
+# Both environment copies on the whole card, whatever Linux named it
+printf '/dev/%s 0x1F0000 0x20000\n/dev/%s 0x210000 0x20000\n' \
+    "$disk" "$disk" > /tmp/fw_env.config
+get() { fw_printenv -c /tmp/fw_env.config -n "$1" 2>/dev/null; }
+
+slot=$(get m9_slot)
+case "$slot" in
+    A) want=2; other=B ;;
+    B) want=3; other=A ;;
+    *) fail "U-Boot recorded no slot (m9_slot '$slot')" ;;
+esac
+id=$(od -A n -t x4 -j 440 -N 4 "/dev/$disk" | tr -d ' ')
+puuid=$(printf '%s-%02x' "$id" "$part")
+[ "$part" = "$want" ] ||
+    fail "U-Boot booted slot $slot (partition $want), but / is partition $part ($puuid)"
+[ "$(cat /etc/m9-slot)" = "$slot" ] ||
+    fail "/etc/m9-slot names $(cat /etc/m9-slot), U-Boot booted $slot"
+for c in /etc/m9-health.d/*; do
+    [ -x "$c" ] || continue
+    "$c" || fail "health check $(basename "$c") failed"
+done
+
+pending=$(get M9_PENDING)
+rollback=
+{
+    echo "BOOT_${slot}_LEFT 3"
+    echo "M9_GOOD $slot"
+    if [ "$pending" = "$slot" ]; then
+        echo "M9_PENDING"
+    elif [ "$pending" = "$other" ] && [ "$(get "BOOT_${other}_LEFT")" = 0 ]; then
+        rollback=$other
+        echo "M9_ROLLBACK $other"
+        echo "M9_PENDING"
+        echo "BOOT_ORDER $slot $other"
+    fi
+} > /tmp/m9-commit
+fw_setenv -c /tmp/fw_env.config -s /tmp/m9-commit ||
+    fail "fw_setenv could not write the environment"
+say "slot $slot committed, / is $puuid: $(tr '\n' ';' < /tmp/m9-commit)"
+[ "$pending" = "$slot" ] && say "the update of slot $slot is committed"
+[ -n "$rollback" ] && say "rollback: slot $rollback gave up, slot $slot runs"
+exit 0

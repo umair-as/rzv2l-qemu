@@ -16,7 +16,7 @@
 #
 # Needs: build-u-boot.sh run once (the pinned clone), python3 with
 # pycryptodome (U-Boot's tools/key2dtsi.py), openssl, dtc, fdtget.
-# Output: ../out/m9/ (u-boot.bin, mkimage, u-boot.config, the keys, the
+# Output: ../out/m9/ (u-boot.bin, mkimage, fw_printenv, u-boot.config, the keys, the
 # key's .dtsi, build.txt with hashes).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -82,6 +82,14 @@ while read -r line; do
 done < "$B/m9.cfg"
 
 make -s -C "$M9SRC" O="$B" CROSS_COMPILE="$CROSS" -j"$(nproc)"
+# fw_printenv / fw_setenv for the slots' Linux (tools/env): the same
+# source and configuration as U-Boot, so they read and write the two
+# copies as U-Boot does; static, for the BusyBox root
+make -s -C "$M9SRC" O="$B" CROSS_COMPILE="$CROSS" HOSTLDFLAGS=-static \
+    envtools
+file "$B/tools/env/fw_printenv" | grep -q "ARM aarch64.*statically linked" || {
+    echo "build-u-boot-m9.sh: fw_printenv is not a static aarch64 binary" >&2
+    exit 1; }
 
 # The key must be in every control DTB U-Boot can select, and those
 # DTBs must be what u-boot.bin carries
@@ -111,13 +119,14 @@ if usable < len(args) + len(" wdt_overflow=0") + 1:
     sys.exit("build-u-boot-m9.sh: bootargs of %d characters overruns" % len(args))
 EOF
 
-cp "$B/u-boot.bin" "$B/u-boot" "$B/tools/mkimage" "$OUT/"
+cp "$B/u-boot.bin" "$B/u-boot" "$B/tools/mkimage" "$B/tools/env/fw_printenv" \
+    "$OUT/"
 cp "$B/.config" "$OUT/u-boot.config"
 {
     echo "source: $REV + patches/u-boot-m9/ ($(cd "$HERE/patches/u-boot-m9" && ls))"
     echo "make: CROSS_COMPILE=$CROSS $DEFCONFIG + u-boot-m9.cfg; all"
     echo "toolchain: $("${CROSS}gcc" --version | head -1)"
-    (cd "$OUT" && sha256sum u-boot.bin u-boot mkimage u-boot.config \
+    (cd "$OUT" && sha256sum u-boot.bin u-boot mkimage fw_printenv u-boot.config \
         m9-dev.dtsi ./*.dtb keys/m9-dev.crt keys/m9-other.crt)
     (cd "$HERE" && sha256sum u-boot-m9.cfg u-boot-m9.env patches/u-boot-m9/*.patch)
 } > "$OUT/build.txt"
