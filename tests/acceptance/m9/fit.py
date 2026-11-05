@@ -21,8 +21,9 @@ before:
           verified with the profile key (sha256,rsa2048:m9-dev+ OK);
           the kernel starts, all in the first boot (no reset before);
           / is slot A's partition by PARTUUID; after
-          QEMU stops, a valid environment copy on the card holds
-          BOOT_A_LEFT=2
+          QEMU stops, the active environment copy holds the health
+          service's commit (BOOT_A_LEFT=3, M9_GOOD=A) and the copy one
+          flag older the attempt U-Boot saved (BOOT_A_LEFT=2)
   each negative (kernel-changed, dtb-changed, unsigned, other-key,
           kernel-only, fakeroot, kernel-at, and unsigned with verify=n
           stored): three attempts, each saved (2, 1, 0),
@@ -129,8 +130,52 @@ def in_order(s, patterns, start, what, timeout=120):
 
 def env_after(out, img):
     copy = os.path.join(out, "slot0-" + os.path.basename(img))
-    return subprocess.run([sys.executable, "-I", UENV, "m9-read", copy],
+    return env_of(copy)
+
+
+def env_of(card_img):
+    return subprocess.run([sys.executable, "-I", UENV, "m9-read", card_img],
                           capture_output=True, text=True).stdout
+
+
+def parse(text):
+    """m9-read output: [(valid, flag, {name: value})], copy 1 first"""
+    res = []
+    for line in text.splitlines():
+        m = re.match(r"copy \d: (valid|invalid) flag (\d+) ?(.*)$", line)
+        if m:
+            res.append((m.group(1) == "valid", int(m.group(2)),
+                        dict(v.split("=", 1) for v in
+                             re.findall(r"(\w+=(?:A B|B A|\S+))", m.group(3)))))
+    return res
+
+
+def active(cs):
+    """The copy U-Boot uses: the valid one, or of two valid ones the one
+    with the higher flag, where 0 follows 255 (env/common.c
+    env_check_redund); None if neither is valid"""
+    valid = [c for c in cs if c[0]]
+    if len(valid) < 2:
+        return valid[0] if valid else None
+    a, b = valid
+    if {a[1], b[1]} == {0, 255}:
+        return a if a[1] == 0 else b
+    return a if a[1] > b[1] else b
+
+
+def accepted_state(cs, what):
+    """After a healthy boot of slot A: the active copy holds Linux's
+    commit (BOOT_A_LEFT=3, M9_GOOD=A), and the other copy, one flag
+    older, the attempt U-Boot saved before the boot (BOOT_A_LEFT=2)"""
+    act = active(cs)
+    other = [c for c in cs if c is not act]
+    ok = (act is not None and act[2].get("BOOT_A_LEFT") == "3" and
+          act[2].get("M9_GOOD") == "A" and len(other) == 1 and
+          other[0][0] and other[0][2].get("BOOT_A_LEFT") == "2" and
+          (other[0][1] + 1) % 256 == act[1])
+    check(ok, "%s: active copy BOOT_A_LEFT=3, M9_GOOD=A (Linux's commit); "
+          "the copy before it BOOT_A_LEFT=2 (U-Boot's saved attempt) (%s)"
+          % (what, cs))
 
 
 def accepted(out):
@@ -157,10 +202,7 @@ def accepted(out):
                   "accepted: / is slot A, PARTUUID 525a0003-02")
     finally:
         bootloader.stop(proc, log)
-    state = env_after(out, img)
-    check(re.search(r"valid flag 2 .*BOOT_A_LEFT=2 ", state) is not None,
-          "accepted: the card's newer environment copy holds BOOT_A_LEFT=2"
-          " (%s)" % " | ".join(state.splitlines()))
+    accepted_state(parse(env_after(out, img)), "accepted")
 
 
 # Extra stored variables per case: verify=n would turn bootm's checks off

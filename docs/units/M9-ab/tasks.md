@@ -21,6 +21,10 @@ Project branch `unit/M9-ab` from `unit/M9-fit` `2b2d791`. No fork branch: no QEM
 | 5 | slot B's health service expects the swapped partitions (A: 3, B: 2) | `FAIL selection: in order: M9-HEALTH: slot B committed, …`; the service printed `U-Boot booted slot B (partition 2), but / is partition 3` |
 | 6 | slot B's health service reads a command line naming `root=PARTUUID=525a0003-02` | `FAIL selection: in order: M9-HEALTH: slot B committed, …`; the service printed `the kernel's root=PARTUUID=525a0003-02 is not / (525a0003-03); not committed; rebooting` |
 
+| 7 | `fit.py`'s accepted-state check on a card whose two copies both hold `BOOT_A_LEFT=2` (no commit), then on one whose two copies both hold the commit (no saved attempt) | `FAIL accepted: active copy BOOT_A_LEFT=3, M9_GOOD=A (Linux's commit); the copy before it BOOT_A_LEFT=2 (U-Boot's saved attempt)` for each; the accepted run's own card passes |
+
+Proof 7 runs the check on prepared cards, without a boot. The check picks the copy U-Boot would use (the valid one with the higher flag, 0 after 255) before asserting. Before the second review it searched for any copy with `BOOT_A_LEFT=2`, which after Linux's commit matched the older copy.
+
 Proofs 5 and 6 change the service under test on a copy of the card. That is the only way to drive these checks: U-Boot sets the partition and the command line together.
 Each break is made on a copy of the card; the outputs are kept in the working area's proof log.
 

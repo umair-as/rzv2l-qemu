@@ -71,19 +71,12 @@ def unhealthy(img, slot, out):
 
 def copies(out, img):
     """The card's environment copies after the run: [(valid, flag, vars)]"""
-    res = []
-    for line in fit.env_after(out, img).splitlines():
-        m = re.match(r"copy \d: (valid|invalid) flag (\d+) ?(.*)$", line)
-        if m:
-            res.append((m.group(1) == "valid", int(m.group(2)),
-                        dict(v.split("=", 1) for v in
-                             re.findall(r"(\w+=(?:A B|B A|\S+))", m.group(3)))))
-    return res
+    return fit.parse(fit.env_after(out, img))
 
 
 def newest(out, img):
-    valid = [c for c in copies(out, img) if c[0]]
-    return max(valid, key=lambda c: c[1])[2] if valid else {}
+    act = fit.active(copies(out, img))
+    return act[2] if act else {}
 
 
 def left(out, img):
