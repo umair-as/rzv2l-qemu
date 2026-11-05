@@ -1,0 +1,7 @@
+# Lines allowed in the -d unimp,guest_errors,invalid_mem log of the M9
+# runs (fit.py), besides the stub windows of ../../m4 and ../../m5,
+# BL2's lines (../../m8/expected/log-allow.txt) and the chain's
+# (../../m8/expected/log-allow-chain.txt). One extended regex per line,
+# each with the reason it is not a gap, checked at its source.
+#
+# None: the M9 runs logged no line outside those lists.

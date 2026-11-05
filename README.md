@@ -115,6 +115,7 @@ This repository is licensed under the [Apache License 2.0](LICENSE), except:
 
 - `qemu/`, the QEMU fork (a submodule): GPL-2.0-or-later, as QEMU (`qemu/COPYING`, `qemu/LICENSE`).
 - `tests/eval/m2/mutations/*.patch`: changes to QEMU source, GPL-2.0-or-later, as the code they change.
+- `tests/guests/fw/patches/`: changes to U-Boot source (an upstream U-Boot commit, backported), GPL-2.0-or-later, as U-Boot.
 - `tests/guests/g1-tee/optee.dtso`: a device-tree overlay for the Linux kernel's GPL-2.0 device tree, GPL-2.0 (its SPDX header).
 - `bench/static/vendor/`: xterm.js and its fit add-on, MIT ([`LICENSE-xterm`](bench/static/vendor/LICENSE-xterm)).
 

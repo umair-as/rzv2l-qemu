@@ -11,19 +11,32 @@
 #   the rest of the 64 MiB erased (0xFF)
 # Inputs: ../out/fw from build-tf-a.sh, build-optee.sh and build-u-boot.sh;
 # fiptool from the TF-A source tree build-tf-a.sh builds in.
-# Output: ../out/spi/spi.img, fip.bin and build.txt (the commands and the
+# Output: ../out/spi/spi.img, fip.bin and build.txt (with --m9:
+# spi-m9.img, fip-m9.bin, build-m9.txt) (the commands and the
 # SHA-256 of each input and output). The same inputs give the same image.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FW="$HERE/../out/fw"
 OUT="$HERE/../out/spi"
+# --m9: the M9 profile's U-Boot as BL33 (build-u-boot-m9.sh), image
+# spi-m9.img; everything else as the vendor-default image
+BL33="$FW/u-boot.bin"
+IMG=spi.img
+FIP=fip.bin
+LOG=build.txt
+if [ "${1:-}" = --m9 ]; then
+    BL33="$HERE/../out/m9/u-boot.bin"
+    IMG=spi-m9.img
+    FIP=fip-m9.bin
+    LOG=build-m9.txt
+fi
 FIPTOOL="$HERE/../dl/rzg_tf-a/tools/fiptool/fiptool"
 SIZE=$((64 * 1024 * 1024))
 FIP_OFFSET=$((0x20000))
 BL2_MAX=$((0x1D000))
 
 for f in "$FW/bp_spi.bin" "$FW/bl2.bin" "$FW/bl31.bin" "$FW/tee-raw.bin" \
-         "$FW/u-boot.bin" "$FIPTOOL"; do
+         "$BL33" "$FIPTOOL"; do
     [ -e "$f" ] || { echo "build-spi-image.sh: missing $f" >&2; exit 1; }
 done
 bl2_size=$(stat -c %s "$FW/bl2.bin")
@@ -32,28 +45,29 @@ bl2_size=$(stat -c %s "$FW/bl2.bin")
          "copies at most $BL2_MAX" >&2; exit 1; }
 
 mkdir -p "$OUT"
-rm -f "$OUT/fip.bin"
+rm -f "$OUT/$FIP"
 "$FIPTOOL" create --align 16 --soc-fw "$FW/bl31.bin" \
-    --tos-fw "$FW/tee-raw.bin" --nt-fw "$FW/u-boot.bin" "$OUT/fip.bin" \
+    --tos-fw "$FW/tee-raw.bin" --nt-fw "$BL33" "$OUT/$FIP" \
     > /dev/null
-fip_size=$(stat -c %s "$OUT/fip.bin")
+fip_size=$(stat -c %s "$OUT/$FIP")
 [ $((FIP_OFFSET + fip_size)) -le "$SIZE" ] || {
     echo "build-spi-image.sh: fip.bin does not fit" >&2; exit 1; }
 
-img="$OUT/spi.img.tmp"
+img="$OUT/$IMG.tmp"
 head -c "$SIZE" /dev/zero | tr '\000' '\377' > "$img"
 dd if="$FW/bp_spi.bin" of="$img" conv=notrunc status=none
 dd if="$FW/bl2.bin" of="$img" bs=512 seek=1 conv=notrunc status=none
-dd if="$OUT/fip.bin" of="$img" bs=4096 seek=$((FIP_OFFSET / 4096)) \
+dd if="$OUT/$FIP" of="$img" bs=4096 seek=$((FIP_OFFSET / 4096)) \
     conv=notrunc status=none
-mv "$img" "$OUT/spi.img"
+mv "$img" "$OUT/$IMG"
 
 {
     echo "fiptool: create --align 16 --soc-fw bl31.bin --tos-fw tee-raw.bin" \
-         "--nt-fw u-boot.bin fip.bin"
+         "--nt-fw $BL33 $FIP"
     echo "layout: bp_spi.bin @0x0, bl2.bin @0x200, fip.bin @0x20000," \
          "0xFF to $SIZE bytes"
-    (cd "$FW" && sha256sum bp_spi.bin bl2.bin bl31.bin tee-raw.bin u-boot.bin)
-    (cd "$OUT" && sha256sum fip.bin spi.img)
-} > "$OUT/build.txt"
-cat "$OUT/build.txt"
+    (cd "$FW" && sha256sum bp_spi.bin bl2.bin bl31.bin tee-raw.bin)
+    sha256sum "$BL33" | sed 's:  .*/:  :'
+    (cd "$OUT" && sha256sum "$FIP" "$IMG")
+} > "$OUT/$LOG"
+cat "$OUT/$LOG"

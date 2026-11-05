@@ -310,13 +310,33 @@ build/qemu/qemu-system-aarch64 -M rzv2l-smarc,boot-mode=3 -nographic \
 
 The console shows BL2's banner, then `NOTICE:  BL2: RZ/V2L`, `SYS_LSI_MODE: 0x10003`, `SYS_LSI_DEVID: 0x18447447`, `SYS_LSI_PRR: 0x0` and `NOTICE:  BL2: Booting BL31`: the DDR set-up and the FIP read are done. BL31's and OP-TEE's banners follow, then U-Boot, which reads the project's boot configuration from the card and boots the Renesas kernel to the shell, as in M7, but with every firmware image read from the flash: QEMU staged none. Without the card, U-Boot stops at its `=>` prompt. `build/spi-try.log` has no line for the DDR controller (`0x11410000`) or PHY (`0x11400000`). Add `-trace 'renesas_rzv2l_ddr_event'` to see the stub's events in the same log: two initialisations, 40 mode-register writes, 81 training commands and their acknowledgements. Quit with Ctrl-A X. Without `-drive if=mtd`, or with a flash that holds no BL2, QEMU stops at once and says why. Read more: [`units/M8-bl2-staging/spec.md`](units/M8-bl2-staging/spec.md), [`units/M8-ddr-stub/spec.md`](units/M8-ddr-stub/spec.md).
 
+## M9: signed FIT images
+
+M9 runs a boot policy on the same chain: U-Boot boots a slot's kernel only from a FIT image signed with the profile's key, and it counts each attempt on the card ([DR-0008](decisions/DR-0008-m9-boot-policy-profile.md)). It uses a second U-Boot build, the M9 profile; the vendor build stays as it is. Build the profile, its FIT images, its flash image and its card once (the M8 builds come first):
+
+```bash
+tests/guests/fw/build-u-boot-m9.sh       # U-Boot 2024.07-m9; makes the test key once, in tests/guests/out/m9/keys/
+tests/guests/fw/build-fit-m9.sh          # the signed FIT and the seven refused ones; checks each on the host
+tests/guests/fw/build-spi-image.sh --m9  # spi-m9.img: the M9 U-Boot in the FIP
+tests/guests/sd/build-image-m9.sh        # sd-m9.img: slots A and B, both environment copies
+cp tests/guests/out/spi/spi-m9.img build/spi-m9-try.img
+cp tests/guests/out/sd/sd-m9.img build/sd-m9-try.img
+build/qemu/qemu-system-aarch64 -M rzv2l-smarc,boot-mode=3 -nographic \
+    -drive if=mtd,format=raw,file=build/spi-m9-try.img \
+    -drive if=sd,index=0,format=raw,file=build/sd-m9-try.img
+```
+
+After the firmware banners, U-Boot prints `U-Boot 2024.07-m9`, saves the attempt (`Writing to redundant MMC(0)... OK`, then `M9: slot A: attempt saved: BOOT_A_LEFT=2 BOOT_B_LEFT=3`), and checks the FIT: `Verifying Hash Integrity ... sha256,rsa2048:m9-dev+ OK`. Linux then reaches the shell from slot A (`M9 slot A`). Read the counters the card now holds with `python3 tests/guests/sd/uboot-env.py m9-read build/sd-m9-try.img`.
+
+Each boot spends an attempt until Linux commits the slot, which the next unit adds. After three boots of slot A, U-Boot tries slot B. Read more: [`units/M9-fit/spec.md`](units/M9-fit/spec.md).
+
 ## Run every check at once
 
 ```bash
 tests/acceptance/m8/run.sh       # several minutes: it boots both kernels several times
 ```
 
-It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and the QSPI flash under U-Boot and Linux (reads of a random image, a write across a reboot and a QEMU restart): the M7 run, whose report is `tests/acceptance/m8/out/m7.txt`. That report also boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. Then BL2 runs from the QSPI flash to its DDR set-up, and the boot ROM stand-in's errors are checked. Last comes the whole chain from the flash to the Linux shell: through a reboot, with OP-TEE called from Linux, in boot mode 4, and with firmware packages missing BL31 or BL33, where BL2 stops. The run prints `M8 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
+It runs the acceptance checks of M1 to M6 in turn, then the firmware-mode boot, the boot through OP-TEE and U-Boot, Linux calling a trusted application, the root chosen by PARTUUID (kernel from one card, root from the other; a missing PARTUUID stops the boot visibly), and the QSPI flash under U-Boot and Linux (reads of a random image, a write across a reboot and a QEMU restart): the M7 run, whose report is `tests/acceptance/m8/out/m7.txt`. That report also boots the vendor's unchanged U-Boot command twice and prints a separate line, `VENDOR-DEFAULT COMPATIBILITY: PASS` or `FAIL (n of 2 boots lost their root ...)`: that line does not change the acceptance result, and it can fail on the SD name race above. Then BL2 runs from the QSPI flash to its DDR set-up, and the boot ROM stand-in's errors are checked. Last comes the whole chain from the flash to the Linux shell: through a reboot, with OP-TEE called from Linux, in boot mode 4, and with firmware packages missing BL31 or BL33, where BL2 stops. The run prints `M8 ACCEPTANCE: PASS`. `tests/acceptance/m9/run.sh` runs all of that first, then the M9 checks: the signed FIT boots slot A, and eight refused cases each spend slot A's three attempts and end at U-Boot's prompt, without a kernel. It prints `M9 ACCEPTANCE: PASS`. The qtests (register-level tests of each device) run with `cd build/qemu && QTEST_QEMU_BINARY=./qemu-system-aarch64 ./tests/qtest/rzv2l-sdhi-test`, and the same for the other `rzv2l-*-test` files ([`learning/building-and-testing.md`](learning/building-and-testing.md) §3).
 
 
 ## Options of `scripts/run.sh`
