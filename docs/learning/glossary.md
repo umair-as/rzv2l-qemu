@@ -46,6 +46,8 @@ This file explains the terms that the learning docs use, in four groups. Convent
 |---|---|
 | Guest | Software running inside the emulated machine (as opposed to the host, the PC running QEMU). |
 | TF-A, BL2, BL31 | Trusted Firmware-A, the first firmware after the boot ROM. BL2 loads the next stages; BL31 stays resident at EL3 and serves PSCI. |
+| FIP | Firmware Image Package: TF-A's container for the images BL2 loads (BL31, OP-TEE as BL32, U-Boot as BL33). Here at flash offset `0x20000`. |
+| Boot ROM stand-in | QEMU's replacement for the boot ROM's serial-flash load in boot modes 3 and 4: it copies BL2 from the flash to on-chip RAM and starts it at EL3. The ROM code itself is not modelled. |
 | U-Boot | The bootloader that loads Linux. |
 | OP-TEE | The secure-world OS running beside Linux. |
 | PSCI | Power State Coordination Interface: the firmware call Linux uses to power CPUs on and off (here via the `SMC` instruction). |
