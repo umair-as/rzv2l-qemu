@@ -40,6 +40,7 @@ compat.py's.
 Writes OUTDIR/serial.log and qemu.log. Exit 0 only if every check
 passes. QEMU binary: $QEMU.
 """
+import hashlib
 import os
 import shutil
 import subprocess
@@ -120,11 +121,15 @@ def card_copy(out, image, slot, env=None):
     return ["-drive", "if=sd,index=%d,format=raw,file=%s" % (slot, img)]
 
 
-def start(out, env=None, carrier=None):
+def start(out, env=None, carrier=None, flash=None, boot_mode=3):
     """Start QEMU with a fresh copy of IMAGE in the module slot (and of
-    carrier in the carrier slot); return (proc, serial, log)"""
-    for f in (BL31, BL32, BL33, IMAGE, KERNEL) + ((carrier,) if carrier
-                                                   else ()):
+    carrier in the carrier slot); return (proc, serial, log). The
+    firmware: BL31, BL32 and BL33 staged by QEMU (-bios, bl32=, bl33=),
+    or, with flash, a fresh copy of that QSPI flash image in boot mode
+    boot_mode (3 or 4), from which the machine's boot ROM stand-in loads
+    BL2 and BL2 the rest (tests/acceptance/m8/chain.py)"""
+    fw = (flash,) if flash else (BL31, BL32, BL33)
+    for f in fw + (IMAGE, KERNEL) + ((carrier,) if carrier else ()):
         if not os.path.exists(f):
             print("FAIL missing %s (tests/guests/*/build-*.sh)" % f)
             sys.exit(1)
@@ -141,14 +146,33 @@ def start(out, env=None, carrier=None):
     for f in (sock, os.path.join(out, "qemu.log")):
         if os.path.exists(f):
             os.unlink(f)
-    cmd = [os.environ["QEMU"],
-           "-M", "rzv2l-smarc,bl32=%s,bl33=%s" % (BL32, BL33),
-           "-bios", BL31, "-display", "none", "-nodefaults",
+    if flash:
+        img = os.path.join(out, "spi.img")
+        shutil.copyfile(flash, img)
+        firmware_args = ["-M", "rzv2l-smarc,boot-mode=%d" % boot_mode,
+                         "-drive", "if=mtd,format=raw,file=" + img]
+    else:
+        firmware_args = ["-M", "rzv2l-smarc,bl32=%s,bl33=%s" % (BL32, BL33),
+                         "-bios", BL31]
+    cmd = [os.environ["QEMU"]] + firmware_args + [
+           "-display", "none", "-nodefaults",
            "-chardev", "socket,id=scif0,path=%s,server=on,wait=on" % sock,
            "-serial", "chardev:scif0",
            ] + drives + [
            "-d", "unimp,guest_errors,invalid_mem",
            "-D", os.path.join(out, "qemu.log")]
+    # The run's own input, before QEMU writes to it: command and images
+    with open(os.path.join(out, "command.txt"), "w") as f:
+        f.write(" ".join(cmd) + "\n")
+    with open(os.path.join(out, "images.sha256"), "w") as f:
+        for a in cmd:
+            path = a.split("file=")[-1] if "file=" in a else None
+            if path and os.path.isfile(path):
+                h = hashlib.sha256()
+                with open(path, "rb") as g:
+                    for b in iter(lambda: g.read(1 << 20), b""):
+                        h.update(b)
+                f.write("%s  %s\n" % (h.hexdigest(), os.path.basename(path)))
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
     log = open(os.path.join(out, "serial.log"), "w")
