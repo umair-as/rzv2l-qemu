@@ -186,7 +186,7 @@ copy 1: valid flag 3 BOOT_B_LEFT=3 BOOT_ORDER=A B BOOT_A_LEFT=3 M9_GOOD=A
 copy 2: valid flag 4 BOOT_ORDER=A B BOOT_A_LEFT=3 M9_GOOD=A BOOT_B_LEFT=0
 ```
 
-Copy 2, the newer one, says slot B cannot boot. Slot A boots, and the update runs again to completion. Stopped while saving the selection, three runs found the old state twice and the new state once. Each time the next boot followed it: slot A at version 1, or slot B as the pending update.
+Copy 2, the newer one, says slot B cannot boot. Slot A boots, and the update runs again to completion. Stopped while saving the selection, at 0, 0.05, 0.3 and 1.0 s after its line, four runs found the old, old, new and new state. Each time the next boot followed it: slot A at version 1, or slot B as the pending update.
 
 **What this does not show.** QEMU hands each guest write to the host as a write to the image file, and the host finishes it even when the process is killed (an inference about the host, not something these tests check). So a stopped process is not expected to leave a torn write. A real SD card that loses power during a write can tear it. These tests show the order of the steps and the redundant copies working against a stopped process. They make no claim about a card's behaviour on power loss.
 
