@@ -25,11 +25,11 @@ The M9 profile carries it as its one source patch (`tests/guests/fw/patches/u-bo
 
 ## What the guest needs
 
-1. **U-Boot verifies the configuration** (`boot/image-fit-sig.c` `fit_config_verify`, called from `boot/image-fit.c` `fit_image_load` when `CONFIG_FIT_SIGNATURE` is set). It checks every key node that is marked `required = "conf"`. A configuration without a valid signature by that key is refused before any image loads.
-2. **U-Boot checks each image's hash** when it loads the image (`fit_image_verify`), so a changed kernel or DTB fails even under a valid configuration signature.
-3. **The environment** is read from the two copies at `0x1F0000` and `0x210000` (`env/mmc.c` with `CONFIG_SYS_REDUNDAND_ENVIRONMENT`).
+1. **U-Boot verifies the configuration.** `fit_image_load` calls `fit_config_verify` while `images->verify` is set (`boot/image-fit.c:2120-2126`). That function checks every key node marked `required = "conf"` (`boot/image-fit-sig.c:607`, `:684`). A configuration without a valid signature by that key is refused, with `Verifying Hash Integrity ... ` then `Bad Data Hash`, before any image loads.
+2. **U-Boot checks each image's hash** when it loads the image (`fit_image_select`, `boot/image-fit.c:1975`, `:2145`; `fit_image_verify`, `:1423`), so a changed kernel or DTB fails even under a valid configuration signature: `Bad hash value for 'hash-1' hash node in '<image>' image node` (`boot/image-fit.c:1338`, `:1404`).
+3. **The environment** is read from the two copies at `0x1F0000` and `0x210000` (`env/mmc.c:397-439` with `CONFIG_SYS_REDUNDAND_ENVIRONMENT`).
 
-The exact function and line citations are filled in from the source during T2, and the messages are checked against the source, not copied from elsewhere.
+The refusal lines `fit.py` matches are the ones these functions print, as seen in the runs.
 
 ## Exit criterion
 
