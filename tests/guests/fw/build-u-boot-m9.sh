@@ -62,9 +62,15 @@ cp "$OUT/m9-dev.dtsi" "$M9SRC/arch/arm/dts/m9-dev.dtsi"
 
 export SOURCE_DATE_EPOCH="$(git -C "$SRC" log -1 --format=%ct)"
 make -s -C "$M9SRC" O="$B" CROSS_COMPILE="$CROSS" "$DEFCONFIG"
+# The built-in default environment: the M9 policy's variables, but a
+# boot command that stops (both stored copies invalid: no slot state)
+sed 's/^bootcmd=.*/bootcmd=run m9_nostate/' "$HERE/u-boot-m9.env" \
+    > "$B/m9-default.env"
+grep -qx 'bootcmd=run m9_nostate' "$B/m9-default.env" || {
+    echo "build-u-boot-m9.sh: no bootcmd in u-boot-m9.env" >&2; exit 1; }
 {
     cat "$HERE/u-boot-m9.cfg"
-    echo "CONFIG_DEFAULT_ENV_FILE=\"$HERE/u-boot-m9.env\""
+    echo "CONFIG_DEFAULT_ENV_FILE=\"$B/m9-default.env\""
     echo "CONFIG_DEVICE_TREE_INCLUDES=\"m9-dev.dtsi\""
 } > "$B/m9.cfg"
 "$M9SRC/scripts/kconfig/merge_config.sh" -m -O "$B" "$B/.config" \

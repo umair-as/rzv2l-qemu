@@ -23,7 +23,7 @@ This section explains why M9 needs its own U-Boot build. The vendor build checks
 | `CONFIG_SYS_REDUNDAND_ENVIRONMENT`, `CONFIG_ENV_OFFSET_REDUND=0x210000` | two environment copies, so one damaged copy has a defined recovery |
 | `# CONFIG_LEGACY_IMAGE_FORMAT is not set` | `bootm` takes FIT images only |
 | `CONFIG_CMD_PART` | the boot command reads a slot's PARTUUID from the card |
-| `CONFIG_USE_DEFAULT_ENV_FILE` | the built-in default environment is the M9 policy (`u-boot-m9.env`), not the vendor's unsigned boot command |
+| `CONFIG_USE_DEFAULT_ENV_FILE` | the built-in default environment holds the M9 policy's variables (`u-boot-m9.env`), not the vendor's unsigned boot command; its own boot command stops (§5) |
 | `CONFIG_LOCALVERSION="-m9"` | the banner names the build: `U-Boot 2024.07-m9` |
 
 The vendor build stays as it was and keeps running the acceptance of M7 and M8. The spec lists the second build as an exception to its rule that firmware is not changed (spec §8, v0.4).
@@ -137,7 +137,7 @@ What happens when a copy is damaged:
 |---|---|---|
 | copy 1 | `Reading from redundant MMC(0)... OK` | copy 2; the next save rewrites copy 1 |
 | copy 2 | `Reading from MMC(0)... OK`, the same as an intact card | copy 1; the next save rewrites copy 2 |
-| both | `*** Warning - bad CRC, using default environment` | the built-in default: the M9 policy with fresh counters |
+| both | `*** Warning - bad CRC, using default environment`, then `M9: no valid environment copy on the card, so no slot state: not booting` | the built-in default, whose boot command stops at the prompt: with no slot state left, nothing boots until someone restores the environment |
 
 One damaged copy produces no warning: `env_check_redund` picks the valid one and returns success (`env/common.c:447-493`). The test therefore reads the card before the boot to prove that the copy really was damaged.
 
