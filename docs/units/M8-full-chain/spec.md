@@ -1,6 +1,6 @@
 # M8-full-chain — spec
 
-**Milestone:** M8 (the full boot chain, stage C; third unit). **Requirements:** REQ-SYSC-002 (the boot source from `SYS_LSI_MODE`), REQ-GUEST-003 (unmodified firmware), REQ-TEE-001 (Linux reaches OP-TEE), REQ-GUEST-006 (the root by PARTUUID). Statuses change at release closure, not here. **Status:** written; implementation follows.
+**Milestone:** M8 (the full boot chain, stage C; third unit). **Requirements:** REQ-SYSC-002 (the boot source from `SYS_LSI_MODE`), REQ-GUEST-003 (unmodified firmware), REQ-TEE-001 (Linux reaches OP-TEE), REQ-GUEST-006 (the root by PARTUUID). Statuses change at release closure, not here. **Status:** implemented.
 
 One page. Facts carry their source; inferences and assumptions are labelled (I) / (A). Guest sources: TF-A `f59ed5a31` (`P/` = `plat/renesas/rz/common/`), U-Boot `4eebfbaa4e` (`B/` = `board/renesas/rzv2l-dev/`).
 
@@ -52,6 +52,6 @@ New acceptance script `tests/acceptance/m8/chain.py`. It reuses M7's check funct
 
 [`research/bl2.md`](../../research/bl2.md) (BL2 on this path), [`research/sysc.md`](../../research/sysc.md) (`SYS_LSI_MODE`), `../../research/boot-chain-firmware.md`, DR-0006, DR-0007; the device map rows for SYSC, RPC and the DDR; the trial run on fork `176d418966` (`main` `8ac2294`), kept in the working area until the acceptance run replaces it.
 
-## Next blocker
+## Next blocker (fork `176d418966`)
 
-Written at the end.
+None in M8. The chain runs from the boot ROM stand-in to the Linux shell twice in one QEMU, with no model change. The `-d unimp,guest_errors,invalid_mem` log of the chain, boot-mode-4 and OP-TEE runs has only the stub windows of M4 and M5 (USB, I2C, CAN-FD, ADC, the thermal sensor, display and sound: UNIMP, the guest's drivers probe and give up or defer), BL2's listed lines, and the four lines of `log-allow-chain.txt`. Layer verified: the serial console and that log. Next: M9 (A/B selection, bootcount, rollback, FIT signatures).
