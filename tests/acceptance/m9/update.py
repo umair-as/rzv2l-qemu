@@ -18,6 +18,11 @@ before) and on the card's active environment copy after each run:
           after reboot B boots version 2 as the pending update and
           commits it; then M9_GOOD=B, BOOT_ORDER=B A, BOOT_B_LEFT=3, no
           M9_PENDING, no M9_ROLLBACK
+  reverse: from the media the success case left, slot B (version 2)
+          runs the tool, which updates slot A; A then boots version 2
+  media: after both, on the image file: the written slot holds the
+          payload's bytes, and the running slot keeps its version and
+          its signed FIT
   refused payload: one payload byte changed: the tool stops at the
           verification; BOOT_B_LEFT=0, nothing pending; after reboot,
           slot A (version 1) boots
@@ -25,12 +30,14 @@ before) and on the card's active environment copy after each run:
           BOOT_B_LEFT=0 and nothing pending; a new QEMU boots slot A
           (version 1), which commits; after the write interruption the
           tool runs again to completion and B boots version 2
-  interrupted while saving the selection (three runs, stopped 0, 0.05
-          and 0.3 s after the line): the active copy is the whole old
+  interrupted while saving the selection (four runs, stopped 0, 0.05,
+          0.3 and 1.0 s after the line; at 1.0 s the save has finished, so
+          the new state is reached on every run): the active copy is the whole old
           state or the whole new state, the boot follows it, and the run
           prints which (NOTE line)
 Exit 0 only if every check passes. QEMU binary: $QEMU.
 """
+import hashlib
 import os
 import shutil
 import subprocess
@@ -39,6 +46,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import ab  # noqa: E402
 import fit  # noqa: E402
 import bootloader  # noqa: E402
 import firmware  # noqa: E402
@@ -84,6 +92,43 @@ def cards(out, payload=None):
     return card, upd
 
 
+def slot_bytes_sha(img, slot, size):
+    """SHA-256 of the first size bytes of slot's partition in img"""
+    start, _ = ab.PART[slot]
+    with open(img, "rb") as f:
+        f.seek(start * 512)
+        return hashlib.sha256(f.read(size)).hexdigest()
+
+
+def slot_file(img, slot, path, out):
+    """A file from slot's root file system in img (debugfs)"""
+    start, n = ab.PART[slot]
+    part = os.path.join(out, "check-part.img")
+    with open(img, "rb") as f:
+        f.seek(start * 512)
+        open(part, "wb").write(f.read(n * 512))
+    data = subprocess.run(["debugfs", "-R", "cat %s" % path, part],
+                          capture_output=True).stdout
+    os.unlink(part)
+    return data
+
+
+def media(out, img, written, kept, what):
+    """On the image file the stopped QEMU left: the written slot holds the
+    payload's bytes; the kept (running) slot still holds version 1 or 2
+    as before and the signed FIT"""
+    want = open(PAYLOAD + ".sha256").read().split()[0]
+    check(slot_bytes_sha(img, written, os.path.getsize(PAYLOAD)) == want,
+          "%s: on the card, slot %s holds the payload's bytes" % (what, written))
+    fit_sha = hashlib.sha256(open(os.path.join(fit.FITS, "fitImage"),
+                                  "rb").read()).hexdigest()
+    got = hashlib.sha256(slot_file(img, kept, "/boot/fitImage",
+                                   out)).hexdigest()
+    check(got == fit_sha, "%s: on the card, slot %s's FIT is unchanged"
+          % (what, kept))
+    return slot_file(img, kept, "/etc/m9-version", out).decode().strip()
+
+
 def state(out, card):
     act = fit.active(fit.parse(fit.env_after(out, card)))
     return act[2] if act else {}
@@ -100,8 +145,10 @@ def booted(s, pos, slot, version, what, pending=False):
 
 
 def up(s, what):
+    """The shell is up; kernel messages are kept off the console from here
+    on, so that none lands inside a line the test waits for"""
     m = firmware.wait_root(s, 0, what)
-    return m is not None
+    return m is not None and run(s, "dmesg -n 1") is not None
 
 
 def update_ok(s, what):
@@ -116,22 +163,63 @@ def update_ok(s, what):
     return p is not None and "rc=0" in out
 
 
-def success(out):
-    card, upd = cards(out)
-    proc, s, log = start(out, card, upd)
+def update_then_boot(out, card, upd, running, target, version_before,
+                     what):
+    """Run 1: running boots, the tool updates target, QEMU stops right
+    after it; the image file then holds the payload in target and
+    running's version and FIT unchanged. Run 2, a new QEMU on that
+    media: target boots version 2 as the pending update and commits.
+    Returns the card run 2 left."""
+    o1, o2 = os.path.join(out, "1"), os.path.join(out, "2")
+    proc, s, log = start(o1, card, upd)
     try:
-        if up(s, "success") and update_ok(s, "success"):
-            pos = len(s.buf)
-            s.send("reboot")
-            booted(s, pos, "B", 2, "success, reboot", pending=True)
+        ok = booted(s, 0, running, version_before, what) is not None and \
+            up(s, what)
+        if ok:
+            res = run(s, "m9-update; echo rc=$?", WAIT) or ""
+            ok = check(("updating slot %s (" % target) in res and
+                       "rc=0" in res and
+                       ("slot %s selected as a pending update" % target)
+                       in res, "%s: slot %s runs, the tool updates slot %s"
+                       % (what, running, target))
+    finally:
+        bootloader.stop(proc, log)      # stopped right after the tool
+    left1 = left(o1, card)
+    v = media(o1, left1, target, running, what)
+    check(v == str(version_before), "%s: on the card, slot %s still holds "
+          "version %d (%r)" % (what, running, version_before, v))
+    env = state(o1, card)
+    check(env.get("M9_PENDING") == target and
+          env.get("BOOT_%s_LEFT" % target) == "3" and
+          env.get("BOOT_ORDER") == "%s %s" % (target, running),
+          "%s: the stopped card selects slot %s as pending (%s)"
+          % (what, target, env))
+    proc, s, log = start(o2, left1, left(o1, upd))
+    try:
+        booted(s, 0, target, 2, "%s, new QEMU" % what, pending=True)
     finally:
         bootloader.stop(proc, log)
-    env = state(out, card)
+    return o2, left(o2, left1)
+
+
+def success(out):
+    card, upd = cards(out)
+    o2, last = update_then_boot(out, card, upd, "A", "B", 1, "success")
+    acts = fit.active(fit.parse(fit.env_of(last)))
+    env = acts[2] if acts else {}
     check(env.get("M9_GOOD") == "B" and env.get("BOOT_ORDER") == "B A" and
           env.get("BOOT_B_LEFT") == "3" and "M9_PENDING" not in env and
           "M9_ROLLBACK" not in env,
           "success: M9_GOOD=B, BOOT_ORDER=B A, BOOT_B_LEFT=3, nothing "
           "pending (%s)" % env)
+
+
+def reverse(out, before):
+    """From the media success() left (B runs version 2): the tool now
+    targets slot A, and A then boots version 2"""
+    card = os.path.join(before, "2", "slot0-slot0-source-sd-m9.img")
+    upd = os.path.join(before, "1", "slot1-source-sd-m9-update.img")
+    update_then_boot(out, card, upd, "B", "A", 2, "reverse")
 
 
 def refused(out):
@@ -244,6 +332,7 @@ def main():
     only = sys.argv[2:]
     shutil.rmtree(out, ignore_errors=True)
     cases = [("success", lambda o: success(o)),
+             ("reverse", lambda o: reverse(o, os.path.join(out, "success"))),
              ("refused", lambda o: refused(o)),
              ("interrupted-write", lambda o: interrupted_early(
                  o, r"M9-UPDATE: writing slot B",
@@ -252,7 +341,7 @@ def main():
                  o, r"M9-UPDATE: slot B verified",
                  "interrupted after verifying", False))] + \
         [("interrupted-env-%s" % d, lambda o, d=d: interrupted_env(o, d))
-         for d in (0, 0.05, 0.3)]
+         for d in (0, 0.05, 0.3, 1.0)]
     for name, fn in cases:
         if not only or name in only:
             fn(os.path.join(out, name))

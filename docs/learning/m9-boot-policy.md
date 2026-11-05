@@ -7,7 +7,7 @@ Until M8, the project asked one question: does the board's software run on the m
 - **Signatures:** does U-Boot boot only a kernel signed with the right key?
 - **Attempts:** does it count each boot attempt before it tries?
 - **Commit:** does Linux commit only a slot that works?
-- **Interruption:** does an interrupted update leave the board able to boot?
+- **Interruption:** does an update, interrupted by stopping QEMU, leave the board able to boot?
 
 No register model changed for any of this. Every result comes from the board's firmware, a second U-Boot build, and scripts in the slots' Linux. That is what an emulator can show well: software decisions, run many times, with damaged inputs that are hard to make on a real board.
 
@@ -41,7 +41,7 @@ $ fdtget tests/guests/out/m9/smarc-rzv2l-ecc.dtb /signature/key-m9-dev required
 conf
 ```
 
-`required = "conf"` means that U-Boot boots a configuration only if a signature by this key covers it. Without `required`, a FIT with no signature at all would still boot.
+`required = "conf"` means that U-Boot boots a configuration only if a signature by this key covers it. Without `required`, a FIT with no signature at all would still boot (U-Boot's `doc/usage/fit/signature.rst`: "Only required keys are" enforced; not tested here).
 
 The vendor build has two control DTBs, one for a board with ECC memory and one without (`CONFIG_MULTI_DTB_FIT`), and U-Boot picks one at run time. The key must be in both, so the build reads it back from each.
 
@@ -53,13 +53,17 @@ This section shows the two checks U-Boot makes on a FIT, and why both are needed
 
 ```
 $ tests/guests/out/m9/mkimage -l tests/guests/out/m9/fit/fitImage
+ ...
  Image 0 (kernel)
+  ...
   Hash algo:    sha256
   Hash value:   0d41afbb43338e1858c398be15401b888e9fec13588235948ae87dbff23269c6
  Image 1 (fdt)
+  ...
   Hash algo:    sha256
   Hash value:   13b2efb0e59c705ebee24c9711b23b5a49226b031811019a480cef149dc2ba0b
  Configuration 0 (conf)
+  ...
   Kernel:       kernel
   FDT:          fdt
   Sign algo:    sha256,rsa2048:m9-dev
@@ -70,12 +74,17 @@ The configuration's signature does not cover the images' data. It covers their n
 1. The configuration signature, against the required key (`fit_config_verify`, `boot/image-fit.c:2120-2126`).
 2. Each image's data, against its hash (`fit_image_verify`, `:1423`).
 
-A FIT with one kernel byte changed passes step 1 and fails step 2:
+A FIT with one kernel byte changed passes step 1 and fails step 2 (the run's log, lines 43-59, with the image description shortened):
 
 ```
    Verifying Hash Integrity ... sha256,rsa2048:m9-dev+ OK
+   Trying 'kernel' kernel subimage
+     ...
+     Hash value:   0d41afbb43338e1858c398be15401b888e9fec13588235948ae87dbff23269c6
+   Verifying Hash Integrity ... sha256 error!
 Bad hash value for 'hash-1' hash node in 'kernel' image node
 Bad Data Hash
+ERROR -2: can't get kernel image!
 ```
 
 **Which nodes the signature covers.** The signer writes the list into the signature node, as `hashed-nodes`:
@@ -91,7 +100,7 @@ The second FIT is signed with the right key, but its signature leaves out the DT
 
 ## 4. Spend the attempt, then try
 
-This section shows the boot command, which is plain U-Boot environment script. For the first slot in `BOOT_ORDER` with an attempt left, U-Boot lowers the counter and saves it before it loads anything:
+This section shows the boot command, which is plain U-Boot environment script. For the first slot in `BOOT_ORDER` with an attempt left, U-Boot lowers the counter and saves it before it loads anything (a trial boot of the M9 card):
 
 ```
 Saving Environment to MMC... Writing to redundant MMC(0)... OK
@@ -106,7 +115,7 @@ The order of the first two lines is the point. A boot that crashes or hangs has 
 
 Two details matter:
 - **Counters are hexadecimal.** U-Boot's `setexpr` and `itest` count in hexadecimal. The counters stay below 10, so the difference never shows.
-- **The `verify` variable.** `bootm` checks signatures only while the variable `verify` is not `n` (`boot/bootm.c:262`). The boot command sets `verify` to `yes` itself, after it saves, so a stored `verify=n` does not turn the checks off on this path.
+- **The `verify` variable.** `bootm` checks signatures only while the variable `verify` is unset or starts with `1`, `y` or `t` (`boot/bootm.c:262`, `env_get_yesno` in `env/common.c:334-342`). Any other stored value, `n` or `no` or `0`, turns the checks off. The boot command sets `verify` to `yes` itself, after it saves, so no stored value turns them off on this path.
 
 A person at U-Boot's prompt can still type `booti` and boot anything. Spec §12 does not claim more than the automatic path.
 
@@ -130,7 +139,7 @@ What happens when a copy is damaged:
 | copy 2 | `Reading from MMC(0)... OK`, the same as an intact card | copy 1; the next save rewrites copy 2 |
 | both | `*** Warning - bad CRC, using default environment` | the built-in default: the M9 policy with fresh counters |
 
-One damaged copy produces no warning (`env/common.c:494-519`). The test therefore reads the card before the boot to prove that the copy really was damaged.
+One damaged copy produces no warning: `env_check_redund` picks the valid one and returns success (`env/common.c:447-493`). The test therefore reads the card before the boot to prove that the copy really was damaged.
 
 ## 6. Linux commits the slot it runs from
 
@@ -149,7 +158,7 @@ M9-HEALTH: slot A committed, / is 525a0003-02: BOOT_A_LEFT 3;M9_GOOD A;M9_ROLLBA
 M9-HEALTH: rollback: slot B gave up, slot A runs
 ```
 
-`fw_printenv` keeps a lock file in `/run`. The BusyBox root had no `/run`, so until the slots mounted a tmpfs there, every read failed with `Error opening lock file /run/fw_printenv.lock`.
+`fw_printenv` keeps a lock file in `/run`. The BusyBox root had no `/run`, so until the slots mounted a tmpfs there, every read failed with `Error opening lock file /run/fw_printenv.lock` (seen in a diagnostic boot during M9-ab).
 
 ## 7. Updating a slot, and stopping in the middle
 
@@ -167,7 +176,7 @@ M9-UPDATE: slot B selected as a pending update; reboot to try it
 
 After `reboot`, slot B prints `M9 slot B, version 2`, and the health service commits it: `M9-HEALTH: the update of slot B is committed`. The order of the steps is what makes a stop safe:
 - **Before writing,** the target is made unbootable, so a half-written slot is never tried.
-- **Before selecting,** the bytes are read back from the partition and checked. A payload with one byte changed stops there: `stopped: slot B holds 91dcf380…, the payload's checksum is 1b8cd21a…; nothing selected`.
+- **Before selecting,** the tool drops Linux's page cache and reads the bytes back from the partition, then checks them. The test also checks the image file on the host after the run: the written slot holds the payload's bytes, and the running slot keeps its version and its signed FIT. A payload with one byte changed stops there: `stopped: slot B holds 91dcf380…, the payload's checksum is 1b8cd21a…; nothing selected`.
 - **The selection is one `fw_setenv` call.** It writes the copy that is not in use, then that copy's higher flag makes it the one U-Boot reads.
 
 **Stopping in the middle.** The test stops the QEMU process at a console line, then starts a new QEMU on the same image files, as the stopped one left them. Stopped while writing slot B, the card holds:
@@ -190,6 +199,7 @@ Copy 2, the newer one, says slot B cannot boot. Slot A boots, and the update run
 - **A damaged copy can be silent.** U-Boot reads around one bad environment copy without a word. Prove the damage before the boot, or the test passes on an intact card.
 - **Assert the copy U-Boot will use.** After two saves, the older copy still holds the older state. A check that searches any copy can match the wrong one; pick the valid copy with the higher flag (0 follows 255).
 - **Ordered lines can match across resets.** A boot that resets and tries again prints the same lines again. A check for "accepted" must also check that it all happened in one boot.
+- **A damaged copy that U-Boot reads around is still damaged.** Only the next save repairs it, so read the card before trusting either copy.
 - **A stopped process is not a power cut.** Killing QEMU loses what the guest had not yet written; what QEMU had already handed to the host is expected to land whole (an inference). A card can tear a write on power loss. Say which one a test shows.
 - **Mark a slot unbootable before you write it.** Otherwise a stop during the write leaves a half-written slot that U-Boot may try once the other slot runs out of attempts.
 - **Two build systems can disagree about an include path.** `CONFIG_DEVICE_TREE_INCLUDES` must name a file beside the board's `.dts` files: U-Boot's make rules put that directory in front of the path (`dtsi_include_list_deps` in U-Boot's `Makefile.lib`).

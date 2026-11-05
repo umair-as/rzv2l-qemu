@@ -61,7 +61,8 @@ dd if="$payload" of="$tdev" bs=1M conv=fsync 2>/dev/null ||
 sync
 
 say "verifying slot $target"
-echo 3 > /proc/sys/vm/drop_caches
+# Drop Linux's caches, so the read-back comes from the card, not memory
+echo 3 > /proc/sys/vm/drop_caches || die "cannot drop the page cache"
 got=$(head -c "$size" "$tdev" | sha256sum | cut -d' ' -f1)
 [ "$got" = "$want" ] ||
     die "slot $target holds $got, the payload's checksum is $want; nothing selected"

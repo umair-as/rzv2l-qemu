@@ -14,7 +14,7 @@ One page. Facts carry their source; inferences and assumptions are labelled (I) 
   1. **Protect the active slot.** The target is the slot whose partition is not `/`. The tool stops if the target partition is `/` or is mounted.
   2. **Mark the target not bootable** before writing to it: one `fw_setenv` call sets `BOOT_<target>_LEFT=0` and clears `M9_PENDING` and `M9_ROLLBACK`. M9-ab left `M9_ROLLBACK` for the next update to clear.
   3. **Write** the payload to the target partition (`dd`, `conv=fsync`).
-  4. **Verify** the bytes read back from the partition against the payload's SHA-256 file. If they differ, the tool stops: the target stays not bootable, and nothing is selected.
+  4. **Verify** the bytes read back from the partition, after dropping Linux's page cache, against the payload's SHA-256 file. If they differ, the tool stops: the target stays not bootable, and nothing is selected.
   5. **Select** in one `fw_setenv` call: `M9_PENDING=<target>`, `BOOT_<target>_LEFT=3`, `BOOT_ORDER=<target> <running>`.
 
   It prints one `M9-UPDATE:` line before each step. A reboot then boots the target as a pending update, and M9-ab's health service commits it or lets it roll back.
@@ -41,13 +41,14 @@ New acceptance script `tests/acceptance/m9/update.py`, on the chain from the QSP
    - Slot A (version 1) runs the tool, which writes, verifies and selects slot B.
    - After `reboot`, U-Boot boots B as a pending update. Linux runs version 2 from partition 3, and the health service commits the update.
    - Afterwards, the active environment copy holds `M9_GOOD=B`, `BOOT_ORDER=B A`, `BOOT_B_LEFT=3`, and neither `M9_PENDING` nor `M9_ROLLBACK`.
+   Then, from the media that run left, slot B (version 2) runs the tool, which updates slot A, and A boots version 2. Each time, QEMU is stopped right after the tool, before the updated slot ever boots. On the host, the image file must then show the written slot holding the payload's bytes, the running slot keeping its version and its signed FIT, and the pending selection saved. A new QEMU on that media boots the update. Once a slot has booted, its ext4 file system has changed, so the byte check comes first.
 2. **A refused payload.** The payload has one byte changed, and its checksum file is the original. The tool reports the mismatch and selects nothing: `BOOT_B_LEFT=0`, no `M9_PENDING`. After `reboot`, slot A boots.
 3. **Interrupted during the payload write** (QEMU stopped a moment after `M9-UPDATE: writing slot B`).
    - The stopped card holds `BOOT_B_LEFT=0` and no pending update.
    - A new QEMU on the same media boots A, which commits.
    - The tool then runs again to completion, and B boots version 2: the update can be retried.
 4. **Interrupted after verification, before the selection** (stopped at `M9-UPDATE: slot B verified`). The same outcome as case 3: A boots and nothing is pending.
-5. **Interrupted during the environment write** (stopped at `M9-UPDATE: saving the selection`, three runs with different delays).
+5. **Interrupted during the environment write** (stopped at `M9-UPDATE: saving the selection`, four runs: 0, 0.05, 0.3 and 1.0 s after the line). Which state the short delays find depends on timing. At 1.0 s the save has finished, so every run checks both the old-state and the new-state path.
    - Each time, the active copy is either the whole old state or the whole new state.
    - The boot follows it: A with version 1, or B pending, then committed.
    - Each run's outcome is recorded.
