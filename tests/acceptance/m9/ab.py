@@ -26,10 +26,11 @@ card's environment copies after QEMU stops:
           BOOT_ORDER=A B, M9_PENDING gone)
   both exhausted: both slots unhealthy: three attempts each, then the
           U-Boot prompt with every counter at 0
-  damaged copies: copy 1, copy 2, then both, damaged before the boot:
-          U-Boot reads the other copy (or warns and uses its default
-          environment, the M9 policy), boots A from the signed FIT, and
-          both copies are valid afterwards
+  damaged copies: copy 1, then copy 2, damaged before the boot: U-Boot
+          reads the other copy, boots A from the signed FIT, and both
+          copies are valid afterwards; both damaged: U-Boot warns, prints
+          that it has no slot state and stops at its prompt, with no
+          attempt saved, no kernel, and both copies still invalid
 Exit 0 only if every check passes. QEMU binary: $QEMU.
 """
 import os
@@ -217,6 +218,22 @@ def damaged(out, which):
                   r"\.\.\. OK",
              "1+2": r"\*\*\* Warning - bad CRC, using default environment"}
     proc, s, log = fit.start(out, img)
+    if which == "1+2":
+        # No valid copy, so no slot state: U-Boot warns, says why and
+        # stops at its prompt; it boots nothing and saves nothing
+        try:
+            fit.in_order(s, [first[which],
+                             r"M9: no valid environment copy on the card, so "
+                             r"no slot state: not booting", r"=> "], 0, what)
+            check("attempt saved" not in s.buf and
+                  "Starting kernel" not in s.buf,
+                  "%s: no attempt saved, no kernel" % what)
+        finally:
+            bootloader.stop(proc, log)
+        state = copies(out, img)
+        check(len(state) == 2 and not any(c[0] for c in state),
+              "%s: both copies still invalid afterwards (%s)" % (what, state))
+        return
     try:
         pos = fit.in_order(s, [first[which],
                                r"M9: slot A: attempt saved: BOOT_A_LEFT=2 "

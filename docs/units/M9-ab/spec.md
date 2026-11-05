@@ -20,7 +20,7 @@ One page. Facts carry their source; inferences and assumptions are labelled (I) 
 - **Pending state in the tests.** M9-update-failure adds the Linux updater. Here, the test harness sets a pending update directly in both copies before QEMU starts (`uboot-env.py m9-write`): `M9_PENDING=B`, `BOOT_ORDER=B A`, `BOOT_B_LEFT=3`. That is the state the updater will write (DR-0008 decision 8). A "bad" slot is slot B with one more health check that fails (`/etc/m9-health.d/90-fail`), written into a copy of the card with `debugfs`.
 - **Damaged copies.** U-Boot uses the valid copy with the higher flag. If one copy's CRC fails, it uses the other one and prints no warning (`env_check_redund`, `env/common.c:447-493`; `env_import_redund`, `:494-519`). It names the second copy only in `Reading from redundant MMC(0)` (`env/mmc.c:439`). If both fail, it prints `*** Warning - bad CRC, using default environment` (`env/common.c:376-377`, `:508`) and uses its built-in default: the M9 policy. The next `saveenv` writes the copy that is not in use, which repairs a single bad copy (`env/mmc.c:277-302`; the damaged-copy cases show both copies valid afterwards).
 - **Recorded consequences (DR-0008 decision 9):**
-  - If both copies are lost, the default environment holds `BOOT_ORDER=A B` with fresh counters and no `M9_PENDING` or `M9_GOOD`. Slot A then runs and commits itself, even if B was the committed slot. U-Boot's warning is the only sign.
+  - If both copies are lost, U-Boot warns, prints that it has no slot state and stops at its prompt. It boots no slot and saves nothing (operator's decision after the v2.0 release; before it, slot A booted from fresh counters).
   - `M9_ROLLBACK` stays set until the next update. The update tool clears it (M9-update-failure).
 - **Not in this unit:** the update tool and interruptions (M9-update-failure), dm-verity, anti-rollback.
 
@@ -39,7 +39,7 @@ New acceptance script `tests/acceptance/m9/ab.py`, on the chain from the QSPI fl
 5. **Damaged copies:**
    - copy 1 damaged: U-Boot reads the other one (`Reading from redundant MMC(0)`) and boots A, and both copies are valid afterwards;
    - copy 2 damaged: U-Boot boots A, and both copies are valid afterwards;
-   - both damaged: U-Boot prints the bad-CRC warning, runs the M9 policy from its default environment and boots A from the signed FIT. The vendor's unsigned boot command never runs. U-Boot's save repairs one copy, and Linux's commit repairs the other.
+   - both damaged: U-Boot prints the bad-CRC warning, then `M9: no valid environment copy on the card, so no slot state: not booting`, and stops at its prompt. No attempt is saved, no kernel starts, and both copies stay invalid. The vendor's unsigned boot command never runs.
 
    In each case the test first reads the card and asserts that exactly the damaged copies are invalid. U-Boot prints the same lines for a damaged copy 2 as for an undamaged card, so only that pre-boot check shows the case is real.
 6. M9-fit's checks and M8's acceptance run unchanged. Each run directory keeps the hashes and records as in M9-fit.

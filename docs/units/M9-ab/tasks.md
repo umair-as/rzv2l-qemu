@@ -25,6 +25,8 @@ Project branch `unit/M9-ab` from `unit/M9-fit` `2b2d791`. No fork branch: no QEM
 
 Proof 7 runs the check on prepared cards, without a boot. The check picks the copy U-Boot would use (the valid one with the higher flag, 0 after 255) before asserting. Before the second review it searched for any copy with `BOOT_A_LEFT=2`, which after Linux's commit matched the older copy.
 
+| 8 | the both-damaged case on a U-Boot whose built-in default boot command still runs the policy (the behaviour before the operator's decision) | `FAIL damaged copy 1+2: in order: M9: no valid environment copy on the card, so no slot state: not booting`; `FAIL … no attempt saved, no kernel` (slot A booted from fresh counters) |
+
 Proofs 5 and 6 change the service under test on a copy of the card. That is the only way to drive these checks: U-Boot sets the partition and the command line together.
 Each break is made on a copy of the card; the outputs are kept in the working area's proof log.
 
