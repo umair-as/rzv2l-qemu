@@ -48,4 +48,4 @@ Requirement → unit → tasks → tests → evidence (spec §15). `requirements
 | REQ-TEST-002 | M1+ | every unit | every unit | M1-T01–T07; each unit's proofs | a qtest per device model with recorded mutations (each unit's `tasks.md`); the three M1 checks without one got theirs at the v1.1 closure (`../units/M1-machine-skeleton/tasks.md`) | spec §13 | V |
 | REQ-TEST-003 | M3+ | M3+ | M1-machine-skeleton; M3b-shell; M4-vendor-kernel | M1-T06; M3b-shell T2; M4-vendor-kernel T5 | acceptance log gates (`-d unimp,guest_errors,invalid_mem`): only recorded stub windows, an empty log fails | spec §13 | V |
 | REQ-BOOT-001 | M9 | M9 | M9-fit | T1-T5 | acceptance `m9/fit.py` (accepted case) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
-| REQ-BOOT-002 | M9 | M9 | M9-fit | T3, T5 | acceptance `m9/fit.py` (four rejections, counter to 0) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
+| REQ-BOOT-002 | M9 | M9 | M9-fit | T3, T5 | acceptance `m9/fit.py` (six refused FIT images, counter to 0) | `../decisions/DR-0008-m9-boot-policy-profile.md` | P |
