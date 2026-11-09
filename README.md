@@ -1,6 +1,6 @@
 # 🖥️ qemu-rzv2l
 
-**A QEMU machine model of the Renesas RZ/V2L SMARC EVK, built to run the board's real software, unmodified.**
+**A QEMU machine model of the Renesas RZ/V2L SMARC EVK, built to run the board's real software.**
 
 ![Target](https://img.shields.io/badge/target-RZ%2FV2L%20SMARC%20EVK-0a5ad4)
 ![SoC](https://img.shields.io/badge/SoC-R9A07G054L2-6f42c1)
@@ -13,11 +13,13 @@
 
 ## ✨ What this is
 
-The RZ/V2L is a Renesas SoC with two Arm Cortex-A55 cores, a GIC-600 interrupt controller and 2 GB of DDR4 on its evaluation kit. This project adds a machine for it to QEMU, so that software built for the physical board boots in emulation **without changes to that software**:
+The RZ/V2L is a Renesas SoC with two Arm Cortex-A55 cores, a GIC-600 interrupt controller and 2 GB of DDR4 on its evaluation kit. This project adds a machine for it to QEMU, so that software built for the physical board boots in emulation:
 
 - 🐧 **mainline Linux** with the upstream device tree
 - 📦 **the Renesas vendor BSP** kernel and userspace
-- 🔐 later, **the vendor firmware chain**: Trusted Firmware-A, OP-TEE and U-Boot
+- 🔐 **the vendor firmware chain**: Trusted Firmware-A, OP-TEE and U-Boot, from the module's QSPI flash
+
+The goal is to run that software **without changes**, and every exception is recorded. OP-TEE is rebuilt without TSIP, a closed crypto engine the model does not emulate. DDR training is a stub: each training pass completes at once. The machine stands in for the boot ROM's copy of BL2. The kernel used with OP-TEE is the vendor source with extra build options, and the M9 boot-policy runs use a separate U-Boot build, while the vendor-default build stays as the regression profile. The full list is in [known fidelity gaps](docs/device-map.md#4-known-fidelity-gaps-req-guest-004-list-and-model-limits).
 
 The point is not a machine that merely boots. It is a machine whose devices behave the way the silicon does, so the emulator can be trusted for development, CI and debugging when the board is not at hand.
 
@@ -26,7 +28,7 @@ The point is not a machine that merely boots. It is a machine whose devices beha
 | | Principle | In practice |
 |---|---|---|
 | 🔎 | **Evidence before implementation** | Every device behaviour traces to the hardware manual, the guest code that depends on it, and measurements on a physical EVK. |
-| 🚫 | **Never modify the guest** | No device-tree edits, driver patches or invented boot arguments. Anything the model cannot satisfy is recorded as a fidelity gap. |
+| 🚫 | **Never modify the guest** | No device-tree edits, driver patches or invented boot arguments. Anything the model cannot satisfy is recorded as a [fidelity gap](docs/device-map.md#4-known-fidelity-gaps-req-guest-004-list-and-model-limits). |
 | ⚖️ | **Never silently wrong** | A device either behaves as the hardware does, or fails in a way the guest can see. |
 | 🧪 | **Booting is not proof** | Device models are verified by tests that assert hardware-manual values (reset values, ID registers), and each test is checked to fail when the model is broken. |
 | 🔁 | **Two start states** | Devices start either at the manual's power-on reset values (firmware boot) or at the state the firmware leaves behind, as measured on the board (direct kernel boot). |
@@ -81,7 +83,7 @@ ninja qemu-system-aarch64
 Rebuilding, running the tests, style checks, tracing and editor setup: [Building and testing by hand](docs/learning/building-and-testing.md).
 
 > [!NOTE]
-> The `rzv2l-smarc` machine boots mainline Linux and Renesas's kernel to a BusyBox shell on the serial console, with an SD card if you give it one. Ethernet, I2C and USB are stubs for now, so their drivers fail at boot; [Milestones](docs/milestones.md) shows what is modelled.
+> The `rzv2l-smarc` machine runs the firmware chain and boots mainline Linux and Renesas's kernel to a shell on the serial console, with SD storage, QSPI flash and Gigabit Ethernet. I2C, USB and the thermal sensor are stubs for now, so their drivers fail at boot; [Milestones](docs/milestones.md) shows what is modelled.
 
 Next: build the guests and run each milestone with the [walkthrough](docs/walkthrough.md).
 
@@ -113,10 +115,12 @@ Agent instructions are in [AGENTS.md](AGENTS.md).
 
 This repository is licensed under the [Apache License 2.0](LICENSE), except:
 
-- `qemu/`, the QEMU fork (a submodule): GPL-2.0-or-later, as QEMU (`qemu/COPYING`, `qemu/LICENSE`).
+- `qemu/`, the QEMU fork (a submodule): GPL version 2 as a whole, with per-file licenses as QEMU specifies (`qemu/COPYING`, `qemu/LICENSE`).
 - `tests/eval/m2/mutations/*.patch`: changes to QEMU source, GPL-2.0-or-later, as the code they change.
 - `tests/guests/fw/patches/`: changes to U-Boot source (an upstream U-Boot commit, backported), GPL-2.0-or-later, as U-Boot.
 - `tests/guests/g1-tee/optee.dtso`: a device-tree overlay for the Linux kernel's GPL-2.0 device tree, GPL-2.0 (its SPDX header).
 - `bench/static/vendor/`: xterm.js and its fit add-on, MIT ([`LICENSE-xterm`](bench/static/vendor/LICENSE-xterm)).
+
+The text of the GPL version 2 is in [`LICENSES/GPL-2.0.txt`](LICENSES/GPL-2.0.txt), so a source archive without the submodule still carries it.
 
 Guest software the scripts fetch or build (Linux, TF-A, OP-TEE, U-Boot, BusyBox) keeps its own licenses and is not part of this repository.

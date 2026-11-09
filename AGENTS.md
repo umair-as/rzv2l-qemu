@@ -109,6 +109,7 @@ tests/guests/       scripts that build or fetch guest artifacts (outputs untrack
 scripts/            repo tooling (lint, build and run helpers)
 bench/              web front end for one QEMU session (stock QEMU interfaces only) and its self-test
 artifacts/rzv2l/    manuals index, manifest and checksums (the manuals are not tracked)
+LICENSES/           GPL-2.0 text for the files the README's License section names
 qemu/               submodule: the QEMU fork
 .agents/            skills shared by Claude Code and Codex
 .claude/            Claude Code agents, hooks and settings (skills: symlink to .agents/skills)
