@@ -122,7 +122,7 @@ The pin controller (PFC) chooses each pin's function. Linux's serial driver appl
 
 `rzv2l-pfc-irqc-test.c` checks reset and post-firmware values, the PWPR gate, port masks, PIN and the IRQC registers. The hello probe checks that an unlisted IRQC offset faults. Thirteen mutations each turn one check red ([tasks](../units/M3b-pfc-irqc/tasks.md#proofs-each-mutation-the-exact-change--the-red-line)).
 
-With the console working, Linux probes Ethernet, I2C, USB and SD next. Each is a logged stub for now and fails within a bound. The boot then ends at "No working init found", because there is no root file system: that is the next unit.
+With the console working, Linux probes Ethernet, I2C, USB and SD next. At this milestone each is a logged stub and fails within a bound. The boot then ends at "No working init found", because there is no root file system: that is the next unit.
 
 ## 4. The shell (unit M3b-shell)
 

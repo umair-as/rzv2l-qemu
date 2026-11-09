@@ -310,7 +310,7 @@ scripts/run.sh --help           # all options; QEMU arguments go after --
 - After about 20 s the shell prompt `rzv2l:~#` comes, after a banner with the machine, the CPUs, the memory and the watchdog.
 - Ctrl-A X stops QEMU. Ctrl-A C switches between the console and the QEMU monitor.
 - `build/run/<tier>/qemu.log` gets one line for each access that the model does not implement. Set the mask with `-d` (`-d none` turns the log off).
-- The SD hosts are stubs until M5. Thus the kernel prints `timeout waiting for hardware interrupt` for `mmc0` and `mmc1` while you work. These lines are expected.
+- Without `--sd` the SD slots are empty, so the kernel finds no card.
 - `-g` stops QEMU before the first instruction and waits for gdb on port 1234.
 
 Checks to try at the prompt:

@@ -269,7 +269,7 @@ A successful boot is evidence that a software path works. It is **not** evidence
 | `spec.md` | one page: the REQ IDs, scope, what the guest needs, the exit criterion, the evidence it rests on |
 | `tasks.md` | a short table of tasks and the tests that prove them, and one proof line per test (the mutation → the red line) |
 
-`traceability.md` links every REQ to its unit, tests and evidence; it and the requirement statuses are updated once at v1.0. M1 and M2 also have a `design.md`, written under the earlier three-file form (§22).
+`traceability.md` links every REQ to its unit, tests and evidence; it and the requirement statuses are updated once per release. M1 and M2 also have a `design.md`, written under the earlier three-file form (§22).
 
 **Fidelity bugs** use `../units/templates/fidelity-bug.md`: observed behaviour, expected behaviour (with evidence), unchanged behaviour (what must not regress), and the layer verified.
 

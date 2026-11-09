@@ -36,6 +36,8 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | OSTM | OS Timer, three channels at `0x12801000` + n × `0x400`; the manual calls it GTM. Linux uses OSTM1 as a clock source and `sched_clock`. |
 | GTM | The manual's name for OSTM, also the name of its CPG clock and reset registers (CLK_ON_GTM, RST_GTM). |
 | SCIF / SCIFA | Serial ports, SCIF0-4 at `0x1004B800` + n × `0x400`; SCIF0 is the board console. |
+| QSPI | Quad SPI, a serial flash interface. The SMARC module's MT25QU512A flash holds the firmware and is reached through the SPI Multi I/O Bus Controller. |
+| TSIP | Renesas's closed crypto engine at `0x11850000`. It is not emulated: the acceptance OP-TEE is built without it (`CFG_RZ_SCE=n`). |
 | TSU | Thermal Sensor Unit at `0x10059400`; read-as-zero stub here, so Linux's probe fails with "Failed to start TSU". |
 | EVK row ID (R10, X01 …) | A numbered register read in [`EVK-2026-10-29-post-firmware.md`](../evidence/EVK-2026-10-29-post-firmware.md); R = planned read, X = experimental read. |
 | DIP switch / boot mode | Physical switches on the board that select the boot source; latched into `SYS_LSI_MODE` at power-on. |
@@ -47,6 +49,9 @@ This file explains the terms that the learning docs use, in four groups. Convent
 | Guest | Software running inside the emulated machine (as opposed to the host, the PC running QEMU). |
 | TF-A, BL2, BL31 | Trusted Firmware-A, the first firmware after the boot ROM. BL2 loads the next stages; BL31 stays resident at EL3 and serves PSCI. |
 | FIP | Firmware Image Package: TF-A's container for the images BL2 loads (BL31, OP-TEE as BL32, U-Boot as BL33). Here at flash offset `0x20000`. |
+| FIT | Flattened Image Tree: U-Boot's container for a kernel, a device tree and their hashes and signatures. M9 boots only FIT images signed with the project's test key. |
+| A/B slots | Two copies of the system on the card, slot A and slot B. An update writes the slot that is not running; if the new slot fails its health checks, the board returns to the other one. |
+| Boot attempts (bootcount) | The tries a slot has left, saved before each try (`BOOT_A_LEFT`). When a slot has none left, U-Boot tries the other slot. |
 | Boot ROM stand-in | QEMU's replacement for the boot ROM's serial-flash load in boot modes 3 and 4: it copies BL2 from the flash to on-chip RAM and starts it at EL3. The ROM code itself is not modelled. |
 | U-Boot | The bootloader that loads Linux. |
 | OP-TEE | The secure-world OS running beside Linux. |
